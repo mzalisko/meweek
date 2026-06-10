@@ -1,0 +1,18 @@
+# Obsidian — локальний стан, не для синхронізації
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+
+# Секрети
+.env
+.env.*
+*.key
+*.pem
+
+# Системне
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Локальні налаштування агентів (особисті)
+.claude/settings.local.json
