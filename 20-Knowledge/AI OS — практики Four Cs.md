@@ -1,6 +1,6 @@
 ---
 tags: [знання, агенти, методологія]
-джерело: скріншоти у 40-Ресурси/Вкладення + Anthropic engineering blog
+джерело: скріншоти у 40-Resources/Attachments + Anthropic engineering blog
 ---
 
 # AI OS — практики Four Cs
@@ -12,7 +12,7 @@ tags: [знання, агенти, методологія]
 | C | Що це | У нас |
 |---|---|---|
 | 1. Context | Хто ти, правила, нотатки («другий мозок») | Сховище Obsidian, `AGENTS.md`, розділи 00–90 |
-| 2. Connections | Твої реальні дані | Конектори: GitHub, Gmail, Notion… ([[30-Агенти/Конектори і навички]]) |
+| 2. Connections | Твої реальні дані | Конектори: GitHub, Gmail, Notion… ([[30-Agents/Конектори і навички]]) |
 | 3. Capabilities | Навички + агенти | `.claude/skills/` (new-project, save-context, weekly-review) |
 | 4. Cadence | Працює саме, ритм | Заплановані задачі, weekly-review |
 
