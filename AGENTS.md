@@ -47,4 +47,5 @@
 
 ## Команди середовища
 
-- `/fitness Микола`, `/fitness Марта`, `/fitness Микола smoke` — працювати за `10-Projects/Fitness/Fitness — Команди.md`. Для Claude є slash-команда `.claude/commands/fitness.md`; інші агенти виконують той самий текст як інструкцію.
+- Fitness у Codex/Gemini: `fitness Микола`, `fitness Марта`, `fitness Микола smoke` — працювати за `10-Projects/Fitness/Fitness — Команди.md`.
+- Fitness у Claude: `/fitness Микола`, `/fitness Марта`, `/fitness Микола smoke` через `.claude/commands/fitness.md`.
