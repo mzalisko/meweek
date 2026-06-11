@@ -1,0 +1,34 @@
+services:
+  core:
+    build: ./docker/core
+    volumes:
+      - ./core:/app
+    ports:
+      - "8001:8000"
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: dbmanager_core
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+    depends_on:
+      - mysql
+      - redis
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: dbmanager_core
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "33061:3306"
+
+  redis:
+    image: redis:7-alpine
+
+volumes:
+  mysql-data:
