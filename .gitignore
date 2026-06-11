@@ -16,3 +16,6 @@ desktop.ini
 
 # Локальні налаштування агентів (особисті)
 .claude/settings.local.json
+
+# Візуальний компаньйон brainstorming (тимчасові макети)
+.superpowers/

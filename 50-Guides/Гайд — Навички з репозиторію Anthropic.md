@@ -42,4 +42,8 @@ cp -r /tmp/anthropic-skills/skills/<назва> C:\Dev\Meweek\.claude\skills\<н
 
 `new-project`, `save-context`, `weekly-review` — у `.claude/skills/`. Опис: [[30-Agents/Конектори і навички]].
 
-## Правила якості (з практик
+## Правила якості (з практик Anthropic)
+
+1. SKILL.md короткий (< 300 рядків), деталі — в окремих файлах поруч (progressive disclosure).
+2. Description «пушна»: що робить + конкретні фрази-тригери.
+3. Правило + чому, а не КАПС.
