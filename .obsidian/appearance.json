@@ -1,1 +1,5 @@
-{}
+{
+  "enabledCssSnippets": [
+    "meweek-hide-service-folders"
+  ]
+}
