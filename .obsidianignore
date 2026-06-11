@@ -1,5 +1,10 @@
 **/.git/**
 **/.obsidian/cache/**
+**/.claude/**
+**/.codex/**
+**/.gemini/**
+**/.superpowers/**
+**/code/**
 **/vendor/**
 **/node_modules/**
 **/.venv/**
