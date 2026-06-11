@@ -1,0 +1,12 @@
+**/.git/**
+**/.obsidian/cache/**
+**/vendor/**
+**/node_modules/**
+**/.venv/**
+**/venv/**
+**/dist/**
+**/build/**
+**/.next/**
+**/coverage/**
+**/storage/**
+**/bootstrap/cache/**
