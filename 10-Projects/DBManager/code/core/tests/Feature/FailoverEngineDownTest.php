@@ -101,4 +101,37 @@ class FailoverEngineDownTest extends TestCase
         $this->assertSame($entries[0]->phoneNumber->e164, $resolved->number);
         $this->assertFalse($affected->pluck('id')->contains($slot->id));
     }
+
+    public function test_show_last_exhaustion_still_creates_critical_incident_and_marks_affected(): void
+    {
+        [$slot, $entries] = $this->slotWithNumbers(['active'], ['exhaustion_policy' => 'show_last']);
+
+        $affected = app(FailoverEngine::class)->markNumberDown($entries[0]->phoneNumber);
+
+        $resolved = app(SlotResolver::class)->resolve($slot->fresh());
+        $this->assertSame('exhausted', $resolved->state);
+        $this->assertTrue($resolved->visible); // показує last_active як політика велить
+        $this->assertTrue($affected->pluck('id')->contains($slot->id));
+        $this->assertSame(
+            1,
+            Incident::where('kind', 'slot_exhausted')->where('severity', 'critical')->count()
+        );
+    }
+
+    public function test_audit_old_state_is_accurate_on_switch(): void
+    {
+        [$slot, $entries] = $this->slotWithNumbers(['active', 'active']);
+
+        app(FailoverEngine::class)->markNumberDown($entries[0]->phoneNumber);
+
+        $log = AuditLog::where('action', 'failover.switch')
+            ->where('subject_type', 'phone_slot')
+            ->where('subject_id', $slot->id)
+            ->orderByDesc('id')
+            ->first();
+
+        $this->assertSame('ok', $log->old['state']);
+        $this->assertSame($entries[0]->phoneNumber->e164, $log->old['number']);
+        $this->assertSame('on_reserve', $log->new['state']);
+    }
 }

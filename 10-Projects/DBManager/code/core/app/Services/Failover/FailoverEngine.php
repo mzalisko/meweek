@@ -21,10 +21,20 @@ class FailoverEngine
             return collect();
         }
 
+        // Знайти уражені слоти й зняти точні знімки ДО зміни статусу номера
+        $slots = PhoneSlot::whereHas('entries', fn ($q) => $q->where('phone_number_id', $number->id))->get();
+        $befores = $slots->mapWithKeys(fn ($s) => [$s->id => $this->resolver->resolve($s)]);
+
         $number->update(['status' => 'down', 'down_since' => now()]);
         $this->audit($source, 'number.down', 'phone_number', $number->id, null, ['e164' => $number->e164]);
 
-        return $this->recomputeSlotsFor($number, $source);
+        return $slots
+            ->filter(function (PhoneSlot $slot) use ($source, $befores) {
+                $slot->unsetRelations();
+
+                return $this->recompute($slot, $source, $befores[$slot->id]);
+            })
+            ->values();
     }
 
     /** @return Collection<int, PhoneSlot> */
@@ -34,10 +44,20 @@ class FailoverEngine
             return collect();
         }
 
+        // Знайти уражені слоти й зняти точні знімки ДО зміни статусу номера
+        $slots = PhoneSlot::whereHas('entries', fn ($q) => $q->where('phone_number_id', $number->id))->get();
+        $befores = $slots->mapWithKeys(fn ($s) => [$s->id => $this->resolver->resolve($s)]);
+
         $number->update(['status' => 'active', 'down_since' => null]);
         $this->audit($source, 'number.recovered', 'phone_number', $number->id, null, ['e164' => $number->e164]);
 
-        return $this->recomputeSlotsFor($number, $source);
+        return $slots
+            ->filter(function (PhoneSlot $slot) use ($source, $befores) {
+                $slot->unsetRelations();
+
+                return $this->recompute($slot, $source, $befores[$slot->id]);
+            })
+            ->values();
     }
 
     public function pin(PhoneSlot $slot, NumberEntry $entry, string $source = 'user'): void
@@ -56,18 +76,21 @@ class FailoverEngine
         $this->recompute($slot->fresh(), $source);
     }
 
-    /** Перерахувати поточний запис слота. Повертає true, якщо видимий вивід змінився. */
-    public function recompute(PhoneSlot $slot, string $source = 'system'): bool
+    /**
+     * Перерахувати поточний запис слота. Повертає true, якщо стан змінився.
+     *
+     * @param  ResolvedSlot|null  $before  Знімок до зміни; якщо null — обчислюється через резолвер.
+     */
+    public function recompute(PhoneSlot $slot, string $source = 'system', ?ResolvedSlot $before = null): bool
     {
         if ($slot->pinned_number_entry_id) {
             return false; // закріплений слот не перемикається автоматично
         }
 
-        // Знімок стану ДО перерахунку: з персистованих стовпців (current_number_entry_id /
-        // last_active_e164), оскільки на момент виклику PhoneNumber вже може бути оновлено в БД.
-        $beforeVisible = $slot->current_number_entry_id !== null;
-        $beforeNumber  = $slot->last_active_e164;
-        $beforeState   = $beforeVisible ? ($slot->current_number_entry_id ? 'ok_or_reserve' : 'exhausted') : 'exhausted';
+        // Точний знімок стану ДО перерахунку через резолвер (коли не передано ззовні)
+        if ($before === null) {
+            $before = $this->resolver->resolve($slot);
+        }
 
         $slot->load('entries.phoneNumber');
 
@@ -95,24 +118,30 @@ class FailoverEngine
 
         $after = $this->resolver->resolve($slot->fresh());
 
-        if ($beforeNumber === $after->number && $beforeVisible === $after->visible) {
+        // Виявлення змін враховує стан: number, visible і state
+        $changed = $before->number !== $after->number
+            || $before->visible !== $after->visible
+            || $before->state !== $after->state;
+
+        if (! $changed) {
             return false;
         }
 
         $this->audit($source, 'failover.switch', 'phone_slot', $slot->id,
-            ['number' => $beforeNumber, 'state' => $beforeState],
+            ['number' => $before->number, 'state' => $before->state],
             ['number' => $after->number, 'state' => $after->state]);
 
-        if ($beforeVisible && ! $after->visible) {
+        // Вичерпання → критичний інцидент ЗАВЖДИ, незалежно від політики видимості
+        if ($after->state === 'exhausted' && $before->state !== 'exhausted') {
             $this->incidentOnce('critical', 'slot_exhausted', $slot,
-                "Слот #{$slot->id}: усі номери неактивні, вивід прибрано");
-        } elseif ($beforeVisible && $after->visible) {
+                "Слот #{$slot->id}: усі номери неактивні");
+        } elseif ($before->visible && $after->visible && $before->number !== $after->number) {
             Incident::create([
                 'severity' => 'warning',
                 'kind' => 'failover',
                 'subject_type' => 'phone_slot',
                 'subject_id' => $slot->id,
-                'message' => "Слот #{$slot->id}: перемкнуто {$beforeNumber} → {$after->number}",
+                'message' => "Слот #{$slot->id}: перемкнуто {$before->number} → {$after->number}",
             ]);
         }
 
@@ -127,15 +156,6 @@ class FailoverEngine
         return $value->scope_type === 'site'
             ? Site::where('id', $value->scope_id)->get()
             : Site::where('site_group_id', $value->scope_id)->get();
-    }
-
-    /** @return Collection<int, PhoneSlot> */
-    private function recomputeSlotsFor(PhoneNumber $number, string $source): Collection
-    {
-        return PhoneSlot::whereHas('entries', fn ($q) => $q->where('phone_number_id', $number->id))
-            ->get()
-            ->filter(fn (PhoneSlot $slot) => $this->recompute($slot, $source))
-            ->values();
     }
 
     private function audit(string $actorType, string $action, ?string $subjectType, ?int $subjectId, ?array $old, ?array $new): void
