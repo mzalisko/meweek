@@ -9,6 +9,7 @@ use App\Services\Failover\FailoverEngine;
 use App\Services\Publishing\SitePayloadCompiler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MonitoringWebhookController extends Controller
 {
@@ -43,16 +44,20 @@ class MonitoringWebhookController extends Controller
             return response()->json(['message' => 'Unknown number'], 422);
         }
 
-        $affectedSlots = $data['status'] === 'down'
-            ? $engine->markNumberDown($number, 'webhook')
-            : $engine->markNumberActive($number, 'webhook');
+        $sites = DB::transaction(function () use ($engine, $compiler, $number, $data) {
+            $affectedSlots = $data['status'] === 'down'
+                ? $engine->markNumberDown($number, 'webhook')
+                : $engine->markNumberActive($number, 'webhook');
 
-        $sites = $affectedSlots
-            ->flatMap(fn ($slot) => $engine->sitesFor($slot))
-            ->unique('id')
-            ->values();
+            $sites = $affectedSlots
+                ->flatMap(fn ($slot) => $engine->sitesFor($slot))
+                ->unique('id')
+                ->values();
 
-        $sites->each(fn ($site) => $compiler->publish($site));
+            $sites->each(fn ($site) => $compiler->publish($site));
+
+            return $sites;
+        });
 
         return response()->json(['affected_sites' => $sites->count()]);
     }

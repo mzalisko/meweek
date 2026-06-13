@@ -71,8 +71,12 @@ class FailoverEngine
 
     public function unpin(PhoneSlot $slot, string $source = 'user'): void
     {
+        $before = $this->resolver->resolve($slot);
         $slot->update(['pinned_number_entry_id' => null]);
-        $this->audit($source, 'slot.unpinned', 'phone_slot', $slot->id, null, null);
+        $slot->unsetRelations();
+        $after = $this->resolver->resolve($slot->fresh());
+        $this->audit($source, 'slot.unpinned', 'phone_slot', $slot->id,
+            ['number' => $before->number], ['number' => $after->number]);
         $this->recompute($slot->fresh(), $source);
     }
 

@@ -119,6 +119,39 @@ class SitePayloadCompilerTest extends TestCase
         $this->assertSame('https://t.me/brand', $item['url']);
     }
 
+    public function test_dangling_linked_slot_messenger_is_hidden(): void
+    {
+        $site = Site::factory()->create();
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'viber_orphan',
+            'content' => ['network' => 'viber', 'linked_slot' => 'no_such_key', 'enabled' => true],
+        ]);
+
+        $item = $this->itemByKey(app(SitePayloadCompiler::class)->compile($site), 'viber_orphan');
+
+        $this->assertSame('hidden', $item['state']);
+        $this->assertNull($item['value']);
+    }
+
+    public function test_linked_whatsapp_builds_wa_me_url(): void
+    {
+        $site = Site::factory()->create();
+        [$slot, $entries] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update([
+            'key' => 'phone_wa', 'scope_type' => 'site', 'scope_id' => $site->id,
+        ]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'wa_main',
+            'content' => ['network' => 'whatsapp', 'linked_slot' => 'phone_wa', 'enabled' => true],
+        ]);
+
+        $item = $this->itemByKey(app(SitePayloadCompiler::class)->compile($site), 'wa_main');
+
+        $digits = ltrim($entries[0]->phoneNumber->e164, '+');
+        $this->assertSame('https://wa.me/' . $digits, $item['url']);
+        $this->assertSame($entries[0]->phoneNumber->e164, $item['value']);
+    }
+
     public function test_publish_increments_version_per_site(): void
     {
         $site = Site::factory()->create();

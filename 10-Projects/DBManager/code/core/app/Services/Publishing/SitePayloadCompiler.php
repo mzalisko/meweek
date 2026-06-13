@@ -116,8 +116,8 @@ class SitePayloadCompiler
             return $base + ['state' => 'hidden', 'value' => null, 'url' => null];
         }
 
-        $digits = ltrim($resolved->number, '+');
-        $url = match ($network) {
+        $digits = $resolved->number ? ltrim($resolved->number, '+') : null;
+        $url = $digits === null ? null : match ($network) {
             'viber' => 'viber://chat?number=%2B' . $digits,
             'whatsapp' => 'https://wa.me/' . $digits,
             default => null,
