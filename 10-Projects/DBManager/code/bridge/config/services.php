@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    'publish' => [
+        'secret' => env('BRIDGE_PUBLISH_SECRET'),
+    ],
+
+    'data' => [
+        'signing_secret' => env('BRIDGE_DATA_SIGNING_SECRET'),
+    ],
+
+    'ping' => [
+        'secret' => env('BRIDGE_PING_SECRET'),
+    ],
+
 ];
