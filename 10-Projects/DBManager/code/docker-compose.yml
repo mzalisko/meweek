@@ -30,5 +30,34 @@ services:
   redis:
     image: redis:7-alpine
 
+  bridge:
+    build: ./docker/core
+    volumes:
+      - ./bridge:/app
+    ports:
+      - "8002:8000"
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: bridge-mysql
+      DB_PORT: "3306"
+      DB_DATABASE: dbmanager_bridge
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+    depends_on:
+      - bridge-mysql
+      - redis
+
+  bridge-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: dbmanager_bridge
+    volumes:
+      - bridge-mysql-data:/var/lib/mysql
+    ports:
+      - "33062:3306"
+
 volumes:
   mysql-data:
+  bridge-mysql-data:
