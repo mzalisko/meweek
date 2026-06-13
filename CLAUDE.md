@@ -17,6 +17,9 @@
 | Зберегти контекст перед /clear | навичка `.claude/skills/save-context/SKILL.md` або `/save-context` |
 | Розбір сховища | навичка `.claude/skills/weekly-review/SKILL.md` або `/weekly-review` |
 | Налаштувати навички / MCP / superpowers | `50-Guides/Гайди.md` |
+| Що вміє кожна навичка (простими словами) | `50-Guides/Гайд — Навички Meweek простими словами.md` |
+| Вибрати модель під задачу / витрати | навичка `.claude/skills/model-budget/SKILL.md` або `/model-budget` |
+| Впровадити ідею навички / покращити скіл | навичка `.claude/skills/skill-forge/SKILL.md` або `/skill-forge` |
 | Слеш-команди | `.claude/commands/` + `50-Guides/Гайд — Команди для агентів.md` |
 | Синхронізація стану (pull/push) | навичка `.claude/skills/git-sync/SKILL.md` або `/sync` |
 | Docker під проєкт | навичка `.claude/skills/docker-project/SKILL.md` |
