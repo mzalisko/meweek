@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'monitoring' => [
+        'secret' => env('MONITORING_WEBHOOK_SECRET'),
+    ],
+
 ];
