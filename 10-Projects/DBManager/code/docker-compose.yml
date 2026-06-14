@@ -64,6 +64,39 @@ services:
       - ./plugin:/app
     working_dir: /app
 
+  wordpress:
+    image: wordpress:php8.4-apache
+    environment:
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      WORDPRESS_DB_NAME: dbmanager_wp
+    volumes:
+      # Лише спільний том WP. Код плагіна НЕ bind-монтуємо у wp-content/plugins —
+      # install-wp.sh копіює його з /plugin у том, щоб сценарій B (wp plugin delete)
+      # реально видаляв файли плагіна, а не натикався на точку bind-монтування.
+      - wp-data:/var/www/html
+    depends_on:
+      - mysql
+
+  wpcli:
+    image: wordpress:cli-php8.4
+    # Образ wordpress:apache тримає www-data на uid 33, а wordpress:cli — на uid 82.
+    # Через спільний том це ламає права (cp у wp-content, запис uploads). Прирівнюємо
+    # wpcli до uid/gid 33, щоб усі файли тому належали одному власнику.
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      WORDPRESS_DB_NAME: dbmanager_wp
+    volumes:
+      - ./plugin:/plugin          # вихідний код плагіна (тільки для читання install-скриптом)
+      - wp-data:/var/www/html     # той самий том WP, що й у сервісу wordpress
+    depends_on:
+      - wordpress
+
 volumes:
   mysql-data:
   bridge-mysql-data:
+  wp-data:
