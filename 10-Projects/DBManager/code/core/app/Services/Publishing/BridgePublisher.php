@@ -52,6 +52,13 @@ class BridgePublisher
             return false;
         }
 
-        return $response->successful();
+        if (! $response->successful()) {
+            // Bridge доступний, але відмовив (auth/stale/5xx) — раніше ковталося мовчки.
+            Log::warning('Bridge push rejected', ['site' => $site->domain, 'status' => $response->status()]);
+
+            return false;
+        }
+
+        return true;
     }
 }

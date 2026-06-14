@@ -85,4 +85,18 @@ class IngestTest extends TestCase
         $this->assertSame(2, PublishedSite::where('domain', 'domen.ua')->first()->version);
         $this->assertSame(1, PublishedSite::where('domain', 'domen.ua')->count());
     }
+
+    public function test_ingest_rejects_equal_version_and_keeps_payload(): void
+    {
+        Queue::fake();
+        $this->postSigned($this->body(['version' => 5,
+            'payload' => ['site' => 'domen.ua', 'version' => 5, 'values' => []]]))->assertOk();
+
+        // Рівна версія — межа `<=`: 409, payload не перезаписується.
+        $this->postSigned($this->body(['version' => 5,
+            'payload' => ['site' => 'domen.ua', 'version' => 5, 'values' => [['key' => 'мутація']]]]))
+            ->assertStatus(409);
+
+        $this->assertSame([], PublishedSite::where('domain', 'domen.ua')->first()->payload['values']);
+    }
 }

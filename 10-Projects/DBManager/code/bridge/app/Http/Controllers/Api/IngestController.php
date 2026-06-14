@@ -7,6 +7,7 @@ use App\Jobs\DeliverPingJob;
 use App\Models\PublishedSite;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class IngestController extends Controller
 {
@@ -30,24 +31,37 @@ class IngestController extends Controller
             'payload' => ['required', 'array'],
         ]);
 
-        $existing = PublishedSite::where('domain', $data['domain'])->first();
+        // Атомарна монотонність: lockForUpdate, щоб конкурентні публікації того
+        // самого домену не перезаписали новішу версію старішою (race check-then-write).
+        $result = DB::transaction(function () use ($data) {
+            $existing = PublishedSite::where('domain', $data['domain'])
+                ->lockForUpdate()
+                ->first();
 
-        if ($existing && $data['version'] <= $existing->version) {
+            if ($existing && $data['version'] <= $existing->version) {
+                return ['stale' => true];
+            }
+
+            $site = PublishedSite::updateOrCreate(
+                ['domain' => $data['domain']],
+                [
+                    'token_hash' => $data['token_hash'],
+                    'ping_url' => $data['ping_url'],
+                    'version' => $data['version'],
+                    'payload' => $data['payload'],
+                ]
+            );
+
+            return ['stale' => false, 'id' => $site->id, 'version' => $site->version];
+        });
+
+        if ($result['stale']) {
             return response()->json(['message' => 'Stale version'], 409);
         }
 
-        $site = PublishedSite::updateOrCreate(
-            ['domain' => $data['domain']],
-            [
-                'token_hash' => $data['token_hash'],
-                'ping_url' => $data['ping_url'],
-                'version' => $data['version'],
-                'payload' => $data['payload'],
-            ]
-        );
+        // Пінг — поза транзакцією: job не має стартувати до коміту запису.
+        DeliverPingJob::dispatch($result['id']);
 
-        DeliverPingJob::dispatch($site->id);
-
-        return response()->json(['stored_version' => $site->version]);
+        return response()->json(['stored_version' => $result['version']]);
     }
 }
