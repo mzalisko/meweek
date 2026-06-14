@@ -42,6 +42,7 @@ return [
     'bridge' => [
         'ingest_url' => env('BRIDGE_INGEST_URL'),
         'publish_secret' => env('BRIDGE_PUBLISH_SECRET'),
+        'geodb_url' => env('BRIDGE_GEODB_URL'),
     ],
 
 ];
