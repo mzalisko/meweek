@@ -38,15 +38,26 @@ class Plugin
         add_action('init', [$this, 'registerShortcode']);
         add_action('rest_api_init', [$this, 'registerRest']);
         add_action('dbm_daily_reconcile', [$this, 'runReconcile']);
+        add_action('dbm_geodb_sync', [$this, 'runGeoDbSync']);
         add_filter('cron_schedules', fn ($s) => $s); // добова — через wp_schedule_event(daily)
         register_activation_hook(
             dirname(__DIR__, 2) . '/dbmanager.php',
-            fn () => wp_next_scheduled('dbm_daily_reconcile') ?: wp_schedule_event(time() + 3600, 'daily', 'dbm_daily_reconcile')
+            function (): void {
+                if (! wp_next_scheduled('dbm_daily_reconcile')) {
+                    wp_schedule_event(time() + 3600, 'daily', 'dbm_daily_reconcile');
+                }
+                if (! wp_next_scheduled('dbm_geodb_sync')) {
+                    wp_schedule_event(time() + 3600, 'weekly', 'dbm_geodb_sync');
+                }
+            }
         );
         register_deactivation_hook(
             dirname(__DIR__, 2) . '/dbmanager.php',
-            fn () => wp_clear_scheduled_hook('dbm_daily_reconcile')
-            // Кеш (dbm_cache) НЕ видаляємо — живучість даних (§8).
+            function (): void {
+                wp_clear_scheduled_hook('dbm_daily_reconcile');
+                wp_clear_scheduled_hook('dbm_geodb_sync');
+                // Кеш (dbm_cache) НЕ видаляємо — живучість даних (§8).
+            }
         );
 
         if (is_admin()) {
@@ -73,10 +84,19 @@ class Plugin
             }');
         }
 
-        add_shortcode($s->shortcode, function ($atts) {
+        // Detect country once per request: CF-IPCountry → MaxMind lookup → WORLD.
+        $detector = new \DBM\Geo\GeoDetector(
+            new \DBM\Geo\MaxMindCountryLookup((string) (get_option('dbm_geodb_path') ?: ''))
+        );
+        $country = $detector->detect(
+            ['CF-IPCountry' => $_SERVER['HTTP_CF_IPCOUNTRY'] ?? ''],
+            (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? ($_SERVER['REMOTE_ADDR'] ?? ''))
+        );
+
+        add_shortcode($s->shortcode, function ($atts) use ($country) {
             $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
 
-            return dbm_get((string) $atts['key'], ['format' => (string) $atts['format']]);
+            return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
         });
     }
 
@@ -103,5 +123,24 @@ class Plugin
     public function runReconcile(): void
     {
         $this->synchronizer()->reconcile();
+    }
+
+    public function runGeoDbSync(): void
+    {
+        $s = $this->settings();
+        if ($s->bridgeUrl === '') {
+            return;
+        }
+
+        $store = new \DBM\Geo\FileGeoDbStore();
+        $synchronizer = new \DBM\Geo\GeoDbSynchronizer(
+            new \DBM\Geo\WpHttpGeoDbClient(),
+            $store,
+            new \DBM\Sync\PayloadVerifier(),
+            rtrim($s->bridgeUrl, '/') . '/api/v1/geodb',
+            $s->siteToken,
+            $s->signingSecret,
+        );
+        $synchronizer->sync();
     }
 }
