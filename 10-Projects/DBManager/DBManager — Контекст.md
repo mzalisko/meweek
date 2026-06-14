@@ -4,23 +4,25 @@ tags: [dbmanager, контекст]
 
 # DBManager — Контекст
 
-**Оновлено:** 2026-06-13
-**Стан:** План 1.1 (Core) ВИКОНАНО — далі план 1.2 (DataBridge і доставка)
+**Оновлено:** 2026-06-14
+**Стан:** Плани 1.1 (Core) і 1.2 (DataBridge + доставка) ВИКОНАНО — далі план 1.3 (WP-плагін)
 
-**Зроблено (план 1.1, код у `code/`):**
-- Laravel 13 + Docker (core + MySQL 8.4 + Redis); 42 тести зелені; міграції на MySQL пройшли
-- Модель даних: сайти/групи/токени, значення з типами і гео-мітками, слоти з ланцюгами резервів, аудит/інциденти/публікації
-- Failover: `SlotResolver` (ok/on_reserve/pinned/exhausted) + `FailoverEngine` (падіння/відновлення, sticky, pin/unpin, спільні номери, дедуплікація інцидентів, точні before-знімки)
-- `SitePayloadCompiler` — контракт payload (override сайт>група, телефони з failover, прив'язані месенджери viber/wa, hidden, версіонування)
-- Webhook моніторингу: HMAC, throttle, атомарність (DB::transaction), публікація уражених сайтів
+**Зроблено (план 1.1, Core — 49 тестів):**
+- Laravel 13 + Docker (core + MySQL 8.4 + Redis); модель даних, значення з гео, слоти з резервами
+- Failover (`SlotResolver` + `FailoverEngine`: падіння/відновлення, sticky, pin, спільні номери, дедуп інцидентів)
+- `SitePayloadCompiler` (контракт payload: override сайт>група, месенджери, hidden, версіонування)
+- Webhook моніторингу (HMAC, throttle, `DB::transaction`); `SiteProvisioner` (токени сайтів, ping_url); `BridgePublisher` (пуш у bridge після failover)
 
-**Шлях коду:** `10-Projects/DBManager/code/` (core = Laravel). Запуск тестів: з `code/` → `docker compose run --rm core php artisan test`.
+**Зроблено (план 1.2, DataBridge — 24 тести):**
+- Окремий Laravel `bridge/` + власна `bridge-mysql` (ізоляція: bridge не торкається БД Core)
+- Ingest Core→Bridge (HMAC, монотонність версій); serve по токену (підпис + ETag); звірка `If-None-Match`→304
+- Rate limit + журнал запитів; push-пінг сайтам із HMAC і backoff (8 спроб); контрактний round-trip
+- Security fail-closed: serve (500) і пінг (виключення) не віддають даних без секрета підпису — раніше підписували порожнім ключем
 
-**Відкладено в наступні плани/деплой (з фінального рев'ю):**
-- Черга публікацій замість inline (план 1.2 — доставка)
-- Throttle webhook по IP може гасити легітимний failover-шторм → переглянути ключ ліміту з дизайном моніторингу
-- Шлях webhook (напряму в Core чи приймач на bridge) і VPN vs allowlist — з DevOps при розгортанні
+**Доперевірити (рев'ю плану 1.2 не дійшло до кінця через ліміт сесії 2026-06-14):** атомарність/гонки в ingest, FK на `request_logs`, тести на рівну версію / відкликаний токен / вичерпання пінга / replay, крихкість rate-limit-тесту. Прогнати рев'ю повторно (крос-модельне Claude↔Codex + security) перед мерджем у прод.
 
-**Наступний крок:** writing-plans → план 1.2 (DataBridge: read-only API по токену з контракту payload, push-пінги з ретраями, добова звірка) і далі 1.3 (WP-плагін DBManager з mu-фолбеком)
+**Шлях коду:** `10-Projects/DBManager/code/` (core, bridge = Laravel). Тести з `code/`: `docker compose run --rm core|bridge php artisan test`.
+
+**Наступний крок:** План 1.3 — WP-плагін (кеш, шорткоди, PHP-функції, вкладки «Дані»/«Вставка»/«Налаштування», mu-plugin фолбек). Сценарії: «bridge мертвий → сайт з кешу», «плагін видалили → значення показуються».
 
 **Орієнтири незмінні:** [[DBManager — Дизайн]] — джерело правди; пріоритети №1 — анти-fingerprint + нуль зовнішніх залежностей.

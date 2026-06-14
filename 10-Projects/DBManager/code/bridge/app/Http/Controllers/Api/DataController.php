@@ -23,6 +23,10 @@ class DataController extends Controller
             return response('', 304)->header('ETag', $etag);
         }
 
+        // Без секрета підпису serve не віддає дані (інакше підпис порожнім ключем).
+        // Generic 500 без тексту — публічний ендпоінт не світить стан конфігу.
+        abort_if(! config('services.data.signing_secret'), 500);
+
         $body = json_encode($site->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $signature = hash_hmac('sha256', $body, (string) config('services.data.signing_secret'));
 

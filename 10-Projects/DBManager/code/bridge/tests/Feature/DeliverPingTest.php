@@ -77,4 +77,22 @@ class DeliverPingTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_missing_ping_secret_throws_and_sends_nothing(): void
+    {
+        // Без секрета пінга джоба не має слати пінг із порожнім ключем — fail-closed.
+        config(['services.ping.secret' => null]);
+        Http::fake();
+        $site = PublishedSite::factory()->create([
+            'ping_url' => 'https://domen.ua/ping', 'version' => 1,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            (new DeliverPingJob($site->id))->handle();
+        } finally {
+            Http::assertNothingSent();
+        }
+    }
 }

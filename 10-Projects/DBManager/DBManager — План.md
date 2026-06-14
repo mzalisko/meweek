@@ -27,11 +27,13 @@ tags: [проєкт, dbmanager, план]
 - [x] Failover-движок (перемикання, sticky, pin, вичерпання) — TDD
 - [x] Компілятор публікацій (контракт payload) + webhook моніторингу з HMAC
 
-**План 1.2 — DataBridge і доставка (наступний):**
-- [ ] DataBridge: read-only API по токену (віддає payload із контракту 1.1)
-- [ ] Push-пінги з ретраями; добова звірка
+**План 1.2 — DataBridge і доставка ✅ (виконано 2026-06-14, 24 тести):** `plans/2026-06-13 — План 1.2 — DataBridge.md`
+- [x] DataBridge: окремий Laravel + власна БД, read-only API по токену (підпис + ETag)
+- [x] Ingest Core→Bridge (HMAC, монотонність); push-пінги з backoff; звірка `If-None-Match`→304
+- [x] Rate limit + журнал; `SiteProvisioner`/`BridgePublisher` у Core; контрактний round-trip
+- [x] Security fail-closed на serve і пінгу (500/виключення без секрета підпису)
 
-**План 1.3 — WP-плагін:**
+**План 1.3 — WP-плагін (наступний):**
 - [ ] WP-плагін: кеш, шорткод, PHP-функції, вкладки «Дані»/«Вставка»/«Налаштування», mu-plugin фолбек
 - [ ] Перевірка сценаріїв: «bridge мертвий → сайт з кешу», «плагін видалили → значення показуються»
 

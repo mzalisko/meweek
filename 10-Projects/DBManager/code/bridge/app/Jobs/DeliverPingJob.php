@@ -32,12 +32,18 @@ class DeliverPingJob implements ShouldQueue
             return; // сайт зник або не має URL для пінга — нічого робити
         }
 
+        $secret = (string) config('services.ping.secret');
+        if ($secret === '') {
+            // Без секрета не шлемо пінг із порожнім ключем — fail-closed.
+            throw new \RuntimeException('Ping secret is not configured');
+        }
+
         $body = json_encode([
             'domain' => $site->domain,
             'version' => (int) $site->version,
         ], JSON_UNESCAPED_SLASHES);
 
-        $signature = hash_hmac('sha256', $body, (string) config('services.ping.secret'));
+        $signature = hash_hmac('sha256', $body, $secret);
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',

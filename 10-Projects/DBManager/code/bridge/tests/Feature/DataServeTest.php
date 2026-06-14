@@ -62,4 +62,13 @@ class DataServeTest extends TestCase
         $this->assertSame('domen.ua', $json['site']);
         $this->assertSame(4, $json['version']);
     }
+
+    public function test_missing_signing_secret_fails_closed(): void
+    {
+        // Без секрета підпису serve не має віддавати дані з порожнім ключем — лише 500.
+        config(['services.data.signing_secret' => null]);
+        $this->makeSite('good-token');
+
+        $this->fetchData('good-token')->assertStatus(500);
+    }
 }
