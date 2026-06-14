@@ -29,6 +29,18 @@ if (! function_exists('dbm_render_from_cache')) {
             ? ' class="' . htmlspecialchars((string) $opts['class'], ENT_QUOTES) . '"'
             : '';
 
-        return '<span' . $cls . '>' . htmlspecialchars($raw, ENT_QUOTES) . '</span>';
+        $text = htmlspecialchars($raw, ENT_QUOTES);
+        $format = $opts['format'] ?? '';
+
+        if ($format === 'tel') {
+            $href = htmlspecialchars('tel:' . preg_replace('/[^+\d]/', '', $raw), ENT_QUOTES);
+
+            return '<a' . $cls . ' href="' . $href . '">' . $text . '</a>';
+        }
+        if ($format === 'link' && ! empty($value['url'])) {
+            return '<a' . $cls . ' href="' . htmlspecialchars((string) $value['url'], ENT_QUOTES) . '">' . $text . '</a>';
+        }
+
+        return '<span' . $cls . '>' . $text . '</span>';
     }
 }
