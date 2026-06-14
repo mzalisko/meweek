@@ -23,7 +23,7 @@ echo "БД $d створено\n";
 '
 
 # 2. WordPress core «з нуля» (PHP/mysqli — працює з MySQL 8.4).
-wp core install --url=http://localhost --title=DBM --admin_user=admin \
+wp core install --url=http://localhost:8080 --title=DBM --admin_user=admin \
   --admin_password=admin --admin_email=a@a.dev --skip-email
 
 # 3. Копіюємо код плагіна у том WP (не bind-монтування — щоб сценарій B міг його видалити).
