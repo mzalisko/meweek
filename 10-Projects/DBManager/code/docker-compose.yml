@@ -6,10 +6,10 @@ services:
     ports:
       - "8001:8000"
     environment:
-      DB_CONNECTION: mysql
+      # DB_CONNECTION і DB_DATABASE задаються в core/.env (runtime) та core/phpunit.xml
+      # (тести → окрема БД dbmanager_core_test). Тут лише хост і креди.
       DB_HOST: mysql
       DB_PORT: "3306"
-      DB_DATABASE: dbmanager_core
       DB_USERNAME: root
       DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       REDIS_HOST: redis
@@ -37,10 +37,10 @@ services:
     ports:
       - "8002:8000"
     environment:
-      DB_CONNECTION: mysql
+      # DB_CONNECTION і DB_DATABASE задаються в bridge/.env (runtime) та bridge/phpunit.xml
+      # (тести → окрема БД dbmanager_bridge_test). Тут лише хост і креди.
       DB_HOST: bridge-mysql
       DB_PORT: "3306"
-      DB_DATABASE: dbmanager_bridge
       DB_USERNAME: root
       DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       REDIS_HOST: redis
