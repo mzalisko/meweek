@@ -13,10 +13,10 @@ Route::view('profile', 'profile')
     ->name('profile');
 
 // Admin routes — protected by auth middleware.
-// Task 1: stub route; Task 2 will replace with the full Livewire layout.
+// Task 2: render the admin shell layout (placeholder; Task 4 will swap to ValuesGrid).
 Route::middleware('auth')->group(function () {
     Route::get('/admin', function () {
-        return response('ok');
+        return view('admin.placeholder');
     })->name('admin.values');
 });
 

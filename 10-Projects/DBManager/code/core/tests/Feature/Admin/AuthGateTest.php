@@ -15,12 +15,10 @@ class AuthGateTest extends TestCase
         $this->get('/admin')->assertRedirect('/login');
     }
 
-    /**
-     * The /admin route is added in Task 2.
-     * This test will be enabled once the route exists.
-     */
     public function test_logged_in_user_reaches_admin(): void
     {
-        $this->markTestSkipped('Route /admin is added in Task 2.');
+        $this->actingAs(User::factory()->create())
+            ->get('/admin')
+            ->assertOk();
     }
 }
