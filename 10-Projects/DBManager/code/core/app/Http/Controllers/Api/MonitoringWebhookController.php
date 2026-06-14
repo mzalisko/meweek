@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\PhoneNumber;
+use App\Models\Publication;
 use App\Services\Failover\FailoverEngine;
+use App\Services\Publishing\BridgePublisher;
 use App\Services\Publishing\SitePayloadCompiler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ class MonitoringWebhookController extends Controller
         Request $request,
         FailoverEngine $engine,
         SitePayloadCompiler $compiler,
+        BridgePublisher $publisher,
     ): JsonResponse {
         $secret = config('services.monitoring.secret');
         abort_if(! $secret, 500, 'Monitoring secret is not configured');
@@ -57,6 +60,13 @@ class MonitoringWebhookController extends Controller
             $sites->each(fn ($site) => $compiler->publish($site));
 
             return $sites;
+        });
+
+        $sites->each(function ($site) use ($publisher) {
+            $publication = Publication::where('site_id', $site->id)->latest('version')->first();
+            if ($publication) {
+                $publisher->push($publication);
+            }
         });
 
         return response()->json(['affected_sites' => $sites->count()]);
