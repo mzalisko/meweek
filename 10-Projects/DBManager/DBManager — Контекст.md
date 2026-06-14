@@ -30,6 +30,8 @@ tags: [dbmanager, контекст]
 
 **Шлях коду:** `10-Projects/DBManager/code/` (core, bridge = Laravel; `plugin/` = WP-плагін). Тести: `docker compose run --rm core|bridge php artisan test`; `docker compose run --rm plugin ./vendor/bin/phpunit`; інтеграція — `wpcli` + `bin/install-wp.sh` + `bin/scenario*.php`.
 
+**Фінальне рев'ю 1.3 пройдено (2026-06-14):** безпека/анти-fingerprint/живучість — надійні; знайдено й виправлено 2 функціональні гео-баги (vendor MaxMind не вантажився/не деплоївся → IP-лукап мертвий; `dbm_get('key')` без країни затінювався mu-фолбеком). Нити (per-request reader, strict base64, HTTPS-валідація bridge_url, тест на реальній mmdb) → борг Етапу 3.
+
 **Наступний крок:** Етап 2 — адмінка за UI, ролі й права, імпорт CSV/XLSX, аудит з відкатом (гео-рендер уже зроблено в 1.3). Перед продом — крос-модельне рев'ю (Codex) + борг безпеки з Етапу 3.
 
 **Орієнтири незмінні:** [[DBManager — Дизайн]] — джерело правди; пріоритети №1 — анти-fingerprint + нуль зовнішніх залежностей.

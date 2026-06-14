@@ -53,6 +53,7 @@ tags: [проєкт, dbmanager, план]
 - [ ] Контрактні, E2E (failover ≤ 1 хв), навантажувальні тести
 - [ ] Security-рев'ю коду (крос-модельне) + бекапи й перевірене відновлення
 - [ ] Технічний борг із рев'ю плану 1.2: anti-replay (nonce/час) на HMAC ingest+webhook; ретенція `request_logs`; моніторинг `failed_jobs` (вичерпання пінга, dead-letter); пропагація відкликання токена Core→Bridge; наскрізний E2E-тест контракту Core↔Bridge
+- [ ] Нити з фінального рев'ю плану 1.3 (плагін): кешувати відкритий MaxMind Reader на запит (зараз open/close щоразу); strict `base64_decode` на geodb serve; валідація `bridge_url` на HTTPS у налаштуваннях; тест `MaxMindCountryLookup` на реальній `.mmdb`
 
 ### Етап 4 — Продакшн
 
