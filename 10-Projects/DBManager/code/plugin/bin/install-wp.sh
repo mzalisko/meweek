@@ -32,6 +32,9 @@ wp core install --url=http://localhost --title=DBM --admin_user=admin \
 rm -rf wp-content/plugins/dbmanager wp-content/plugins/shared
 cp -r /plugin/dbmanager wp-content/plugins/dbmanager
 cp -r /plugin/shared    wp-content/plugins/shared
+# vendor (maxmind-db/reader) — деплоїмо всередину плагіна, щоб dbmanager.php його
+# підвантажив і PHP-лукап країни за IP працював. У проді пакувати з --no-dev.
+cp -r /plugin/vendor    wp-content/plugins/dbmanager/vendor
 
 # 4. mu-plugin фолбек + його самодостатня копія ядра рендеру (для сценарію B).
 mkdir -p wp-content/mu-plugins

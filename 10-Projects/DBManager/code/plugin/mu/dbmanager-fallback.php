@@ -12,8 +12,11 @@ if (! defined('ABSPATH')) {
 require_once __DIR__ . '/render-core.php';
 
 add_action('init', function (): void {
-    // Якщо основний плагін активний — він сам реєструє шорткод; mu мовчить.
-    if (function_exists('dbm_get')) {
+    // Головний плагін присутній → він сам реєструє country-aware dbm_get і шорткод; mu мовчить.
+    // Перевіряємо саме КЛАС плагіна, а не function_exists('dbm_get'): mu-плагіни вантажаться
+    // раніше за звичайні, тож за старим guard mu визначив би dbm_get першим і затінив би
+    // багатший dbm_get плагіна (#2 фінального рев'ю).
+    if (class_exists('DBM\\Wp\\Plugin')) {
         return;
     }
 
@@ -30,23 +33,11 @@ add_action('init', function (): void {
         return dbm_render_from_cache($cache, $key, $opts);
     }
 
-    // Detect country once per request: CF-IPCountry → MaxMind lookup → WORLD.
-    // The mu-fallback uses the same GeoDetector logic via the plugin autoloader if available,
-    // or falls back to WORLD when the autoloader is absent (e.g. plugin fully removed).
-    $country = 'WORLD';
-    if (class_exists('\DBM\Geo\GeoDetector') && class_exists('\DBM\Geo\MaxMindCountryLookup')) {
-        $detector = new \DBM\Geo\GeoDetector(
-            new \DBM\Geo\MaxMindCountryLookup((string) (get_option('dbm_geodb_path') ?: ''))
-        );
-        $country = $detector->detect(
-            ['CF-IPCountry' => $_SERVER['HTTP_CF_IPCOUNTRY'] ?? ''],
-            (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? ($_SERVER['REMOTE_ADDR'] ?? ''))
-        );
-    }
-
-    add_shortcode($shortcode, function ($atts) use ($country) {
+    // Аварійний фолбек активний лише коли плагін видалено — гео-детект потребує класів
+    // плагіна, яких уже немає, тож показуємо значення зі скоупом «Світ» (свідома деградація).
+    add_shortcode($shortcode, function ($atts) {
         $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
 
-        return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
+        return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => 'WORLD']);
     });
 });

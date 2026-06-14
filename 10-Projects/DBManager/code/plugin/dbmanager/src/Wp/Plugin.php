@@ -80,6 +80,7 @@ class Plugin
                 $cache = get_option("dbm_cache"); $cache = is_array($cache) ? $cache : ["values" => []];
                 $st = get_option("dbm_settings");
                 $opts["class"] = $opts["class"] ?? (is_array($st) ? (string)($st["css_class"] ?? "") : "");
+                $opts["country"] = $opts["country"] ?? ($GLOBALS["dbm_country"] ?? "WORLD");
                 return dbm_render_from_cache($cache, $key, $opts);
             }');
         }
@@ -92,6 +93,8 @@ class Plugin
             ['CF-IPCountry' => $_SERVER['HTTP_CF_IPCOUNTRY'] ?? ''],
             (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? ($_SERVER['REMOTE_ADDR'] ?? ''))
         );
+        // Доступно для прямих викликів dbm_get('key') у шаблонах (без явної країни) — #2 рев'ю.
+        $GLOBALS['dbm_country'] = $country;
 
         add_shortcode($s->shortcode, function ($atts) use ($country) {
             $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
