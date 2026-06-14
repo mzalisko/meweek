@@ -2,11 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome');
+// Головна → адмінка (вона сама редіректить на /login, якщо не авторизовано).
+Route::redirect('/', '/admin');
 
-Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+// Breeze після входу веде на route('dashboard'); зводимо його на нашу адмінку.
+Route::redirect('dashboard', '/admin')->name('dashboard');
 
 Route::view('profile', 'profile')
     ->middleware(['auth'])
