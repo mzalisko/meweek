@@ -58,6 +58,12 @@ services:
     ports:
       - "33062:3306"
 
+  plugin:
+    build: ./docker/core
+    volumes:
+      - ./plugin:/app
+    working_dir: /app
+
 volumes:
   mysql-data:
   bridge-mysql-data:
