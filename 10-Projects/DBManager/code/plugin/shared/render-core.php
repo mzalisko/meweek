@@ -20,6 +20,11 @@ if (! function_exists('dbm_render_from_cache')) {
         if ($value === null || in_array($value['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
             return '';
         }
+        $country = $opts['country'] ?? 'WORLD';
+        $geo = $value['geo'] ?? [];
+        if ($geo !== [] && ! in_array('WORLD', $geo, true) && ! in_array($country, $geo, true)) {
+            return ''; // не для цієї країни
+        }
         $raw = (string) ($value['value'] ?? '');
         if ($raw === '') {
             return '';
