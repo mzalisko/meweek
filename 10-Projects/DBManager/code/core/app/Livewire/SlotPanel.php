@@ -8,6 +8,8 @@ use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Failover\ResolvedSlot;
 use App\Services\Failover\SlotResolver;
+use App\Services\Publishing\BridgePublisher;
+use App\Services\Publishing\SitePayloadCompiler;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -112,6 +114,31 @@ class SlotPanel extends Component
         }
 
         $value->phoneSlot->update(['exhaustion_policy' => $policy]);
+    }
+
+    public function save(): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot  = $value->phoneSlot;
+        $sites = app(FailoverEngine::class)->sitesFor($slot);
+
+        // Publish outside any DB transaction; a failed push is not fatal —
+        // bridge reconciles later on its own.
+        $sites->each(function ($site) {
+            $pub = app(SitePayloadCompiler::class)->publish($site);
+            app(BridgePublisher::class)->push($pub);
+        });
+
+        $this->dispatch('toast', message: 'Збережено → опубліковано');
     }
 
     public function toggleMessenger(int $dataValueId): void

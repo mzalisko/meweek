@@ -196,9 +196,9 @@
     {{-- Зберегти --}}
     <div class="mt-4 flex items-center gap-3">
         <button
-            class="btn cursor-not-allowed opacity-60 text-sm px-4 py-1.5 rounded bg-acc text-white"
-            disabled
-            title="Зберегти — доступно після редагування (наступні таски)"
+            wire:click="save"
+            class="btn text-sm px-4 py-1.5 rounded bg-acc text-white hover:bg-acc/90 transition-colors"
+            title="Зберегти та опублікувати уражені сайти у DataBridge"
         >
             Зберегти
         </button>
