@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Admin\SiteGridReader;
 use App\Models\Site;
+use App\Models\SiteGroup;
 use Livewire\Component;
 
 class ValuesGrid extends Component
@@ -26,9 +27,15 @@ class ValuesGrid extends Component
         $rows = $siteModel ? app(SiteGridReader::class)->forSite($siteModel) : [];
         $rows = $this->applyFilters($rows);
 
+        // All sites grouped by SiteGroup for the breadcrumb switcher
+        $groups = SiteGroup::with('sites')->orderBy('id')->get();
+        $ungroupedSites = Site::whereNull('site_group_id')->orderBy('id')->get();
+
         return view('livewire.values-grid', [
-            'siteModel' => $siteModel,
-            'rows'      => $rows,
+            'siteModel'       => $siteModel,
+            'rows'            => $rows,
+            'groups'          => $groups,
+            'ungroupedSites'  => $ungroupedSites,
         ])->layout('components.layouts.admin');
     }
 

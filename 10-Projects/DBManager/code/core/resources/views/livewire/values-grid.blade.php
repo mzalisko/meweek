@@ -1,8 +1,32 @@
 <x-slot name="breadcrumb">
     <span class="text-mut text-xs">›</span>
-    <span class="text-mut text-xs">Група: {{ $siteModel?->group?->name ?? '—' }}</span>
+    <span class="text-mut text-xs">Усі сайти</span>
+    @if($siteModel?->group)
+        <span class="text-mut text-xs">›</span>
+        <span class="text-mut text-xs">{{ $siteModel->group->name }}</span>
+    @endif
     <span class="text-mut text-xs">›</span>
-    <span class="text-xs font-semibold">{{ $siteModel?->domain ?? '—' }}</span>
+    {{-- Site context switcher --}}
+    <select
+        wire:model.live="site"
+        class="text-xs font-semibold bg-transparent border-none outline-none cursor-pointer text-ink hover:text-acc-tx transition-colors"
+        aria-label="Обрати сайт"
+    >
+        @foreach($groups as $group)
+            <optgroup label="{{ $group->name }}">
+                @foreach($group->sites->sortBy('domain') as $s)
+                    <option value="{{ $s->id }}">{{ $s->domain }}</option>
+                @endforeach
+            </optgroup>
+        @endforeach
+        @if($ungroupedSites->isNotEmpty())
+            <optgroup label="Без групи">
+                @foreach($ungroupedSites->sortBy('domain') as $s)
+                    <option value="{{ $s->id }}">{{ $s->domain }}</option>
+                @endforeach
+            </optgroup>
+        @endif
+    </select>
 </x-slot>
 
 <x-slot name="context">
