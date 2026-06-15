@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\AuditLog;
 use App\Models\DataValue;
+use App\Models\GeoTag;
 use App\Models\NumberEntry;
 use App\Models\PhoneNumber;
 use App\Models\ValueType;
@@ -27,6 +28,10 @@ class SlotPanel extends Component
 
     public string $editE164 = '';
 
+    public array $geoTagIds = [];
+
+    public string $emergencyNumber = '';
+
     #[On('close-slot-panel')]
     public function closePanel(): void
     {
@@ -39,6 +44,7 @@ class SlotPanel extends Component
         $value = DataValue::with([
             'phoneSlot.entries.phoneNumber',
             'phoneSlot',
+            'geoTags',
             'type',
         ])->find($dataValueId);
 
@@ -49,8 +55,10 @@ class SlotPanel extends Component
         }
 
         $this->dispatch('close-editor-panel');
-        $this->dataValueId = $dataValueId;
-        $this->open = true;
+        $this->dataValueId      = $dataValueId;
+        $this->geoTagIds        = $value->geoTags->pluck('id')->toArray();
+        $this->emergencyNumber  = $value->phoneSlot->emergency_number ?? '';
+        $this->open             = true;
     }
 
     public function addNumber(): void
@@ -378,13 +386,30 @@ class SlotPanel extends Component
             return;
         }
 
-        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+        $value = DataValue::with(['phoneSlot', 'geoTags'])->find($this->dataValueId);
 
         if (! $value || ! $value->phoneSlot) {
             return;
         }
 
-        $slot  = $value->phoneSlot;
+        // Sync geo-tags with audit when changed
+        $oldGeoIds = $value->geoTags->pluck('id')->sort()->values()->toArray();
+        $newGeoIds = collect($this->geoTagIds)->map(fn ($id) => (int) $id)->sort()->values()->toArray();
+        if ($oldGeoIds !== $newGeoIds) {
+            $value->geoTags()->sync($this->geoTagIds);
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'value.geo_changed',
+                'subject_type' => 'DataValue',
+                'subject_id'   => $value->id,
+                'old'          => ['geo_tag_ids' => $oldGeoIds],
+                'new'          => ['geo_tag_ids' => $newGeoIds],
+            ]);
+        }
+
+        $slot = $value->phoneSlot;
+        $slot->update(['emergency_number' => $this->emergencyNumber ?: null]);
+
         $sites = app(FailoverEngine::class)->sitesFor($slot);
 
         // Publish outside any DB transaction; a failed push is not fatal —
@@ -435,6 +460,57 @@ class SlotPanel extends Component
         ]);
     }
 
+    public function linkMessenger(int $messengerId): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $slotValue = DataValue::find($this->dataValueId);
+        $messenger = DataValue::find($messengerId);
+
+        if (! $slotValue || ! $messenger) {
+            return;
+        }
+
+        $content   = $messenger->content ?? [];
+        $oldLinked = $content['linked_slot'] ?? null;
+        $content['linked_slot'] = $slotValue->key;
+        $messenger->update(['content' => $content]);
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'messenger.linked',
+            'subject_type' => 'DataValue',
+            'subject_id'   => $messenger->id,
+            'old'          => ['linked_slot' => $oldLinked],
+            'new'          => ['linked_slot' => $slotValue->key],
+        ]);
+    }
+
+    public function unlinkMessenger(int $messengerId): void
+    {
+        $messenger = DataValue::find($messengerId);
+
+        if (! $messenger) {
+            return;
+        }
+
+        $content   = $messenger->content ?? [];
+        $oldLinked = $content['linked_slot'] ?? null;
+        unset($content['linked_slot']);
+        $messenger->update(['content' => $content]);
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'messenger.unlinked',
+            'subject_type' => 'DataValue',
+            'subject_id'   => $messenger->id,
+            'old'          => ['linked_slot' => $oldLinked],
+            'new'          => ['linked_slot' => null],
+        ]);
+    }
+
     /**
      * Swap the priority values of two NumberEntry rows, working around the
      * unique(phone_slot_id, priority) constraint via a three-step swap:
@@ -479,11 +555,13 @@ class SlotPanel extends Component
 
     public function render()
     {
-        $value      = null;
-        $slot       = null;
-        $entries    = collect();
-        $resolved   = null;
-        $messengers = collect();
+        $value               = null;
+        $slot                = null;
+        $entries             = collect();
+        $resolved            = null;
+        $messengers          = collect();
+        $availableMessengers = collect();
+        $allGeoTags          = GeoTag::orderBy('code')->get();
 
         if ($this->open && $this->dataValueId) {
             $value = DataValue::with([
@@ -498,6 +576,15 @@ class SlotPanel extends Component
                 $entries    = $slot->entries->sortBy('priority');
                 $messengers = $this->loadLinkedMessengers($value);
 
+                $messengerType = ValueType::where('code', 'messenger')->first();
+                if ($messengerType) {
+                    $availableMessengers = DataValue::where('value_type_id', $messengerType->id)
+                        ->where('scope_type', $value->scope_type)
+                        ->where('scope_id', $value->scope_id)
+                        ->get()
+                        ->filter(fn (DataValue $dv) => ($dv->content['linked_slot'] ?? null) === null);
+                }
+
                 try {
                     $resolved = app(SlotResolver::class)->resolve($slot);
                 } catch (\Throwable) {
@@ -509,11 +596,13 @@ class SlotPanel extends Component
         }
 
         return view('livewire.slot-panel', [
-            'value'      => $value,
-            'slot'       => $slot,
-            'entries'    => $entries,
-            'resolved'   => $resolved,
-            'messengers' => $messengers,
+            'value'               => $value,
+            'slot'                => $slot,
+            'entries'             => $entries,
+            'resolved'            => $resolved,
+            'messengers'          => $messengers,
+            'availableMessengers' => $availableMessengers,
+            'allGeoTags'          => $allGeoTags,
         ]);
     }
 }
