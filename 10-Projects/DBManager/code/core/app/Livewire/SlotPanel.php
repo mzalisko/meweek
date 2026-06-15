@@ -87,6 +87,86 @@ class SlotPanel extends Component
         $this->newNumber = '';
     }
 
+    public function moveUp(int $entryId): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot    = $value->phoneSlot;
+        $entries = $slot->entries()->orderBy('priority')->get();
+        $current = $entries->firstWhere('id', $entryId);
+
+        if (! $current) {
+            return;
+        }
+
+        $index    = $entries->search(fn ($e) => $e->id === $current->id);
+        $neighbour = $entries->get($index - 1);
+
+        if ($index === 0 || ! $neighbour) {
+            return; // Already at top — nothing to do
+        }
+
+        $this->swapEntryPriorities($current, $neighbour);
+
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'slot.reordered',
+            'subject_type' => 'phone_slot',
+            'subject_id'   => $slot->id,
+            'new'          => ['moved' => $entryId, 'direction' => 'up'],
+        ]);
+    }
+
+    public function moveDown(int $entryId): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot    = $value->phoneSlot;
+        $entries = $slot->entries()->orderBy('priority')->get();
+        $current = $entries->firstWhere('id', $entryId);
+
+        if (! $current) {
+            return;
+        }
+
+        $index     = $entries->search(fn ($e) => $e->id === $current->id);
+        $neighbour = $entries->get($index + 1);
+
+        if (! $neighbour) {
+            return; // Already at bottom — nothing to do
+        }
+
+        $this->swapEntryPriorities($current, $neighbour);
+
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'slot.reordered',
+            'subject_type' => 'phone_slot',
+            'subject_id'   => $slot->id,
+            'new'          => ['moved' => $entryId, 'direction' => 'down'],
+        ]);
+    }
+
     public function removeNumber(int $entryId): void
     {
         if (! $this->dataValueId) {
@@ -261,6 +341,29 @@ class SlotPanel extends Component
             'old'          => ['enabled' => $oldEnabled],
             'new'          => ['enabled' => $newEnabled],
         ]);
+    }
+
+    /**
+     * Swap the priority values of two NumberEntry rows, working around the
+     * unique(phone_slot_id, priority) constraint via a three-step swap:
+     * move A to a temporary safe value, move B to A's old value, move A to B's old value.
+     * The temp value is chosen to be guaranteed absent from the slot's priorities.
+     */
+    private function swapEntryPriorities(NumberEntry $a, NumberEntry $b): void
+    {
+        $pA = $a->priority;
+        $pB = $b->priority;
+
+        // Find a temp priority value that does not exist in this slot.
+        // Using max(priority)+1 of ALL entries in the same slot guarantees no collision.
+        $maxPriority = \DB::table('number_entries')
+            ->where('phone_slot_id', $a->phone_slot_id)
+            ->max('priority');
+        $temp = (int) $maxPriority + 1;
+
+        \DB::table('number_entries')->where('id', $a->id)->update(['priority' => $temp]);
+        \DB::table('number_entries')->where('id', $b->id)->update(['priority' => $pA]);
+        \DB::table('number_entries')->where('id', $a->id)->update(['priority' => $pB]);
     }
 
     /**

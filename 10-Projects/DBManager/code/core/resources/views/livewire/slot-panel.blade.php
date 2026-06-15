@@ -50,6 +50,12 @@
                 @else
                     <span class="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold bg-bad-bg text-bad-tx whitespace-nowrap">down</span>
                 @endif
+                <button wire:click="moveUp({{ $entry->id }})"
+                    class="shrink-0 text-[#b0b8b2] hover:text-ink text-[13px] leading-none px-1"
+                    aria-label="Підняти вгору">↑</button>
+                <button wire:click="moveDown({{ $entry->id }})"
+                    class="shrink-0 text-[#b0b8b2] hover:text-ink text-[13px] leading-none px-1"
+                    aria-label="Опустити вниз">↓</button>
                 <button wire:click="removeNumber({{ $entry->id }})"
                     wire:confirm="Видалити цей номер із ланцюга?"
                     class="shrink-0 text-[#b0b8b2] hover:text-bad-tx text-[13px] leading-none px-1"
