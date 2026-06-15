@@ -94,13 +94,32 @@
     <div class="mb-3">
         <div class="text-xs font-semibold text-mut uppercase tracking-wide mb-1">Поведінка</div>
 
-        <div class="text-xs mb-1">
-            Повернення:
-            <span class="{{ $slot->return_mode === 'auto' ? 'font-semibold text-ink' : 'text-mut' }}">● Авто</span>
-            <span class="{{ $slot->return_mode === 'sticky' ? 'font-semibold text-ink' : 'text-mut' }}">○ Sticky</span>
+        {{-- Повернення: Авто / Sticky --}}
+        <div class="text-xs mb-2">
+            <span class="text-mut mr-1">Повернення:</span>
+            <button
+                wire:click="setReturnMode('auto')"
+                class="px-2 py-0.5 rounded border text-xs transition-colors mr-1
+                    {{ $slot->return_mode === 'auto'
+                        ? 'bg-acc text-white border-acc font-semibold'
+                        : 'border-line text-mut hover:border-acc hover:text-acc-tx' }}"
+                title="Авто-повернення на пріоритетний номер"
+            >
+                Авто
+            </button>
+            <button
+                wire:click="setReturnMode('sticky')"
+                class="px-2 py-0.5 rounded border text-xs transition-colors
+                    {{ $slot->return_mode === 'sticky'
+                        ? 'bg-acc text-white border-acc font-semibold'
+                        : 'border-line text-mut hover:border-acc hover:text-acc-tx' }}"
+                title="Залишатись на поточному номері"
+            >
+                Sticky
+            </button>
         </div>
 
-        <div class="text-xs mb-1">
+        <div class="text-xs mb-2">
             Ручний режим:
             @if($slot->pinned_number_entry_id)
                 <span class="text-acc-tx font-medium">активний</span>
@@ -116,14 +135,38 @@
             @endif
         </div>
 
+        {{-- Якщо всі впали: вибір політики вичерпання --}}
         <div class="text-xs">
-            Якщо всі впали:
-            <span class="chip text-xs px-1.5 py-0.5 rounded bg-surface-2 border border-line">
-                @php
-                    $exhaustionLabels = ['hide' => 'Прибрати вивід', 'last' => 'Показати останній', 'emergency' => 'Аварійний номер'];
-                @endphp
-                {{ $exhaustionLabels[$slot->exhaustion_policy] ?? $slot->exhaustion_policy }} ▾
-            </span>
+            <span class="text-mut block mb-1">Якщо всі впали:</span>
+            <div class="flex gap-1 flex-wrap">
+                <button
+                    wire:click="setExhaustionPolicy('hide')"
+                    class="px-2 py-0.5 rounded border text-xs transition-colors
+                        {{ $slot->exhaustion_policy === 'hide'
+                            ? 'bg-acc text-white border-acc font-semibold'
+                            : 'border-line text-mut hover:border-acc hover:text-acc-tx' }}"
+                >
+                    Прибрати вивід
+                </button>
+                <button
+                    wire:click="setExhaustionPolicy('last')"
+                    class="px-2 py-0.5 rounded border text-xs transition-colors
+                        {{ $slot->exhaustion_policy === 'last'
+                            ? 'bg-acc text-white border-acc font-semibold'
+                            : 'border-line text-mut hover:border-acc hover:text-acc-tx' }}"
+                >
+                    Показувати останній
+                </button>
+                <button
+                    wire:click="setExhaustionPolicy('emergency')"
+                    class="px-2 py-0.5 rounded border text-xs transition-colors
+                        {{ $slot->exhaustion_policy === 'emergency'
+                            ? 'bg-acc text-white border-acc font-semibold'
+                            : 'border-line text-mut hover:border-acc hover:text-acc-tx' }}"
+                >
+                    Аварійний
+                </button>
+            </div>
         </div>
     </div>
 

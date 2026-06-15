@@ -72,6 +72,46 @@ class SlotPanel extends Component
         app(FailoverEngine::class)->unpin($value->phoneSlot, 'user');
     }
 
+    public function setReturnMode(string $mode): void
+    {
+        if (! in_array($mode, ['auto', 'sticky'], true)) {
+            return;
+        }
+
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot = $value->phoneSlot;
+        $slot->update(['return_mode' => $mode]);
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+    }
+
+    public function setExhaustionPolicy(string $policy): void
+    {
+        if (! in_array($policy, ['hide', 'last', 'emergency'], true)) {
+            return;
+        }
+
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $value->phoneSlot->update(['exhaustion_policy' => $policy]);
+    }
+
     public function render()
     {
         $value    = null;
