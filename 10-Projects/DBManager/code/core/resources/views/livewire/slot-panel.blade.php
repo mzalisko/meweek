@@ -87,7 +87,30 @@
     {{-- Прив'язані месенджери --}}
     <div class="mb-3">
         <div class="text-xs font-semibold text-mut uppercase tracking-wide mb-1">Прив'язані месенджери</div>
-        <p class="text-xs text-mut italic">— (завантаження в наступному таску)</p>
+
+        @if($messengers->isEmpty())
+            <p class="text-xs text-mut italic">— немає прив'язаних месенджерів</p>
+        @else
+            @foreach($messengers as $messenger)
+                @php
+                    $enabled = $messenger->content['enabled'] ?? true;
+                    $network = $messenger->content['network'] ?? 'невідомо';
+                @endphp
+                <div class="flex items-center justify-between py-1.5 border-b border-line/50 last:border-0">
+                    <span class="text-xs text-ink">{{ $network }}</span>
+                    <button
+                        wire:click="toggleMessenger({{ $messenger->id }})"
+                        class="text-xs px-2 py-0.5 rounded border transition-colors
+                            {{ $enabled
+                                ? 'bg-green-50 text-green-700 border-green-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
+                                : 'bg-red-50 text-red-600 border-red-300 hover:bg-green-50 hover:text-green-700 hover:border-green-300' }}"
+                        title="{{ $enabled ? 'Вимкнути месенджер' : 'Увімкнути месенджер' }}"
+                    >
+                        {{ $enabled ? 'Увімкнено' : 'Вимкнено' }}
+                    </button>
+                </div>
+            @endforeach
+        @endif
     </div>
 
     {{-- Поведінка --}}
