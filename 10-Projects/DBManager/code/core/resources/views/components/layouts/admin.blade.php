@@ -7,66 +7,63 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="bg-canvas text-ink text-[13px]">
+<body class="bg-canvas text-ink text-[13px] h-screen flex flex-col overflow-hidden">
     @include('admin.icons')
 
-    <div class="max-w-[1280px] mx-auto my-4 border border-[#e3e5e1] rounded-xl overflow-hidden bg-canvas">
-
-        {{-- Header --}}
-        <div class="bg-white border-b border-[#e3e5e1] px-[18px] py-3 flex justify-between items-center">
-            <div class="flex gap-3 items-center">
-                <b class="text-[14px]">DBManager Core</b>
-                {{ $breadcrumb ?? '' }}
-            </div>
-            <div class="flex gap-4 items-center text-mut">
-                <span>@svg('search') пошук ⌘K</span>
-                <span class="relative">
-                    @svg('bell')<span class="bg-[#a85c52] text-white rounded-lg text-[10px] px-1.5 relative -top-1.5 -left-1">{{ $incidents ?? 0 }}</span>
-                </span>
-                <span>@svg('user') {{ auth()->user()?->name }}</span>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="underline text-mut">вихід</button>
-                </form>
-            </div>
+    {{-- Header --}}
+    <header class="bg-white border-b border-[#e3e5e1] px-5 py-2.5 flex justify-between items-center shrink-0">
+        <div class="flex gap-4 items-center min-w-0">
+            <b class="text-[15px] text-acc-tx whitespace-nowrap">DBManager&nbsp;Core</b>
+            <div class="min-w-0">{{ $breadcrumb ?? '' }}</div>
         </div>
-
-        {{-- Context bar (optional slot) --}}
-        {{ $context ?? '' }}
-
-        {{-- Body: sidebar + main --}}
-        <div class="flex">
-
-            {{-- Sidebar nav --}}
-            <nav class="w-[170px] shrink-0 bg-white border-r border-[#e3e5e1] py-3">
-                @php
-                    $nav = [
-                        ['Дашборд',          'grid',  false],
-                        ['Значення',         'tag',   true],
-                        ['Сайти і групи',    'sites', false],
-                        ['Інциденти',        'alert', false],
-                        ['Аудит',            'audit', false],
-                        ['Доступи й токени', 'key',   false],
-                    ];
-                @endphp
-
-                @foreach($nav as [$label, $icon, $active])
-                    <div @class([
-                        'px-[18px] py-2 flex gap-2.5 items-center',
-                        'text-mut' => !$active,
-                        'bg-acc-bg border-r-[3px] border-acc text-acc-tx font-bold' => $active,
-                    ])>
-                        @svg($icon) {{ $label }}
-                    </div>
-                @endforeach
-            </nav>
-
-            {{-- Main content --}}
-            <div class="flex-1 min-w-0">
-                {{ $slot }}
-            </div>
-
+        <div class="flex gap-5 items-center text-mut shrink-0">
+            <span class="hidden lg:inline-flex items-center gap-1.5">@svg('search') пошук ⌘K</span>
+            <span class="relative inline-flex items-center gap-1">
+                @svg('bell')<span class="bg-[#a85c52] text-white rounded-full text-[10px] leading-none px-1.5 py-0.5">{{ $incidents ?? 0 }}</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 whitespace-nowrap">@svg('user') {{ auth()->user()?->name }}</span>
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button class="underline hover:text-ink">вихід</button>
+            </form>
         </div>
+    </header>
+
+    {{-- Context bar (optional slot) --}}
+    {{ $context ?? '' }}
+
+    {{-- Body: sidebar + main --}}
+    <div class="flex flex-1 min-h-0">
+
+        {{-- Sidebar nav --}}
+        <nav class="w-[210px] shrink-0 bg-white border-r border-[#e3e5e1] py-3 overflow-y-auto">
+            @php
+                $nav = [
+                    ['Дашборд',          'grid',  false],
+                    ['Значення',         'tag',   true],
+                    ['Сайти і групи',    'sites', false],
+                    ['Інциденти',        'alert', false],
+                    ['Аудит',            'audit', false],
+                    ['Доступи й токени', 'key',   false],
+                ];
+            @endphp
+
+            @foreach($nav as [$label, $icon, $active])
+                <div @class([
+                    'px-5 py-2.5 flex gap-3 items-center',
+                    'text-mut hover:bg-acc-bg/50' => !$active,
+                    'bg-acc-bg border-r-[3px] border-acc text-acc-tx font-semibold' => $active,
+                ])>
+                    @svg($icon) <span>{{ $label }}</span>
+                </div>
+            @endforeach
+        </nav>
+
+        {{-- Main content --}}
+        <main class="flex-1 min-w-0 overflow-y-auto">
+            {{ $slot }}
+        </main>
+
     </div>
 
     @livewireScripts
