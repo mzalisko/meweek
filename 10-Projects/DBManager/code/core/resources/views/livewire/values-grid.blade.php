@@ -47,6 +47,14 @@
         <div class="text-[11px] text-mut mb-2 hidden" aria-label="site-domain">{{ $siteModel->domain }}</div>
     @endif
 
+    {{-- Add value button --}}
+    <div class="flex justify-end mb-2">
+        <button wire:click="addValue"
+            class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-acc text-white hover:bg-acc/90 transition-colors">
+            + Додати значення
+        </button>
+    </div>
+
     {{-- Filter chips (Task 5: interactive wire:model.live bindings) --}}
     <div class="flex gap-2 items-center text-mut text-xs mb-3 flex-wrap">
         {{-- Type filter --}}
@@ -159,8 +167,10 @@
 
                 @foreach($items as $r)
                     @php($st = $stateMap[$r['state']] ?? 'ok')
-                    <div class="grid grid-cols-[24px_minmax(105px,1fr)_44px_minmax(210px,1.7fr)_50px_96px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors{{ $type === 'phone' ? ' cursor-pointer' : '' }}"
-                        @if($type === 'phone' && isset($r['id'])) wire:click="openSlot({{ $r['id'] }})" @endif>
+                    <div class="grid grid-cols-[24px_minmax(105px,1fr)_44px_minmax(210px,1.7fr)_50px_96px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors cursor-pointer"
+                        @if($type === 'phone' && isset($r['id'])) wire:click="openSlot({{ $r['id'] }})"
+                        @elseif($type !== 'phone' && isset($r['id'])) wire:click="editValue({{ $r['id'] }})"
+                        @endif>
                         {{-- Checkbox placeholder --}}
                         <span class="text-[#c0c5c1] select-none">☐</span>
 
@@ -198,4 +208,5 @@
     @endif
 </div>
 <livewire:slot-panel />
+<livewire:value-editor />
 </div>

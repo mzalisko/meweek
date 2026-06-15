@@ -21,6 +21,16 @@ class ValuesGrid extends Component
         $this->dispatch('open-slot', dataValueId: $dataValueId);
     }
 
+    public function editValue(int $dataValueId): void
+    {
+        $this->dispatch('edit-value', valueId: $dataValueId);
+    }
+
+    public function addValue(): void
+    {
+        $this->dispatch('open-value-editor', siteId: $this->site);
+    }
+
     public function mount(?int $site = null): void
     {
         $this->site = $site ?? Site::query()->orderBy('id')->value('id');

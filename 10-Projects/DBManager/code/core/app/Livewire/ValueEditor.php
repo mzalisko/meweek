@@ -32,6 +32,12 @@ class ValueEditor extends Component
 
     public ?string $url = null;
 
+    #[On('open-value-editor')]
+    public function openCreate(int $siteId): void
+    {
+        $this->createFor($siteId);
+    }
+
     public function createFor(int $siteId): void
     {
         $this->siteId = $siteId;
