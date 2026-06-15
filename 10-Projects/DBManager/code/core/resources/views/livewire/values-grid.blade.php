@@ -105,18 +105,20 @@
             </button>
         @endif
 
-        {{-- Search input --}}
-        <label class="border rounded-lg px-2.5 py-1 flex items-center gap-1.5
-            {{ $search ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
-            @svg('search')
+        {{-- Search input — просторе поле, бордер лише у фокусі --}}
+        <div class="ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 w-72 max-w-full bg-[#eef1ee] border border-transparent transition-colors focus-within:bg-white focus-within:border-acc">
+            <span class="text-mut shrink-0">@svg('search')</span>
             <input
-                wire:model.live="search"
+                wire:model.live.debounce.250ms="search"
                 type="text"
                 placeholder="Пошук за ключем…"
-                class="bg-transparent outline-none placeholder-mut text-xs w-32"
+                class="bg-transparent outline-none placeholder-mut text-xs flex-1 min-w-0 text-ink"
                 aria-label="Пошук за ключем"
             >
-        </label>
+            @if($search)
+                <button type="button" wire:click="$set('search', null)" class="text-mut hover:text-ink shrink-0 leading-none" aria-label="Очистити пошук">✕</button>
+            @endif
+        </div>
     </div>
 
     @if(empty($rows))
