@@ -146,8 +146,9 @@ class SlotMessengerTest extends TestCase
                 'content' => ['network' => 'viber', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
             ]);
 
+        // Назва мережі рендериться через ucfirst (як у макеті: Viber/WhatsApp).
         Livewire::test(SlotPanel::class)
             ->call('open', $slot->dataValue->id)
-            ->assertSee('viber');
+            ->assertSee('Viber');
     }
 }
