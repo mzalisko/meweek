@@ -40,6 +40,9 @@
                 $label     = $isFirst ? 'основний' : 'резерв';
             @endphp
 
+            @php
+                $isPinned = $slot->pinned_number_entry_id === $entry->id;
+            @endphp
             <div class="chain flex items-center gap-2 py-1.5 border-b border-line/50 last:border-0 {{ $status !== 'active' ? 'opacity-60' : '' }}">
                 {{-- Grip icon --}}
                 @svg('grip', 'ic ic-sm inline-block w-3.5 h-3.5 text-mut flex-shrink-0')
@@ -47,6 +50,9 @@
                 <span class="flex-1 min-w-0">
                     <b>#{{ $i }} {{ $label }}</b>
                     <span class="ml-2 font-mono text-xs text-ink">{{ $e164 }}</span>
+                    @if($isPinned)
+                        <span class="ml-1 text-xs text-acc-tx font-medium">📌</span>
+                    @endif
                 </span>
 
                 <span class="flex-shrink-0 text-xs font-medium
@@ -63,6 +69,17 @@
                         {{ $status }}
                     @endif
                 </span>
+
+                {{-- Pin button: show for active non-current entries --}}
+                @if($status === 'active' && ! $isCurrent)
+                    <button
+                        wire:click="pin({{ $entry->id }})"
+                        class="btn-ghost text-xs px-1.5 py-0.5 border border-line rounded hover:border-acc hover:text-acc-tx transition-colors flex-shrink-0"
+                        title="Показувати цей номер"
+                    >
+                        Показувати цей
+                    </button>
+                @endif
             </div>
         @endforeach
     </div>
@@ -87,7 +104,13 @@
             Ручний режим:
             @if($slot->pinned_number_entry_id)
                 <span class="text-acc-tx font-medium">активний</span>
-                <button class="btn-ghost text-xs ml-2 cursor-not-allowed opacity-60" disabled>Зняти</button>
+                <button
+                    wire:click="unpin"
+                    class="btn-ghost text-xs ml-2 border border-line rounded px-1.5 py-0.5 hover:border-red-400 hover:text-red-600 transition-colors"
+                    title="Зняти закріплення"
+                >
+                    Зняти
+                </button>
             @else
                 <span class="text-mut">не активний</span>
             @endif

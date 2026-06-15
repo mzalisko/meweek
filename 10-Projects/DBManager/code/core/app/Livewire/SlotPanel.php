@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\DataValue;
+use App\Services\Failover\FailoverEngine;
 use App\Services\Failover\ResolvedSlot;
 use App\Services\Failover\SlotResolver;
 use Livewire\Attributes\On;
@@ -31,6 +32,44 @@ class SlotPanel extends Component
 
         $this->dataValueId = $dataValueId;
         $this->open = true;
+    }
+
+    public function pin(int $entryId): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot.entries')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot  = $value->phoneSlot;
+        $entry = $slot->entries->firstWhere('id', $entryId);
+
+        if (! $entry) {
+            // Entry does not belong to this slot — reject silently
+            return;
+        }
+
+        app(FailoverEngine::class)->pin($slot, $entry, 'user');
+    }
+
+    public function unpin(): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        app(FailoverEngine::class)->unpin($value->phoneSlot, 'user');
     }
 
     public function render()
