@@ -23,6 +23,10 @@ class SlotPanel extends Component
 
     public string $newNumber = '';
 
+    public ?int $editingEntryId = null;
+
+    public string $editE164 = '';
+
     #[On('open-slot')]
     public function open(int $dataValueId): void
     {
@@ -85,6 +89,67 @@ class SlotPanel extends Component
         ]);
 
         $this->newNumber = '';
+    }
+
+    public function startEditNumber(int $entryId): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot.entries.phoneNumber')->find($this->dataValueId);
+        $entry = $value?->phoneSlot?->entries->firstWhere('id', $entryId);
+
+        if (! $entry) {
+            return;
+        }
+
+        $this->editingEntryId = $entryId;
+        $this->editE164 = $entry->phoneNumber->e164 ?? '';
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingEntryId = null;
+        $this->editE164 = '';
+    }
+
+    public function saveNumber(): void
+    {
+        $this->validate([
+            'editE164' => ['required', 'regex:/^\+\d{7,15}$/'],
+        ]);
+
+        if (! $this->dataValueId || $this->editingEntryId === null) {
+            $this->cancelEdit();
+
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot.entries.phoneNumber')->find($this->dataValueId);
+        $slot = $value?->phoneSlot;
+        $entry = $slot?->entries->firstWhere('id', $this->editingEntryId);
+
+        if (! $slot || ! $entry) {
+            $this->cancelEdit();
+
+            return;
+        }
+
+        $old = $entry->phoneNumber->e164;
+        $entry->phoneNumber->update(['e164' => $this->editE164]);
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'number.edited',
+            'subject_type' => 'phone_slot',
+            'subject_id'   => $slot->id,
+            'old'          => ['e164' => $old],
+            'new'          => ['e164' => $this->editE164],
+        ]);
+
+        $this->cancelEdit();
     }
 
     public function moveUp(int $entryId): void
