@@ -1,14 +1,15 @@
 <div>
+<aside class="w-[420px] shrink-0 bg-white border-l border-[#e3e5e1] overflow-y-auto text-[13px]">
 @if($open && $value && $slot)
-<aside class="w-[380px] shrink-0 bg-white border-l border-[#e3e5e1] p-4 overflow-y-auto text-[13px]">
+<div class="p-4">
 
     {{-- Header --}}
     <div class="flex justify-between items-center">
         <b class="text-acc-tx flex items-center gap-1.5">@svg('phone') Слот: {{ $value->key }}</b>
-        <button wire:click="$set('open', false)" class="text-mut hover:text-ink" aria-label="Закрити">✕</button>
+        <button wire:click="$set('open', false)" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
     </div>
-    <div class="text-[11px] text-mut mt-1">
-        @if($value->scope_type === 'site') ✎ Перекриття цього сайта @else Значення групи @endif
+    <div class="text-[11px] text-mut mt-1 flex items-center gap-1">
+        @if($value->scope_type === 'site')<span class="text-acc-tx">@svg('edit')</span> Перекриття цього сайта @else Значення групи @endif
     </div>
 
     {{-- Гео-мітки --}}
@@ -17,7 +18,7 @@
         <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Гео-мітки</div>
         <div class="flex flex-wrap gap-1.5">
             @foreach($value->geoTags as $geo)
-                <span class="inline-block bg-acc-bg border border-acc text-acc-tx font-semibold rounded-[9px] px-2.5 py-0.5 text-[11px]">{{ $geo->name }} ✓</span>
+                <span class="inline-block bg-acc-bg border border-acc text-acc-tx font-semibold rounded-[9px] px-2.5 py-0.5 text-[11px]">{{ $geo->name }}</span>
             @endforeach
         </div>
     </div>
@@ -46,8 +47,8 @@
                     @if($editing)
                         <input type="text" wire:model="editE164"
                             class="flex-1 min-w-0 border border-[#dfe3e0] rounded px-2 py-0.5 text-[12px] focus:outline-none focus:border-acc">
-                        <button wire:click="saveNumber" class="shrink-0 text-ok-tx text-[14px] leading-none px-1" title="Зберегти" aria-label="Зберегти номер">✓</button>
-                        <button wire:click="cancelEdit" class="shrink-0 text-mut text-[13px] leading-none px-1" title="Скасувати" aria-label="Скасувати">✕</button>
+                        <button wire:click="saveNumber" class="shrink-0 text-ok-tx hover:opacity-80 px-0.5" title="Зберегти" aria-label="Зберегти номер">@svg('check')</button>
+                        <button wire:click="cancelEdit" class="shrink-0 text-mut hover:text-ink px-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
                     @else
                         <span class="text-ink truncate">{{ $e164 }}</span>
                         @if($isPinned)<span class="text-acc-tx shrink-0" title="Закріплено">@svg('pin')</span>@endif
@@ -61,16 +62,21 @@
 
                 {{-- Рядок 2: дії --}}
                 @unless($editing)
-                <div class="flex items-center gap-1 mt-1.5">
-                    @if($status === 'active' && ! $isCurrent)
-                        <button wire:click="pin({{ $entry->id }})" class="border border-acc text-acc-tx rounded-md px-2 py-0.5 text-[11px] hover:bg-acc-bg whitespace-nowrap mr-auto">Показувати цей</button>
-                    @else
-                        <span class="mr-auto"></span>
-                    @endif
-                    <button wire:click="startEditNumber({{ $entry->id }})" class="text-[#9aa39c] hover:text-acc-tx text-[12px] leading-none px-1.5 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">✎</button>
-                    <button wire:click="moveUp({{ $entry->id }})" class="text-[#9aa39c] hover:text-ink text-[13px] leading-none px-1.5 py-0.5" title="Вгору" aria-label="Вгору">↑</button>
-                    <button wire:click="moveDown({{ $entry->id }})" class="text-[#9aa39c] hover:text-ink text-[13px] leading-none px-1.5 py-0.5" title="Вниз" aria-label="Вниз">↓</button>
-                    <button wire:click="removeNumber({{ $entry->id }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-[#9aa39c] hover:text-bad-tx text-[13px] leading-none px-1.5 py-0.5" title="Видалити" aria-label="Видалити">✕</button>
+                <div class="flex items-center gap-0.5 mt-1.5 text-[#9aa39c]">
+                    <div class="flex items-center gap-1.5 mr-auto">
+                        @if($status === 'down')
+                            <button wire:click="setNumberStatus({{ $entry->id }}, 'active')" class="border border-ok-tx/50 text-ok-tx rounded-md px-2 py-0.5 text-[11px] hover:bg-ok-bg whitespace-nowrap">Повернути</button>
+                        @else
+                            @if(! $isCurrent)
+                                <button wire:click="pin({{ $entry->id }})" class="border border-acc text-acc-tx rounded-md px-2 py-0.5 text-[11px] hover:bg-acc-bg whitespace-nowrap">Показувати цей</button>
+                            @endif
+                            <button wire:click="setNumberStatus({{ $entry->id }}, 'down')" wire:confirm="Позначити номер неактивним?" class="text-[11px] text-mut hover:text-bad-tx whitespace-nowrap">деактивувати</button>
+                        @endif
+                    </div>
+                    <button wire:click="startEditNumber({{ $entry->id }})" class="hover:text-acc-tx px-1 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
+                    <button wire:click="moveUp({{ $entry->id }})" class="hover:text-ink px-1 py-0.5" title="Вгору" aria-label="Вгору">@svg('chevron-up')</button>
+                    <button wire:click="moveDown({{ $entry->id }})" class="hover:text-ink px-1 py-0.5" title="Вниз" aria-label="Вниз">@svg('chevron-down')</button>
+                    <button wire:click="removeNumber({{ $entry->id }})" wire:confirm="Видалити цей номер із ланцюга?" class="hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
                 </div>
                 @endunless
             </div>
@@ -84,7 +90,7 @@
                 placeholder="+380XXXXXXXXX"
                 class="flex-1 min-w-0 border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
             <button wire:click="addNumber"
-                class="shrink-0 bg-acc text-white rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 whitespace-nowrap">+ додати резерв</button>
+                class="shrink-0 inline-flex items-center gap-1 bg-acc text-white rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 whitespace-nowrap">@svg('plus') додати резерв</button>
         </div>
         @error('newNumber')
             <p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>
@@ -147,8 +153,9 @@
         <span class="text-[11px] text-mut">→ аудит + push</span>
     </div>
 
-</aside>
+</div>
 @else
-<div></div>
+<div class="h-full flex items-center justify-center p-6 text-center text-mut text-[12px]">Оберіть рядок, щоб редагувати</div>
 @endif
+</aside>
 </div>

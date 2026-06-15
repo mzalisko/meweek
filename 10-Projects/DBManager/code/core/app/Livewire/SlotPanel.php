@@ -152,6 +152,26 @@ class SlotPanel extends Component
         $this->cancelEdit();
     }
 
+    /** Ручне перемикання номера active|down (§6) — повернути впалий або деактивувати. */
+    public function setNumberStatus(int $entryId, string $status): void
+    {
+        if (! in_array($status, ['active', 'down'], true) || ! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot.entries.phoneNumber')->find($this->dataValueId);
+        $entry = $value?->phoneSlot?->entries->firstWhere('id', $entryId);
+
+        if (! $entry) {
+            return;
+        }
+
+        $engine = app(FailoverEngine::class);
+        $status === 'active'
+            ? $engine->markNumberActive($entry->phoneNumber, 'user')
+            : $engine->markNumberDown($entry->phoneNumber, 'user');
+    }
+
     public function moveUp(int $entryId): void
     {
         if (! $this->dataValueId) {

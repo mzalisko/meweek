@@ -6,7 +6,7 @@
         {{-- Header --}}
         <div class="flex justify-between items-center mb-4">
             <b class="text-acc-tx text-[15px]">{{ $valueId ? 'Редагувати значення' : 'Додати значення' }}</b>
-            <button wire:click="$set('open', false)" class="text-mut hover:text-ink" aria-label="Закрити">✕</button>
+            <button wire:click="$set('open', false)" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
         </div>
 
         {{-- Type --}}

@@ -199,7 +199,7 @@
                         {{-- Scope badge --}}
                         <span>
                             @if($r['scope'] === 'site')
-                                <span class="inline-block bg-[#eef1ee] border border-dashed border-[#aeb6b0] rounded-md px-2 py-0.5 text-[11px] text-[#5a625d] whitespace-nowrap">✎ цього сайта</span>
+                                <span class="inline-block bg-[#eef1ee] border border-dashed border-[#aeb6b0] rounded-md px-2 py-0.5 text-[11px] text-[#5a625d] whitespace-nowrap">цього сайта</span>
                             @else
                                 <span class="text-mut text-xs">Група</span>
                             @endif
