@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\ValuesGrid;
 use Illuminate\Support\Facades\Route;
 
 // Головна → адмінка (вона сама редіректить на /login, якщо не авторизовано).
@@ -13,11 +14,8 @@ Route::view('profile', 'profile')
     ->name('profile');
 
 // Admin routes — protected by auth middleware.
-// Task 2: render the admin shell layout (placeholder; Task 4 will swap to ValuesGrid).
 Route::middleware('auth')->group(function () {
-    Route::get('/admin', function () {
-        return view('admin.placeholder');
-    })->name('admin.values');
+    Route::get('/admin', ValuesGrid::class)->name('admin.values');
 });
 
 require __DIR__.'/auth.php';
