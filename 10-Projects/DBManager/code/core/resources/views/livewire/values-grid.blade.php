@@ -171,8 +171,11 @@
                         @if($type === 'phone' && isset($r['id'])) wire:click="openSlot({{ $r['id'] }})"
                         @elseif($type !== 'phone' && isset($r['id'])) wire:click="editValue({{ $r['id'] }})"
                         @endif>
-                        {{-- Checkbox placeholder --}}
-                        <span class="text-[#c0c5c1] select-none">☐</span>
+                        {{-- Row checkbox --}}
+                        <input type="checkbox"
+                            wire:click.stop="toggleSelect({{ $r['id'] }})"
+                            @checked(in_array($r['id'], $selected))
+                            class="cursor-pointer accent-acc">
 
                         {{-- Key --}}
                         <span class="font-medium text-ink truncate" title="{{ $r['key'] }}">{{ $r['key'] }}</span>

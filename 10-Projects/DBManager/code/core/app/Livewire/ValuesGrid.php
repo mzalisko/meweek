@@ -16,6 +16,47 @@ class ValuesGrid extends Component
     public ?string $geo    = null;
     public ?string $status = null;
 
+    public array $selected = [];
+
+    public function toggleSelect(int $id): void
+    {
+        if (in_array($id, $this->selected, true)) {
+            $this->selected = array_values(array_filter($this->selected, fn($v) => $v !== $id));
+        } else {
+            $this->selected[] = $id;
+        }
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selected = [];
+    }
+
+    public function updatedSite(): void
+    {
+        $this->clearSelection();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->clearSelection();
+    }
+
+    public function updatedType(): void
+    {
+        $this->clearSelection();
+    }
+
+    public function updatedGeo(): void
+    {
+        $this->clearSelection();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->clearSelection();
+    }
+
     public function openSlot(int $dataValueId): void
     {
         $this->dispatch('open-slot', dataValueId: $dataValueId);
