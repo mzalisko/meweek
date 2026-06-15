@@ -22,12 +22,77 @@
         <div class="text-[11px] text-mut mb-2 hidden" aria-label="site-domain">{{ $siteModel->domain }}</div>
     @endif
 
-    {{-- Filter chips (static placeholders — Task 5 adds interactivity) --}}
-    <div class="flex gap-2 items-center text-mut text-xs mb-3">
-        <span class="border border-[#dfe3e0] bg-white rounded-lg px-2.5 py-1 cursor-pointer">Тип ▾</span>
-        <span class="border border-[#dfe3e0] bg-white rounded-lg px-2.5 py-1 cursor-pointer">Гео ▾</span>
-        <span class="border border-[#dfe3e0] bg-white rounded-lg px-2.5 py-1 cursor-pointer">Статус ▾</span>
-        <span class="border border-[#dfe3e0] bg-white rounded-lg px-2.5 py-1 cursor-pointer">@svg('search') Пошук…</span>
+    {{-- Filter chips (Task 5: interactive wire:model.live bindings) --}}
+    <div class="flex gap-2 items-center text-mut text-xs mb-3 flex-wrap">
+        {{-- Type filter --}}
+        <label class="border rounded-lg px-2.5 py-1 cursor-pointer flex items-center gap-1
+            {{ $type ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
+            Тип ▾
+            <select wire:model.live="type" class="opacity-0 absolute w-0 h-0 pointer-events-none" aria-label="Фільтр за типом">
+                <option value="">Усі типи</option>
+                <option value="phone">Телефони</option>
+                <option value="messenger">Месенджери</option>
+                <option value="price">Ціни</option>
+                <option value="text">Текст</option>
+            </select>
+        </label>
+        @if($type)
+            <button wire:click="$set('type', null)"
+                class="border border-acc bg-acc-bg text-acc-tx rounded-lg px-2.5 py-1 font-semibold">
+                Тип: {{ $type }} ✕
+            </button>
+        @endif
+
+        {{-- Geo filter --}}
+        <label class="border rounded-lg px-2.5 py-1 cursor-pointer flex items-center gap-1
+            {{ $geo ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
+            Гео ▾
+            <select wire:model.live="geo" class="opacity-0 absolute w-0 h-0 pointer-events-none" aria-label="Фільтр за гео">
+                <option value="">Усі регіони</option>
+                <option value="UA">UA</option>
+                <option value="RU">RU</option>
+                <option value="WORLD">WORLD</option>
+            </select>
+        </label>
+        @if($geo)
+            <button wire:click="$set('geo', null)"
+                class="border border-acc bg-acc-bg text-acc-tx rounded-lg px-2.5 py-1 font-semibold">
+                Гео: {{ $geo }} ✕
+            </button>
+        @endif
+
+        {{-- Status filter --}}
+        <label class="border rounded-lg px-2.5 py-1 cursor-pointer flex items-center gap-1
+            {{ $status ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
+            Статус ▾
+            <select wire:model.live="status" class="opacity-0 absolute w-0 h-0 pointer-events-none" aria-label="Фільтр за статусом">
+                <option value="">Усі статуси</option>
+                <option value="ok">ok</option>
+                <option value="on_reserve">резерв</option>
+                <option value="pinned">закріплено</option>
+                <option value="exhausted">вичерпано</option>
+                <option value="hidden">приховано</option>
+            </select>
+        </label>
+        @if($status)
+            <button wire:click="$set('status', null)"
+                class="border border-acc bg-acc-bg text-acc-tx rounded-lg px-2.5 py-1 font-semibold">
+                Статус: {{ $status }} ✕
+            </button>
+        @endif
+
+        {{-- Search input --}}
+        <label class="border rounded-lg px-2.5 py-1 flex items-center gap-1.5
+            {{ $search ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
+            @svg('search')
+            <input
+                wire:model.live="search"
+                type="text"
+                placeholder="Пошук за ключем…"
+                class="bg-transparent outline-none placeholder-mut text-xs w-32"
+                aria-label="Пошук за ключем"
+            >
+        </label>
     </div>
 
     @if(empty($rows))
