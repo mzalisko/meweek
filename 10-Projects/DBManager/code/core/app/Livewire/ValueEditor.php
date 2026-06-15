@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Admin\AffectedSites;
 use App\Models\AuditLog;
 use App\Models\DataValue;
+use App\Models\GeoTag;
 use App\Models\PhoneSlot;
 use App\Models\Site;
 use App\Models\ValueType;
@@ -16,6 +17,12 @@ use Livewire\Component;
 class ValueEditor extends Component
 {
     public bool $open = false;
+
+    #[On('close-editor-panel')]
+    public function closePanel(): void
+    {
+        $this->open = false;
+    }
 
     public ?int $siteId = null;
 
@@ -33,6 +40,10 @@ class ValueEditor extends Component
 
     public ?string $url = null;
 
+    public array $geoTagIds = [];
+
+    public string $linkedSlot = '';
+
     #[On('open-value-editor')]
     public function openCreate(int $siteId): void
     {
@@ -49,7 +60,10 @@ class ValueEditor extends Component
         $this->scope = 'site';
         $this->network = null;
         $this->url = null;
+        $this->geoTagIds = [];
+        $this->linkedSlot = '';
         $this->resetValidation();
+        $this->dispatch('close-slot-panel');
         $this->open = true;
     }
 
@@ -64,9 +78,12 @@ class ValueEditor extends Component
         $this->key     = $dv->key;
         $this->value   = $dv->content['value'] ?? '';
         $this->scope   = $dv->scope_type;
-        $this->network = $dv->content['network'] ?? null;
-        $this->url     = $dv->content['url'] ?? null;
+        $this->network   = $dv->content['network'] ?? null;
+        $this->url       = $dv->content['url'] ?? null;
+        $this->geoTagIds = $dv->geoTags->pluck('id')->toArray();
+        $this->linkedSlot = $dv->content['linked_slot'] ?? '';
         $this->resetValidation();
+        $this->dispatch('close-slot-panel');
         $this->open    = true;
     }
 
@@ -87,8 +104,9 @@ class ValueEditor extends Component
         // Build content
         $content = $this->type === 'phone' ? [] : ['value' => $this->value];
         if ($this->type === 'messenger') {
-            $content['network'] = $this->network;
-            $content['url']     = $this->url;
+            $content['network']     = $this->network;
+            $content['url']         = $this->url;
+            $content['linked_slot'] = $this->linkedSlot ?: null;
         }
 
         // Resolve value_type_id
@@ -99,8 +117,9 @@ class ValueEditor extends Component
 
         if ($this->valueId) {
             // UPDATE existing value
-            $dv      = DataValue::findOrFail($this->valueId);
+            $dv         = DataValue::with('geoTags')->findOrFail($this->valueId);
             $oldContent = $dv->content;
+            $oldGeoIds  = $dv->geoTags->pluck('id')->sort()->values()->all();
 
             $dv->update([
                 'key'           => $this->key,
@@ -116,6 +135,19 @@ class ValueEditor extends Component
                 'old'          => $oldContent,
                 'new'          => $content,
             ]);
+
+            $newGeoIds = collect($this->geoTagIds)->sort()->values()->all();
+            if ($oldGeoIds !== $newGeoIds) {
+                $dv->geoTags()->sync($this->geoTagIds);
+                AuditLog::create([
+                    'actor_type'   => 'user',
+                    'action'       => 'value.geo_changed',
+                    'subject_type' => 'DataValue',
+                    'subject_id'   => $dv->id,
+                    'old'          => ['geo_tag_ids' => $oldGeoIds],
+                    'new'          => ['geo_tag_ids' => $newGeoIds],
+                ]);
+            }
         } else {
             // CREATE new value — resolve scope_id
             if ($this->scope === 'site') {
@@ -147,6 +179,10 @@ class ValueEditor extends Component
                 'old'          => null,
                 'new'          => $content,
             ]);
+
+            if (! empty($this->geoTagIds)) {
+                $dv->geoTags()->sync($this->geoTagIds);
+            }
 
             if ($this->type === 'phone') {
                 PhoneSlot::create([
@@ -252,6 +288,25 @@ class ValueEditor extends Component
 
     public function render()
     {
-        return view('livewire.value-editor');
+        $allGeoTags = GeoTag::orderBy('code')->get();
+
+        $availableSlots = collect();
+        if ($this->siteId) {
+            $site = Site::find($this->siteId);
+            $phoneTypeId = ValueType::where('code', 'phone')->value('id');
+            if ($phoneTypeId && $site) {
+                $availableSlots = DataValue::where('value_type_id', $phoneTypeId)
+                    ->where(fn ($q) => $q
+                        ->where(fn ($q2) => $q2->where('scope_type', 'site')->where('scope_id', $site->id))
+                        ->orWhere(fn ($q2) => $q2->where('scope_type', 'group')->where('scope_id', $site->site_group_id))
+                    )
+                    ->pluck('key');
+            }
+        }
+
+        return view('livewire.value-editor', [
+            'allGeoTags'     => $allGeoTags,
+            'availableSlots' => $availableSlots,
+        ]);
     }
 }

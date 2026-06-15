@@ -27,6 +27,12 @@ class SlotPanel extends Component
 
     public string $editE164 = '';
 
+    #[On('close-slot-panel')]
+    public function closePanel(): void
+    {
+        $this->open = false;
+    }
+
     #[On('open-slot')]
     public function open(int $dataValueId): void
     {
@@ -42,6 +48,7 @@ class SlotPanel extends Component
             return;
         }
 
+        $this->dispatch('close-editor-panel');
         $this->dataValueId = $dataValueId;
         $this->open = true;
     }
