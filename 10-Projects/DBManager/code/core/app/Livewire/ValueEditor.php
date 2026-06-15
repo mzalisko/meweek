@@ -137,6 +137,42 @@ class ValueEditor extends Component
         $this->dispatch('value-saved');
     }
 
+    public function overrideForSite(int $valueId, int $siteId): void
+    {
+        $groupValue = DataValue::findOrFail($valueId);
+
+        // Guard: only override group-scoped values
+        if ($groupValue->scope_type !== 'group') {
+            return;
+        }
+
+        // Guard: site must belong to the group
+        $site = Site::find($siteId);
+        if (! $site || $site->site_group_id !== $groupValue->scope_id) {
+            return;
+        }
+
+        $siteValue = DataValue::create([
+            'key'           => $groupValue->key,
+            'value_type_id' => $groupValue->value_type_id,
+            'scope_type'    => 'site',
+            'scope_id'      => $siteId,
+            'content'       => $groupValue->content,
+            'status'        => 'active',
+        ]);
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'value.overridden',
+            'subject_type' => 'DataValue',
+            'subject_id'   => $siteValue->id,
+            'old'          => ['scope_type' => 'group', 'scope_id' => $groupValue->scope_id],
+            'new'          => ['scope_type' => 'site', 'scope_id' => $siteId],
+        ]);
+
+        $this->dispatch('value-saved');
+    }
+
     public function delete(): void
     {
         $dv = DataValue::findOrFail($this->valueId);
