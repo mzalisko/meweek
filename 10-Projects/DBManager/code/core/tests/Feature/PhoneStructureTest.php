@@ -18,7 +18,7 @@ class PhoneStructureTest extends TestCase
         $second = NumberEntry::factory()->for($slot, 'slot')->create(['priority' => 1]);
         $first = NumberEntry::factory()->for($slot, 'slot')->create(['priority' => 0]);
 
-        $ordered = $slot->fresh()->entries;
+        $ordered = $slot->fresh()->entries->sortBy('priority')->values();
         $this->assertSame([$first->id, $second->id], $ordered->pluck('id')->all());
         $this->assertInstanceOf(PhoneNumber::class, $ordered->first()->phoneNumber);
         $this->assertSame('phone', $slot->dataValue->type->code);

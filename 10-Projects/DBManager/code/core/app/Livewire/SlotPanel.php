@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Models\AuditLog;
 use App\Models\DataValue;
+use App\Models\NumberEntry;
+use App\Models\PhoneNumber;
 use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Failover\ResolvedSlot;
@@ -18,6 +20,8 @@ class SlotPanel extends Component
     public bool $open = false;
 
     public ?int $dataValueId = null;
+
+    public string $newNumber = '';
 
     #[On('open-slot')]
     public function open(int $dataValueId): void
@@ -36,6 +40,51 @@ class SlotPanel extends Component
 
         $this->dataValueId = $dataValueId;
         $this->open = true;
+    }
+
+    public function addNumber(): void
+    {
+        $this->validate([
+            'newNumber' => ['required', 'regex:/^\+\d{7,15}$/'],
+        ]);
+
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot.entries')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot = $value->phoneSlot;
+        $next = $slot->entries()->count()
+            ? ((int) $slot->entries()->max('priority') + 1)
+            : 0;
+
+        $pn = PhoneNumber::create([
+            'e164'   => $this->newNumber,
+            'status' => 'active',
+        ]);
+
+        NumberEntry::create([
+            'phone_slot_id'   => $slot->id,
+            'phone_number_id' => $pn->id,
+            'priority'        => $next,
+        ]);
+
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'number.added',
+            'subject_type' => 'phone_slot',
+            'subject_id'   => $slot->id,
+            'new'          => ['e164' => $this->newNumber, 'priority' => $next],
+        ]);
+
+        $this->newNumber = '';
     }
 
     public function pin(int $entryId): void

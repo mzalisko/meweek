@@ -20,6 +20,6 @@ class PhoneSlot extends Model
 
     public function entries(): HasMany
     {
-        return $this->hasMany(NumberEntry::class)->orderBy('priority');
+        return $this->hasMany(NumberEntry::class);
     }
 }

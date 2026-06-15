@@ -52,6 +52,19 @@
                 @endif
             </div>
         @endforeach
+
+        {{-- Додати резерв --}}
+        <div class="mt-2 flex items-center gap-2">
+            <input type="text"
+                wire:model="newNumber"
+                placeholder="+380XXXXXXXXX"
+                class="flex-1 min-w-0 border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
+            <button wire:click="addNumber"
+                class="shrink-0 bg-acc text-white rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 whitespace-nowrap">+ додати резерв</button>
+        </div>
+        @error('newNumber')
+            <p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>
+        @enderror
     </div>
 
     {{-- Прив'язані месенджери --}}
