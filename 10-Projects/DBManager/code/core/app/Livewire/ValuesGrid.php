@@ -16,6 +16,11 @@ class ValuesGrid extends Component
     public ?string $geo    = null;
     public ?string $status = null;
 
+    public function openSlot(int $dataValueId): void
+    {
+        $this->dispatch('open-slot', dataValueId: $dataValueId);
+    }
+
     public function mount(?int $site = null): void
     {
         $this->site = $site ?? Site::query()->orderBy('id')->value('id');

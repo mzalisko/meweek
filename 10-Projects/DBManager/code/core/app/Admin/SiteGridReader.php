@@ -55,6 +55,7 @@ class SiteGridReader
         $geo = $value->geoTags->pluck('code')->all() ?: ['WORLD'];
 
         $base = [
+            'id'       => $value->id,
             'key'      => $value->key,
             'type'     => $value->type->code,
             'geo'      => $geo,

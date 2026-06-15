@@ -40,7 +40,8 @@
     </div>
 </x-slot>
 
-<div class="p-3.5">
+<div class="flex gap-0 min-h-0">
+<div class="flex-1 min-w-0 p-3.5">
     {{-- Site context heading (also ensures domain is in the component's wire-snapshot for tests) --}}
     @if($siteModel)
         <div class="text-[11px] text-mut mb-2 hidden" aria-label="site-domain">{{ $siteModel->domain }}</div>
@@ -158,7 +159,8 @@
 
                 @foreach($items as $r)
                     @php($st = $stateMap[$r['state']] ?? 'ok')
-                    <div class="grid grid-cols-[24px_minmax(105px,1fr)_44px_minmax(210px,1.7fr)_50px_96px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors">
+                    <div class="grid grid-cols-[24px_minmax(105px,1fr)_44px_minmax(210px,1.7fr)_50px_96px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors{{ $type === 'phone' ? ' cursor-pointer' : '' }}"
+                        @if($type === 'phone' && isset($r['id'])) wire:click="openSlot({{ $r['id'] }})" @endif>
                         {{-- Checkbox placeholder --}}
                         <span class="text-[#c0c5c1] select-none">☐</span>
 
@@ -194,4 +196,6 @@
             </div>
         @endforeach
     @endif
+</div>
+<livewire:slot-panel />
 </div>
