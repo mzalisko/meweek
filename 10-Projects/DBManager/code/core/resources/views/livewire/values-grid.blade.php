@@ -167,7 +167,7 @@
 
                 @foreach($items as $r)
                     @php($st = $stateMap[$r['state']] ?? 'ok')
-                    <div class="grid grid-cols-[24px_minmax(105px,1fr)_44px_minmax(210px,1.7fr)_50px_96px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors cursor-pointer"
+                    <div class="grid grid-cols-[24px_minmax(96px,0.9fr)_minmax(92px,0.75fr)_minmax(170px,1.4fr)_44px_84px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors cursor-pointer"
                         @if($type === 'phone' && isset($r['id'])) wire:click="openSlot({{ $r['id'] }})"
                         @elseif($type !== 'phone' && isset($r['id'])) wire:click="editValue({{ $r['id'] }})"
                         @endif>
@@ -181,10 +181,14 @@
                         <span class="font-medium text-ink truncate" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
 
                         {{-- Geo --}}
-                        <span class="text-mut text-xs">{{ implode(',', $r['geo']) }}</span>
+                        <span class="min-w-0 flex flex-wrap gap-1 text-mut text-[11px]" title="{{ implode(', ', $r['geo']) }}">
+                            @foreach($r['geo'] as $geo)
+                                <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none">{{ $geo }}</span>
+                            @endforeach
+                        </span>
 
                         {{-- Status badge + value --}}
-                        <span class="flex items-center gap-2 min-w-0">
+                        <span class="flex items-center gap-2 min-w-0 overflow-hidden">
                             <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold text-[11px] shrink-0 bg-{{ $st }}-bg text-{{ $st }}-tx">
                                 ●&nbsp;{{ $stateLabels[$r['state']] ?? $r['state'] }}
                             </span>

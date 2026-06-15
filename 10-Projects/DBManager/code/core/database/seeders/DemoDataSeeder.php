@@ -2,11 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Models\ApiToken;
+use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
+use App\Models\Incident;
 use App\Models\NumberEntry;
 use App\Models\PhoneNumber;
 use App\Models\PhoneSlot;
+use App\Models\Publication;
 use App\Models\Site;
 use App\Models\SiteGroup;
 use App\Services\Failover\FailoverEngine;
@@ -15,126 +19,148 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Демо-дані для адмінки (НЕ викликається з DatabaseSeeder — лише вручну:
- * php artisan db:seed --class=DemoDataSeeder). Видаляє попередні demo-дані
- * й наповнює грід реалістичним набором з трьома телефонними слотами:
- * RO (world + резерв), UA (world+UA), RU (world+RU+BY).
+ * php artisan db:seed --class=DemoDataSeeder). У local/testing робить
+ * demo-reset і створює два сайти в одній групі: RO/UA однакові на обох,
+ * RU перекритий на другому.
  */
 class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->wipeDemoData();
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('DemoDataSeeder: demo-reset дозволений лише в local/testing.');
 
-        $group  = SiteGroup::factory()->create(['name' => 'Brand A']);
-        $siteRo = Site::factory()->for($group, 'group')->create(['domain' => 'domen.ro']);
-        Site::factory()->for($group, 'group')->create(['domain' => 'domen.ua']);
+            return;
+        }
 
-        $world = GeoTag::firstOrCreate(['code' => 'WORLD'], ['name' => 'World (catch-all)']);
-        $ua    = GeoTag::firstOrCreate(['code' => 'UA'],    ['name' => 'Ukraine']);
-        $ru    = GeoTag::firstOrCreate(['code' => 'RU'],    ['name' => 'Russia']);
-        $by    = GeoTag::firstOrCreate(['code' => 'BY'],    ['name' => 'Belarus']);
-
-        // RO phone slot — group scope, geo: WORLD, 1 main + 1 reserve
-        $roValue = $this->slot(
-            statuses: ['active', 'active'],
-            key: 'phone_ro_1',
-            scopeType: 'group',
-            scopeId: $group->id,
-            geoTags: [$world->id],
-        );
-
-        // UA phone slot — site scope, geo: WORLD + UA
-        $this->slot(
-            statuses: ['active'],
-            key: 'phone_ua_1',
-            scopeType: 'site',
-            scopeId: $siteRo->id,
-            geoTags: [$world->id, $ua->id],
-        );
-
-        // RU phone slot — group scope, geo: WORLD + RU + BY
-        $this->slot(
-            statuses: ['active'],
-            key: 'phone_ru_1',
-            scopeType: 'group',
-            scopeId: $group->id,
-            geoTags: [$world->id, $ru->id, $by->id],
-        );
-
-        // A messenger without linked_slot so it appears in "available to link"
-        DataValue::factory()->forGroup($group)->ofType('messenger')->create([
-            'key'     => 'tg_brand',
-            'content' => ['network' => 'telegram', 'url' => 'https://t.me/brand'],
+        $this->call([
+            GeoTagSeeder::class,
+            ValueTypeSeeder::class,
         ]);
 
-        $this->command?->info('DemoDataSeeder: Brand A + domen.ro/domen.ua, 3 phone slots (RO/UA/RU).');
+        DB::transaction(function () {
+            $this->wipeDemoData();
+
+            $group = SiteGroup::factory()->create(['name' => 'Brand A']);
+            Site::factory()->for($group, 'group')->create([
+                'name' => 'Domen RO',
+                'domain' => 'domen.ro',
+                'country_hint' => 'RO',
+            ]);
+            $siteUa = Site::factory()->for($group, 'group')->create([
+                'name' => 'Domen UA',
+                'domain' => 'domen.ua',
+                'country_hint' => 'UA',
+            ]);
+
+            $world = GeoTag::where('code', 'WORLD')->sole();
+            $ua    = GeoTag::where('code', 'UA')->sole();
+            $ru    = GeoTag::where('code', 'RU')->sole();
+            $by    = GeoTag::where('code', 'BY')->sole();
+
+            // Однаковий RO для всієї групи: WORLD, основний + 1 резерв.
+            $this->slot(
+                key: 'phone_ro_1',
+                scopeType: 'group',
+                scopeId: $group->id,
+                geoTags: [$world->id],
+                numbers: [
+                    ['+40211222333', 'RO основний'],
+                    ['+40211444555', 'RO резерв'],
+                ],
+            );
+
+            // Однаковий UA для всієї групи: WORLD + UA, без RU.
+            $this->slot(
+                key: 'phone_ua_1',
+                scopeType: 'group',
+                scopeId: $group->id,
+                geoTags: [$world->id, $ua->id],
+                numbers: [
+                    ['+380441112233', 'UA основний'],
+                ],
+            );
+
+            // Груповий RU діє на сайтах без власного override: WORLD + RU + BY, без UA.
+            $this->slot(
+                key: 'phone_ru_1',
+                scopeType: 'group',
+                scopeId: $group->id,
+                geoTags: [$world->id, $ru->id, $by->id],
+                numbers: [
+                    ['+74951234567', 'RU груповий'],
+                ],
+            );
+
+            // На другому сайті RU відрізняється, але RO і UA лишаються груповими.
+            $this->slot(
+                key: 'phone_ru_1',
+                scopeType: 'site',
+                scopeId: $siteUa->id,
+                geoTags: [$world->id, $ru->id, $by->id],
+                numbers: [
+                    ['+74957654321', 'RU для domen.ua'],
+                ],
+            );
+        });
+
+        $this->command?->info('DemoDataSeeder: створено Brand A + domen.ro/domen.ua; RO/UA групові, RU перекритий на domen.ua.');
     }
 
-    /** @param array<int,string> $statuses priority => active|down */
-    private function slot(array $statuses, string $key, string $scopeType, int $scopeId, array $geoTags = []): DataValue
+    /**
+     * @param array<int,int> $geoTags
+     * @param array<int,array{0:string,1:string}> $numbers
+     */
+    private function slot(string $key, string $scopeType, int $scopeId, array $geoTags, array $numbers): DataValue
     {
-        $slot = PhoneSlot::factory()->create();
+        $value = DataValue::factory()->ofType('phone')->create([
+            'key'        => $key,
+            'scope_type' => $scopeType,
+            'scope_id'   => $scopeId,
+            'content'    => null,
+            'status'     => 'active',
+        ]);
 
-        foreach ($statuses as $priority => $status) {
-            NumberEntry::factory()->for($slot, 'slot')->create([
+        $slot = PhoneSlot::create([
+            'data_value_id' => $value->id,
+            'return_mode' => 'auto',
+            'exhaustion_policy' => 'hide',
+        ]);
+
+        foreach ($numbers as $priority => [$e164, $label]) {
+            $phone = PhoneNumber::create([
+                'e164' => $e164,
+                'label' => $label,
+                'status' => 'active',
+            ]);
+
+            NumberEntry::create([
+                'phone_slot_id'   => $slot->id,
                 'priority'        => $priority,
-                'phone_number_id' => PhoneNumber::factory()->create(['status' => $status])->id,
+                'phone_number_id' => $phone->id,
             ]);
         }
 
-        $slot->dataValue->update(['key' => $key, 'scope_type' => $scopeType, 'scope_id' => $scopeId]);
-
-        if ($geoTags) {
-            $slot->dataValue->geoTags()->sync($geoTags);
-        }
+        $value->geoTags()->sync($geoTags);
 
         app(FailoverEngine::class)->recompute($slot->fresh());
 
-        return $slot->dataValue->fresh();
+        return $value->fresh();
     }
 
     private function wipeDemoData(): void
     {
-        $demoGroupNames = ['Brand A'];
-        $groups = SiteGroup::whereIn('name', $demoGroupNames)->with('sites')->get();
+        Publication::query()->delete();
+        ApiToken::query()->delete();
+        AuditLog::query()->delete();
+        Incident::query()->delete();
+        NumberEntry::query()->delete();
+        PhoneSlot::query()->delete();
+        DataValue::query()->delete();
+        PhoneNumber::query()->delete();
+        Site::query()->delete();
+        SiteGroup::query()->delete();
 
-        foreach ($groups as $group) {
-            $siteIds = $group->sites->pluck('id');
-
-            // Delete DataValues scoped to sites in this group
-            DataValue::where('scope_type', 'site')
-                ->whereIn('scope_id', $siteIds)
-                ->with(['phoneSlot.entries.phoneNumber', 'geoTags'])
-                ->get()
-                ->each(fn ($dv) => $this->deleteDataValue($dv));
-
-            // Delete DataValues scoped to the group itself
-            DataValue::where('scope_type', 'group')
-                ->where('scope_id', $group->id)
-                ->with(['phoneSlot.entries.phoneNumber', 'geoTags'])
-                ->get()
-                ->each(fn ($dv) => $this->deleteDataValue($dv));
-
-            $group->sites()->delete();
-            $group->delete();
-        }
-
-        $this->command?->info('DemoDataSeeder: попередні demo-дані видалено.');
-    }
-
-    private function deleteDataValue(DataValue $dv): void
-    {
-        $dv->geoTags()->detach();
-
-        if ($dv->relationLoaded('phoneSlot') && $dv->phoneSlot) {
-            foreach ($dv->phoneSlot->entries as $entry) {
-                $pn = $entry->phoneNumber;
-                $entry->delete();
-                $pn?->delete();
-            }
-            $dv->phoneSlot->delete();
-        }
-
-        $dv->delete();
+        $this->command?->info('DemoDataSeeder: попередні робочі дані видалено.');
     }
 }

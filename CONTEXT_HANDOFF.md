@@ -2,7 +2,7 @@
 
 Знімок стану роботи для продовження в новій сесії. Канонічний контекст проєкту — `10-Projects/DBManager/DBManager — Контекст.md`; огляд для людини — `10-Projects/DBManager/documentation/`.
 
-**Оновлено:** 2026-06-15 · **Гілка:** main, **ahead 5+** від origin · **Core 164 тести зелені.**
+**Оновлено:** 2026-06-16 · **Гілка:** main, **ahead 6+** від origin · **Core 165 тестів зелені.**
 
 ## Стан роботи
 
@@ -15,8 +15,9 @@
   - **2.3 ✅** — редактор значень: CRUD, область дії група/сайт, перекриття групового, публікація уражених; хелпер `App\Admin\AffectedSites`.
   - **2.4 ✅** — телефонний слот: створення (DataValue+PhoneSlot), у панелі — додати/видалити/редагувати(e164)/↑↓-пріоритет/повернути-деактивувати номер.
   - **2.5 — НА ПАУЗІ (Task 1 з 4 зроблено):** виділення рядків чекбоксами ✅. Лишилось: прев'ю «торкнеться N сайтів», bulk-видалення з публікацією. План: `plans/2026-06-15 — План 2.5 — Bulk-дії.md`.
-  - **2.6 ✅** — ValueEditor переведено з modal overlay на `fixed right-0 top-0 bottom-0 z-40 w-[420px]` панель. Взаємне виключення SlotPanel ↔ ValueEditor через Livewire-події (`close-slot-panel` / `close-editor-panel`). Гео-мітки: toggle-чіпи, sync pivot, аудит `value.geo_changed`. Linked_slot: select для месенджера. 164 тести зелені.
-- Демо-дані: `php artisan db:seed --class=DemoDataSeeder` (група Brand A + domen.ua/domen.org).
+  - **2.6 ✅** — ValueEditor переведено з modal overlay на `fixed right-0 top-0 bottom-0 z-40 w-[420px]` панель. Взаємне виключення SlotPanel ↔ ValueEditor через Livewire-події (`close-slot-panel` / `close-editor-panel`). Гео-мітки: toggle-чіпи, sync pivot, аудит `value.geo_changed`. Linked_slot: select для месенджера.
+  - **2.7 ✅** — SlotPanel: гео-мітки стали editable toggle-чіпи (sync+аудит у save), поле аварійного номера при exhaustion_policy=emergency, `linkMessenger`/`unlinkMessenger` з аудитом + UI «Прив'язати / Від'язати». DemoDataSeeder: demo-reset + 2 сайти в групі Brand A; `domen.ro` має RO/UA/RU з групи, `domen.ua` має ті самі RO/UA й власний RU override.
+- Демо-дані: `php artisan db:seed --class=DemoDataSeeder` (Brand A + `domen.ro`/`domen.ua`; RO має 1 резерв; UA = WORLD+UA; RU = WORLD+RU+BY).
 
 ## Ключові змінені файли (Етап 2; повний перелік — `git log`)
 
@@ -40,7 +41,7 @@
 
 ## Наступні кроки (за пріоритетом)
 
-1. ~~**План 2.6 — Єдина панель редагування**~~ **ВИКОНАНО** (164 тести зелені).
+1. ~~**План 2.6**~~ ✅ ~~**План 2.7**~~ ✅ (165 тестів зелені).
 2. **План 2.5 — добити bulk:** прев'ю «торкнеться N сайтів» + bulk-видалення з публікацією (Tasks 2–4). План: `plans/2026-06-15 — План 2.5 — Bulk-дії.md`.
 3. Далі Етап 2: дашборд + дзвіночок інцидентів + аудит-стрічка з відкатом; ролі/права; імпорт CSV/XLSX.
 4. **Перед продом:** крос-модельне рев'ю (Codex) + security; борг Етапу 3.
