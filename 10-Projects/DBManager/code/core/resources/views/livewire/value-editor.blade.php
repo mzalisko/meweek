@@ -18,6 +18,7 @@
                 <option value="messenger">Месенджер</option>
                 <option value="address">Адреса</option>
                 <option value="social">Соцмережа</option>
+                <option value="phone">Телефон</option>
             </select>
             @error('type')<p class="text-red-500 text-[11px] mt-0.5">{{ $message }}</p>@enderror
         </div>

@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Admin\AffectedSites;
 use App\Models\AuditLog;
 use App\Models\DataValue;
+use App\Models\PhoneSlot;
 use App\Models\Site;
 use App\Models\ValueType;
 use App\Services\Publishing\BridgePublisher;
@@ -71,14 +72,20 @@ class ValueEditor extends Component
 
     public function save(): void
     {
-        $this->validate([
+        $rules = [
             'key'   => ['required', 'regex:/^[a-z0-9_]+$/'],
-            'type'  => ['required', 'in:text,price,messenger,address,social'],
+            'type'  => ['required', 'in:text,price,messenger,address,social,phone'],
             'scope' => ['required', 'in:group,site'],
-        ]);
+        ];
+
+        if ($this->type !== 'phone') {
+            $rules['value'] = ['required'];
+        }
+
+        $this->validate($rules);
 
         // Build content
-        $content = ['value' => $this->value];
+        $content = $this->type === 'phone' ? [] : ['value' => $this->value];
         if ($this->type === 'messenger') {
             $content['network'] = $this->network;
             $content['url']     = $this->url;
@@ -140,6 +147,15 @@ class ValueEditor extends Component
                 'old'          => null,
                 'new'          => $content,
             ]);
+
+            if ($this->type === 'phone') {
+                PhoneSlot::create([
+                    'data_value_id'    => $dv->id,
+                    'return_mode'      => 'auto',
+                    'exhaustion_policy' => 'hide',
+                ]);
+                $this->dispatch('open-slot', dataValueId: $dv->id);
+            }
         }
 
         $this->open = false;
