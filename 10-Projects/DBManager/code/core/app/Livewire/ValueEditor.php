@@ -2,10 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Admin\AffectedSites;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\Site;
 use App\Models\ValueType;
+use App\Services\Publishing\BridgePublisher;
+use App\Services\Publishing\SitePayloadCompiler;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -135,6 +138,7 @@ class ValueEditor extends Component
 
         $this->open = false;
         $this->dispatch('value-saved');
+        $this->publishAffected($dv);
     }
 
     public function overrideForSite(int $valueId, int $siteId): void
@@ -171,11 +175,15 @@ class ValueEditor extends Component
         ]);
 
         $this->dispatch('value-saved');
+        $this->publishAffected($siteValue);
     }
 
     public function delete(): void
     {
         $dv = DataValue::findOrFail($this->valueId);
+
+        // Capture affected sites BEFORE deleting the row (AffectedSites needs the record).
+        $affectedSites = app(AffectedSites::class)->for($dv);
 
         AuditLog::create([
             'actor_type'   => 'user',
@@ -191,6 +199,33 @@ class ValueEditor extends Component
         $this->valueId = null;
         $this->open    = false;
         $this->dispatch('value-saved');
+
+        // Publish outside the transaction; a failed push is non-fatal.
+        $published = 0;
+        $affectedSites->each(function ($site) use (&$published) {
+            $publication = app(SitePayloadCompiler::class)->publish($site);
+            if (app(BridgePublisher::class)->push($publication)) {
+                $published++;
+            }
+        });
+        if ($published > 0) {
+            $this->dispatch('toast', message: "Видалено → опубліковано {$published} сайтів");
+        }
+    }
+
+    /** Публікує уражені сайти в DataBridge; невдалий push не валить операцію. */
+    private function publishAffected(DataValue $dv): void
+    {
+        $published = 0;
+        app(AffectedSites::class)->for($dv)->each(function ($site) use (&$published) {
+            $publication = app(SitePayloadCompiler::class)->publish($site);
+            if (app(BridgePublisher::class)->push($publication)) {
+                $published++;
+            }
+        });
+        if ($published > 0) {
+            $this->dispatch('toast', message: "Збережено → опубліковано {$published} сайтів");
+        }
     }
 
     public function render()
