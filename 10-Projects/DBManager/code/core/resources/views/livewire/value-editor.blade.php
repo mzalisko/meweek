@@ -65,9 +65,16 @@
         </div>
 
         {{-- Buttons --}}
-        <div class="flex justify-end gap-2">
-            <button wire:click="$set('open', false)" type="button" class="px-4 py-1.5 rounded-lg border border-[#e3e5e1] text-ink hover:bg-[#f5f5f3]">Скасувати</button>
-            <button wire:click="save" type="button" class="px-4 py-1.5 rounded-lg bg-[#5f7d6e] text-white hover:bg-[#4e6b5e]">Зберегти</button>
+        <div class="flex justify-between gap-2">
+            @if($valueId)
+            <button wire:click="delete" wire:confirm="Видалити це значення?" type="button" class="px-4 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50">Видалити</button>
+            @else
+            <span></span>
+            @endif
+            <div class="flex gap-2">
+                <button wire:click="$set('open', false)" type="button" class="px-4 py-1.5 rounded-lg border border-[#e3e5e1] text-ink hover:bg-[#f5f5f3]">Скасувати</button>
+                <button wire:click="save" type="button" class="px-4 py-1.5 rounded-lg bg-[#5f7d6e] text-white hover:bg-[#4e6b5e]">Зберегти</button>
+            </div>
         </div>
 
     </div>

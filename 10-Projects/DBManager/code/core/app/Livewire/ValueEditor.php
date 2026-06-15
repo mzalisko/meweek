@@ -43,11 +43,21 @@ class ValueEditor extends Component
         $this->open = true;
     }
 
-    /** Task 3 — stub only */
     #[On('edit-value')]
     public function edit(int $valueId): void
     {
-        // Task 3 will implement this
+        $dv = DataValue::findOrFail($valueId);
+
+        $this->valueId = $dv->id;
+        $this->siteId  = $dv->scope_type === 'site' ? $dv->scope_id : null;
+        $this->type    = $dv->type->code;
+        $this->key     = $dv->key;
+        $this->value   = $dv->content['value'] ?? '';
+        $this->scope   = $dv->scope_type;
+        $this->network = $dv->content['network'] ?? null;
+        $this->url     = $dv->content['url'] ?? null;
+        $this->resetValidation();
+        $this->open    = true;
     }
 
     public function save(): void
@@ -57,19 +67,6 @@ class ValueEditor extends Component
             'type'  => ['required', 'in:text,price,messenger,address,social'],
             'scope' => ['required', 'in:group,site'],
         ]);
-
-        // Resolve scope_id
-        if ($this->scope === 'site') {
-            $scopeId = $this->siteId;
-        } else {
-            $site = Site::find($this->siteId);
-            if (! $site || ! $site->site_group_id) {
-                $this->addError('scope', 'Сайт не належить до жодної групи.');
-
-                return;
-            }
-            $scopeId = $site->site_group_id;
-        }
 
         // Build content
         $content = ['value' => $this->value];
@@ -84,27 +81,79 @@ class ValueEditor extends Component
             ['name' => $this->type],
         );
 
-        // Create DataValue
-        $dv = DataValue::create([
-            'key'           => $this->key,
-            'value_type_id' => $valueType->id,
-            'scope_type'    => $this->scope,
-            'scope_id'      => $scopeId,
-            'content'       => $content,
-            'status'        => 'active',
-        ]);
+        if ($this->valueId) {
+            // UPDATE existing value
+            $dv      = DataValue::findOrFail($this->valueId);
+            $oldContent = $dv->content;
 
-        // Audit
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'value.created',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $dv->id,
-            'old'          => null,
-            'new'          => $content,
-        ]);
+            $dv->update([
+                'key'           => $this->key,
+                'value_type_id' => $valueType->id,
+                'content'       => $content,
+            ]);
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'value.updated',
+                'subject_type' => 'DataValue',
+                'subject_id'   => $dv->id,
+                'old'          => $oldContent,
+                'new'          => $content,
+            ]);
+        } else {
+            // CREATE new value — resolve scope_id
+            if ($this->scope === 'site') {
+                $scopeId = $this->siteId;
+            } else {
+                $site = Site::find($this->siteId);
+                if (! $site || ! $site->site_group_id) {
+                    $this->addError('scope', 'Сайт не належить до жодної групи.');
+
+                    return;
+                }
+                $scopeId = $site->site_group_id;
+            }
+
+            $dv = DataValue::create([
+                'key'           => $this->key,
+                'value_type_id' => $valueType->id,
+                'scope_type'    => $this->scope,
+                'scope_id'      => $scopeId,
+                'content'       => $content,
+                'status'        => 'active',
+            ]);
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'value.created',
+                'subject_type' => 'DataValue',
+                'subject_id'   => $dv->id,
+                'old'          => null,
+                'new'          => $content,
+            ]);
+        }
 
         $this->open = false;
+        $this->dispatch('value-saved');
+    }
+
+    public function delete(): void
+    {
+        $dv = DataValue::findOrFail($this->valueId);
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'value.deleted',
+            'subject_type' => 'DataValue',
+            'subject_id'   => $dv->id,
+            'old'          => $dv->content,
+            'new'          => null,
+        ]);
+
+        $dv->delete();
+
+        $this->valueId = null;
+        $this->open    = false;
         $this->dispatch('value-saved');
     }
 
