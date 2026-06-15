@@ -40,6 +40,10 @@ class SiteGridReaderTest extends TestCase
         $this->assertSame('ok', $phone['state']);
         $this->assertSame(['UA'], $phone['geo']);
         $this->assertSame(1, $phone['reserves']); // 2 entries — 1 current, 1 reserve
+        $this->assertSame($slot->fresh()->current_number_entry_id, $phone['entry_id']);
+        $this->assertCount(2, $phone['numbers']);
+        $this->assertSame(0, $phone['numbers'][0]['priority']);
+        $this->assertSame(1, $phone['numbers'][1]['priority']);
 
         $price = collect($rows['price'] ?? [])->firstWhere('key', 'price_basic');
         $this->assertNotNull($price, 'price_basic row must exist');

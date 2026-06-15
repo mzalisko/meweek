@@ -3,8 +3,13 @@
 namespace App\Livewire;
 
 use App\Admin\SiteGridReader;
+use App\Models\AuditLog;
+use App\Models\NumberEntry;
 use App\Models\Site;
 use App\Models\SiteGroup;
+use App\Services\Failover\FailoverEngine;
+use App\Services\Publishing\BridgePublisher;
+use App\Services\Publishing\SitePayloadCompiler;
 use Livewire\Component;
 
 class ValuesGrid extends Component
@@ -17,6 +22,10 @@ class ValuesGrid extends Component
     public ?string $status = null;
 
     public array $selected = [];
+
+    public ?int $editingPhoneEntryId = null;
+
+    public string $editingPhoneNumber = '';
 
     public function toggleSelect(int $id): void
     {
@@ -70,6 +79,64 @@ class ValuesGrid extends Component
     public function addValue(): void
     {
         $this->dispatch('open-value-editor', siteId: $this->site);
+    }
+
+    public function startInlinePhoneEdit(int $entryId): void
+    {
+        $entry = NumberEntry::with(['slot.dataValue', 'phoneNumber'])->find($entryId);
+
+        if (! $this->entryBelongsToCurrentSite($entry)) {
+            return;
+        }
+
+        $this->editingPhoneEntryId = $entry->id;
+        $this->editingPhoneNumber = $entry->phoneNumber->e164 ?? '';
+    }
+
+    public function cancelInlinePhoneEdit(): void
+    {
+        $this->editingPhoneEntryId = null;
+        $this->editingPhoneNumber = '';
+    }
+
+    public function saveInlinePhoneNumber(): void
+    {
+        $this->validate([
+            'editingPhoneNumber' => ['required', 'regex:/^\+\d{7,15}$/'],
+        ]);
+
+        if ($this->editingPhoneEntryId === null) {
+            return;
+        }
+
+        $entry = NumberEntry::with(['slot.dataValue', 'phoneNumber'])->find($this->editingPhoneEntryId);
+
+        if (! $this->entryBelongsToCurrentSite($entry)) {
+            $this->cancelInlinePhoneEdit();
+
+            return;
+        }
+
+        $old = $entry->phoneNumber->e164;
+
+        if ($old !== $this->editingPhoneNumber) {
+            $entry->phoneNumber->update(['e164' => $this->editingPhoneNumber]);
+            app(FailoverEngine::class)->recompute($entry->slot->fresh(), 'user');
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'number.edited',
+                'subject_type' => 'phone_slot',
+                'subject_id'   => $entry->phone_slot_id,
+                'old'          => ['e164' => $old],
+                'new'          => ['e164' => $this->editingPhoneNumber],
+            ]);
+
+            $this->publishSlotSites($entry);
+        }
+
+        $this->cancelInlinePhoneEdit();
+        $this->dispatch('toast', message: 'Номер збережено → опубліковано');
     }
 
     public function mount(?int $site = null): void
@@ -131,5 +198,30 @@ class ValuesGrid extends Component
         }
 
         return $filtered;
+    }
+
+    private function entryBelongsToCurrentSite(?NumberEntry $entry): bool
+    {
+        if (! $entry || ! $entry->slot || ! $entry->slot->dataValue || ! $this->site) {
+            return false;
+        }
+
+        $site = Site::find($this->site);
+        $value = $entry->slot->dataValue;
+
+        return $site
+            && (
+                ($value->scope_type === 'site' && (int) $value->scope_id === (int) $site->id)
+                || ($value->scope_type === 'group' && (int) $value->scope_id === (int) $site->site_group_id)
+            );
+    }
+
+    private function publishSlotSites(NumberEntry $entry): void
+    {
+        app(FailoverEngine::class)->sitesFor($entry->slot->fresh())
+            ->each(function (Site $site) {
+                $publication = app(SitePayloadCompiler::class)->publish($site);
+                app(BridgePublisher::class)->push($publication);
+            });
     }
 }

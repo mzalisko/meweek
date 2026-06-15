@@ -157,17 +157,24 @@
         @endphp
 
         @foreach($rows as $type => $items)
-            <div class="mt-3.5">
-                {{-- Group header with counter --}}
-                <div class="text-[11px] uppercase tracking-wide text-mut mb-1.5 flex gap-1.5 items-center">
-                    @svg($typeLabels[$type][1] ?? 'tag')
-                    <span>{{ $typeLabels[$type][0] ?? $type }}</span>
-                    <span class="bg-[#eef1ee] border border-[#c8cec9] rounded-full px-2 py-0.5 text-[10px] leading-none">{{ count($items) }}</span>
+            <div class="mt-3 overflow-hidden border border-[#dfe3e0] bg-white rounded-lg">
+                <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] text-[10px] uppercase tracking-wide text-mut">
+                    <div></div>
+                    <div class="flex gap-1.5 items-center">
+                        @svg($typeLabels[$type][1] ?? 'tag')
+                        <span>{{ $typeLabels[$type][0] ?? $type }}</span>
+                        <span class="bg-[#eef1ee] border border-[#c8cec9] rounded-full px-2 py-0.5 text-[10px] leading-none">{{ count($items) }}</span>
+                    </div>
+                    <div>Гео</div>
+                    <div>Стан</div>
+                    <div>Значення / резерви</div>
+                    <div>Область</div>
+                    <div></div>
                 </div>
 
                 @foreach($items as $r)
                     @php($st = $stateMap[$r['state']] ?? 'ok')
-                    <div class="grid grid-cols-[24px_minmax(96px,0.9fr)_minmax(92px,0.75fr)_minmax(170px,1.4fr)_44px_84px] gap-2.5 items-center px-2.5 py-2.5 mt-1 bg-white border border-[#e3e5e1] rounded-[10px] hover:border-acc-bd transition-colors cursor-pointer"
+                    <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 hover:bg-[#fafbfa] transition-colors cursor-pointer"
                         @if($type === 'phone' && isset($r['id'])) wire:click="openSlot({{ $r['id'] }})"
                         @elseif($type !== 'phone' && isset($r['id'])) wire:click="editValue({{ $r['id'] }})"
                         @endif>
@@ -187,25 +194,74 @@
                             @endforeach
                         </span>
 
-                        {{-- Status badge + value --}}
-                        <span class="flex items-center gap-2 min-w-0 overflow-hidden">
-                            <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold text-[11px] shrink-0 bg-{{ $st }}-bg text-{{ $st }}-tx">
-                                ●&nbsp;{{ $stateLabels[$r['state']] ?? $r['state'] }}
+                        {{-- Status badge --}}
+                        <span class="min-w-0">
+                            <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold text-[11px] bg-{{ $st }}-bg text-{{ $st }}-tx">
+                                ● {{ $stateLabels[$r['state']] ?? $r['state'] }}
                             </span>
-                            @if($r['value'] !== null)
-                                <span class="text-ink truncate">{{ $r['value'] }}</span>
+                        </span>
+
+                        {{-- Value / inline phone edit --}}
+                        <span class="min-w-0" wire:click.stop>
+                            @if($type === 'phone' && !empty($r['numbers']))
+                                <span class="flex flex-col gap-1">
+                                    @foreach($r['numbers'] as $number)
+                                        @php($isEditingNumber = $editingPhoneEntryId === $number['entry_id'])
+                                        <span class="flex items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }}">
+                                            <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
+                                                {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
+                                            </span>
+                                            @if($isEditingNumber)
+                                                <input
+                                                    wire:model.defer="editingPhoneNumber"
+                                                    wire:keydown.enter="saveInlinePhoneNumber"
+                                                    wire:keydown.escape="cancelInlinePhoneEdit"
+                                                    type="text"
+                                                    class="w-44 max-w-full border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
+                                                    aria-label="Редагувати номер"
+                                                >
+                                                <button wire:click="saveInlinePhoneNumber" class="text-ok-tx hover:opacity-80 px-1" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
+                                                <button wire:click="cancelInlinePhoneEdit" class="text-mut hover:text-ink px-1" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
+                                            @else
+                                                <span class="min-w-0 truncate text-ink">{{ $number['e164'] }}</span>
+                                                @if(($number['status'] ?? 'active') !== 'active')
+                                                    <span class="shrink-0 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">{{ $number['status'] }}</span>
+                                                @endif
+                                                @if($number['is_current'])
+                                                    <span class="shrink-0 rounded-md bg-ok-bg px-1.5 py-0.5 text-[10px] font-semibold text-ok-tx">показується</span>
+                                                @endif
+                                                <button wire:click="startInlinePhoneEdit({{ $number['entry_id'] }})" class="ml-auto shrink-0 text-mut hover:text-acc-tx px-1" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
+                                            @endif
+                                        </span>
+                                        @if($isEditingNumber)
+                                            @error('editingPhoneNumber')
+                                                <span class="ml-[5.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
+                                            @enderror
+                                        @endif
+                                    @endforeach
+                                </span>
+                            @else
+                                @if($r['value'] !== null)
+                                    <span class="text-ink truncate">{{ $r['value'] }}</span>
+                                @else
+                                    <span class="text-mut">—</span>
+                                @endif
                             @endif
                         </span>
 
-                        {{-- Reserves --}}
-                        <span class="text-mut text-xs text-center">{{ $r['reserves'] ?: '—' }}</span>
-
                         {{-- Scope badge --}}
-                        <span>
+                        <span class="min-w-0">
                             @if($r['scope'] === 'site')
                                 <span class="inline-block bg-[#eef1ee] border border-dashed border-[#aeb6b0] rounded-md px-2 py-0.5 text-[11px] text-[#5a625d] whitespace-nowrap">цього сайта</span>
                             @else
                                 <span class="text-mut text-xs">Група</span>
+                            @endif
+                        </span>
+
+                        {{-- Details --}}
+                        <span class="text-mut hover:text-acc-tx text-right">
+                            @if($type === 'phone')
+                                @svg('edit')
                             @endif
                         </span>
                     </div>

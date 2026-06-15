@@ -73,6 +73,18 @@ class SiteGridReader
             $base['reserves'] = max(0, $slot->entries->count() - 1);
             $base['state']    = $resolved->visible ? $resolved->state : 'hidden';
             $base['value']    = $resolved->visible ? $resolved->number : null;
+            $base['entry_id'] = $resolved->entryId;
+            $base['numbers']  = $slot->entries
+                ->sortBy('priority')
+                ->map(fn ($entry) => [
+                    'entry_id' => $entry->id,
+                    'priority' => $entry->priority,
+                    'e164' => $entry->phoneNumber?->e164,
+                    'status' => $entry->phoneNumber?->status,
+                    'is_current' => $entry->id === $resolved->entryId,
+                ])
+                ->values()
+                ->all();
         }
 
         return $base;
