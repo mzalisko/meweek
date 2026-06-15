@@ -87,6 +87,41 @@ class SlotPanel extends Component
         $this->newNumber = '';
     }
 
+    public function removeNumber(int $entryId): void
+    {
+        if (! $this->dataValueId) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($this->dataValueId);
+
+        if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        $slot  = $value->phoneSlot;
+        $entry = $slot->entries()->find($entryId);
+
+        if (! $entry) {
+            // Entry does not belong to this slot — reject silently
+            return;
+        }
+
+        $e164 = $entry->phoneNumber->e164 ?? null;
+
+        $entry->delete();
+
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'number.removed',
+            'subject_type' => 'phone_slot',
+            'subject_id'   => $slot->id,
+            'old'          => ['e164' => $e164],
+        ]);
+    }
+
     public function pin(int $entryId): void
     {
         if (! $this->dataValueId) {
