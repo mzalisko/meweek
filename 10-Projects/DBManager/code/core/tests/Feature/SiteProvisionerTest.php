@@ -43,4 +43,18 @@ class SiteProvisionerTest extends TestCase
 
         $this->assertNull(app(SiteProvisioner::class)->activeTokenHash($site));
     }
+
+    public function test_revoke_token_marks_all_active_tokens_revoked(): void
+    {
+        $site = Site::factory()->create();
+        $provisioner = app(SiteProvisioner::class);
+        $provisioner->issueToken($site);
+        $provisioner->issueToken($site);
+
+        $count = $provisioner->revokeToken($site);
+
+        $this->assertSame(2, $count);
+        $this->assertNull($provisioner->activeTokenHash($site));
+        $this->assertSame(0, ApiToken::where('site_id', $site->id)->whereNull('revoked_at')->count());
+    }
 }

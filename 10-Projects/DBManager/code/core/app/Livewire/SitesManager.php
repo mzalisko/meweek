@@ -5,8 +5,10 @@ namespace App\Livewire;
 use App\Admin\AccessControl;
 use App\Models\AuditLog;
 use App\Models\DataValue;
+use App\Models\Publication;
 use App\Models\Site;
 use App\Models\SiteGroup;
+use App\Services\Provisioning\SiteProvisioner;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -30,6 +32,8 @@ class SitesManager extends Component
     public string $siteCountryHint = '';
 
     public ?int $siteGroupId = null;
+
+    public ?string $visibleToken = null;
 
     public function mount(): void
     {
@@ -164,6 +168,7 @@ class SitesManager extends Component
         $this->siteDomain = '';
         $this->siteCountryHint = '';
         $this->siteGroupId = $groupId;
+        $this->visibleToken = null;
         $this->resetValidation();
     }
 
@@ -178,6 +183,7 @@ class SitesManager extends Component
         $this->siteDomain = $site->domain;
         $this->siteCountryHint = $site->country_hint ?? '';
         $this->siteGroupId = $site->site_group_id;
+        $this->visibleToken = null;
         $this->resetValidation();
     }
 
@@ -266,6 +272,42 @@ class SitesManager extends Component
         $this->dispatch('toast', message: 'Сайт відновлено');
     }
 
+    public function issueToken(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        $this->visibleToken = app(SiteProvisioner::class)->issueToken($site);
+        $this->auditToken('token.issued', $site->id);
+
+        $this->dispatch('toast', message: 'Токен видано. Скопіюйте зараз — більше не покажемо.');
+    }
+
+    public function revokeToken(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        app(SiteProvisioner::class)->revokeToken($site);
+        $this->visibleToken = null;
+        $this->auditToken('token.revoked', $site->id);
+
+        $this->dispatch('toast', message: 'Токени сайта відкликано');
+    }
+
+    public function rotateToken(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        $provisioner = app(SiteProvisioner::class);
+        $provisioner->revokeToken($site);
+        $this->visibleToken = $provisioner->issueToken($site);
+        $this->auditToken('token.rotated', $site->id);
+
+        $this->dispatch('toast', message: 'Токен зротовано. Старий більше не діє.');
+    }
+
     public function closePanel(): void
     {
         $this->panelMode = null;
@@ -276,7 +318,31 @@ class SitesManager extends Component
         $this->siteDomain = '';
         $this->siteCountryHint = '';
         $this->siteGroupId = null;
+        $this->visibleToken = null;
         $this->resetValidation();
+    }
+
+    private function auditToken(string $action, int $siteId): void
+    {
+        AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => auth()->id(),
+            'action' => $action,
+            'subject_type' => 'Site',
+            'subject_id' => $siteId,
+        ]);
+    }
+
+    /**
+     * @return array{lastSeenAt: ?string, lastVersion: ?int, hasActiveToken: bool}
+     */
+    private function connectionStatus(Site $site): array
+    {
+        return [
+            'lastSeenAt' => $site->tokens()->max('last_seen_at'),
+            'lastVersion' => Publication::where('site_id', $site->id)->max('version'),
+            'hasActiveToken' => $site->tokens()->whereNull('revoked_at')->exists(),
+        ];
     }
 
     public function render()
@@ -298,11 +364,16 @@ class SitesManager extends Component
             ->orderBy('domain')
             ->get();
 
+        $editingSite = $this->editingSiteId
+            ? Site::withTrashed()->find($this->editingSiteId)
+            : null;
+
         return view('livewire.sites-manager', [
             'groups' => $groups,
             'ungroupedSites' => $ungroupedSites,
             'valueCounts' => $this->valueCounts(),
             'groupOptions' => SiteGroup::orderBy('name')->pluck('name', 'id'),
+            'tokenStatus' => $editingSite ? $this->connectionStatus($editingSite) : null,
         ])->layout('components.layouts.admin');
     }
 

@@ -196,6 +196,57 @@
                     </button>
                 </div>
             </form>
+
+            @if($editingSiteId && $tokenStatus)
+                <div class="space-y-3 border-t border-[#edf0ed] px-4 py-4">
+                    <div class="text-[11px] uppercase tracking-wide text-mut">Токен і зв’язок</div>
+
+                    <div class="space-y-1 rounded-lg border border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[12px] text-mut">
+                        <div>
+                            Стан:
+                            @if($tokenStatus['hasActiveToken'])
+                                <span class="font-semibold text-ok-tx">чинний токен</span>
+                            @else
+                                <span class="font-semibold text-bad-tx">токена немає</span>
+                            @endif
+                        </div>
+                        <div>
+                            Остання активність:
+                            {{ $tokenStatus['lastSeenAt'] ? \Illuminate\Support\Carbon::parse($tokenStatus['lastSeenAt'])->diffForHumans() : '—' }}
+                        </div>
+                        <div>
+                            Публікація:
+                            {{ $tokenStatus['lastVersion'] ? 'Версія '.$tokenStatus['lastVersion'] : 'ще не публікувалось' }}
+                        </div>
+                    </div>
+
+                    @if($visibleToken)
+                        <div class="rounded-lg border border-acc-bd bg-acc-bg px-3 py-2">
+                            <div class="mb-1 text-[11px] text-acc-tx">Сирий токен (показуємо один раз):</div>
+                            <code class="block select-all break-all text-[12px] text-ink">{{ $visibleToken }}</code>
+                        </div>
+                    @endif
+
+                    <div class="flex gap-2">
+                        @if($tokenStatus['hasActiveToken'])
+                            <button type="button" wire:click="rotateToken"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                                @svg('key') Ротувати
+                            </button>
+                            <button type="button" wire:click="revokeToken"
+                                wire:confirm="Відкликати всі чинні токени сайта? Публікація зупиниться, доки не видасте новий."
+                                class="rounded-lg border border-[#cdb9b4] px-3 py-2 text-xs font-semibold text-[#a85c52] hover:bg-[#f3e7e4]">
+                                Відкликати
+                            </button>
+                        @else
+                            <button type="button" wire:click="issueToken"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                                @svg('key') Видати токен
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </aside>
     @endif
 </div>

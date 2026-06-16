@@ -30,4 +30,12 @@ class SiteProvisioner
             ->latest('id')
             ->value('token_hash');
     }
+
+    /** Відкликати всі чинні токени сайта; повертає кількість відкликаних. */
+    public function revokeToken(Site $site): int
+    {
+        return ApiToken::where('site_id', $site->id)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => now()]);
+    }
 }
