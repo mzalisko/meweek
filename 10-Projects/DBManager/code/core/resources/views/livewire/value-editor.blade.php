@@ -13,12 +13,14 @@
     <div class="mb-3">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Тип</label>
         <select wire:model.live="type" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-acc">
-            <option value="text">Текст</option>
-            <option value="price">Ціна</option>
-            <option value="messenger">Месенджер</option>
-            <option value="address">Адреса</option>
-            <option value="social">Соцмережа</option>
+            @if($valueId)
+                <option value="text">Текст</option>
+                <option value="price">Ціна</option>
+                <option value="address">Адреса</option>
+                <option value="social">Соцмережа</option>
+            @endif
             <option value="phone">Телефон</option>
+            <option value="messenger">Месенджер</option>
         </select>
         @error('type')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
@@ -33,7 +35,9 @@
     {{-- Value (не для телефона — там номери в панелі слота) --}}
     @if($type !== 'phone')
     <div class="mb-3">
-        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Значення</label>
+        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">
+            {{ $type === 'messenger' ? 'Значення месенджера' : 'Значення' }}
+        </label>
         <input wire:model="value" type="text" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc @error('value') border-bad-tx @enderror" />
         @error('value')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
@@ -46,22 +50,8 @@
     <div class="mb-3">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Мережа</label>
         <input wire:model="network" type="text" placeholder="telegram" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
+        @error('network')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
-    <div class="mb-3">
-        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">URL</label>
-        <input wire:model="url" type="text" placeholder="https://t.me/example" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
-    </div>
-    @if($availableSlots->isNotEmpty())
-    <div class="mb-3">
-        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Прив'язаний слот</label>
-        <select wire:model="linkedSlot" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-acc">
-            <option value="">— не прив'язано —</option>
-            @foreach($availableSlots as $sk)
-                <option value="{{ $sk }}">{{ $sk }}</option>
-            @endforeach
-        </select>
-    </div>
-    @endif
     @endif
 
     {{-- Гео-мітки --}}

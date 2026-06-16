@@ -40,7 +40,9 @@ class SlotPanelSaveTest extends TestCase
 
         Livewire::test(SlotPanel::class)
             ->call('open', $slot->dataValue->id)
-            ->call('save');
+            ->call('save')
+            ->assertSet('open', false)
+            ->assertDispatched('slot-updated');
 
         Http::assertSent(
             fn ($r) => str_contains($r->url(), 'internal/publish')

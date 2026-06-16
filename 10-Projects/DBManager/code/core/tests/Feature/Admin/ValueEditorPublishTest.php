@@ -40,9 +40,10 @@ class ValueEditorPublishTest extends TestCase
 
         Livewire::test(ValueEditor::class)
             ->call('createFor', $a->id)
-            ->set('type', 'price')
-            ->set('key', 'p')
-            ->set('value', '9')
+            ->set('type', 'messenger')
+            ->set('key', 'tg_brand')
+            ->set('value', 'https://t.me/brand')
+            ->set('network', 'telegram')
             ->set('scope', 'group')
             ->call('save');
 
@@ -64,9 +65,10 @@ class ValueEditorPublishTest extends TestCase
 
         Livewire::test(ValueEditor::class)
             ->call('createFor', $a->id)
-            ->set('type', 'price')
-            ->set('key', 'price_site')
-            ->set('value', '42')
+            ->set('type', 'messenger')
+            ->set('key', 'tg_site')
+            ->set('value', 'https://t.me/site')
+            ->set('network', 'telegram')
             ->set('scope', 'site')
             ->call('save');
 

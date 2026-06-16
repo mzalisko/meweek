@@ -34,7 +34,8 @@ class SlotNumberEditTest extends TestCase
             ->call('startEditNumber', $entry->id)
             ->set('editE164', '+380999888777')
             ->call('saveNumber')
-            ->assertSet('editingEntryId', null);
+            ->assertSet('editingEntryId', null)
+            ->assertSet('open', false);
 
         $this->assertSame('+380999888777', $entry->phoneNumber->fresh()->e164);
         $this->assertTrue(AuditLog::where('action', 'number.edited')->exists());
@@ -61,5 +62,17 @@ class SlotNumberEditTest extends TestCase
             ->call('startEditNumber', $entries[0]->id)
             ->assertSet('editingEntryId', $entries[0]->id)
             ->assertSet('editE164', $entries[0]->phoneNumber->e164);
+    }
+
+    public function test_open_number_editor_opens_number_mode(): void
+    {
+        [$slot, $entries] = $this->slotWithNumbers(['active']);
+
+        Livewire::test(SlotPanel::class)
+            ->call('openNumberEditor', $slot->dataValue->id, $entries[0]->id)
+            ->assertSet('open', true)
+            ->assertSet('mode', 'number')
+            ->assertSet('editingEntryId', $entries[0]->id)
+            ->assertSee('#1 основний');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Admin\AffectedSites;
+use App\Admin\AccessControl;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
@@ -28,7 +29,7 @@ class ValueEditor extends Component
 
     public ?int $valueId = null;
 
-    public string $type = 'text';
+    public string $type = 'phone';
 
     public string $key = '';
 
@@ -42,8 +43,6 @@ class ValueEditor extends Component
 
     public array $geoTagIds = [];
 
-    public string $linkedSlot = '';
-
     #[On('open-value-editor')]
     public function openCreate(int $siteId): void
     {
@@ -52,17 +51,21 @@ class ValueEditor extends Component
 
     public function createFor(int $siteId): void
     {
+        if (! $this->canChangeSite($siteId)) {
+            return;
+        }
+
         $this->siteId = $siteId;
         $this->valueId = null;
-        $this->type = 'text';
+        $this->type = 'phone';
         $this->key = '';
         $this->value = '';
         $this->scope = 'site';
         $this->network = null;
         $this->url = null;
         $this->geoTagIds = [];
-        $this->linkedSlot = '';
         $this->resetValidation();
+        $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
         $this->open = true;
     }
@@ -71,42 +74,54 @@ class ValueEditor extends Component
     public function edit(int $valueId): void
     {
         $dv = DataValue::findOrFail($valueId);
+        if (! $this->canChangeValue($dv)) {
+            return;
+        }
 
         $this->valueId = $dv->id;
         $this->siteId  = $dv->scope_type === 'site' ? $dv->scope_id : null;
         $this->type    = $dv->type->code;
         $this->key     = $dv->key;
-        $this->value   = $dv->content['value'] ?? '';
+        $this->value   = $dv->content['value'] ?? ($dv->content['name'] ?? '');
         $this->scope   = $dv->scope_type;
         $this->network   = $dv->content['network'] ?? null;
         $this->url       = $dv->content['url'] ?? null;
         $this->geoTagIds = $dv->geoTags->pluck('id')->toArray();
-        $this->linkedSlot = $dv->content['linked_slot'] ?? '';
         $this->resetValidation();
+        $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
         $this->open    = true;
     }
 
     public function save(): void
     {
+        if (! $this->canSaveCurrentTarget()) {
+            return;
+        }
+
         $rules = [
             'key'   => ['required', 'regex:/^[a-z0-9_]+$/'],
-            'type'  => ['required', 'in:text,price,messenger,address,social,phone'],
+            'type'  => ['required', $this->valueId ? 'in:text,price,messenger,address,social,phone' : 'in:phone,messenger'],
             'scope' => ['required', 'in:group,site'],
         ];
 
         if ($this->type !== 'phone') {
             $rules['value'] = ['required'];
         }
+        if ($this->type === 'messenger') {
+            $rules['network'] = ['nullable', 'string', 'max:64'];
+        }
 
         $this->validate($rules);
 
         // Build content
-        $content = $this->type === 'phone' ? [] : ['value' => $this->value];
+        $content = $this->type === 'phone' ? [] : ['value' => $this->value !== '' ? $this->value : null];
         if ($this->type === 'messenger') {
-            $content['network']     = $this->network;
-            $content['url']         = $this->url;
-            $content['linked_slot'] = $this->linkedSlot ?: null;
+            $content['network'] = $this->network;
+            $content['url']     = $this->url ?: $this->messengerUrlFromValue($this->value);
+            if (! $this->valueId) {
+                $content['exhaustion_policy'] = 'hide';
+            }
         }
 
         // Resolve value_type_id
@@ -120,6 +135,26 @@ class ValueEditor extends Component
             $dv         = DataValue::with('geoTags')->findOrFail($this->valueId);
             $oldContent = $dv->content;
             $oldGeoIds  = $dv->geoTags->pluck('id')->sort()->values()->all();
+
+            if ($this->type === 'messenger') {
+                $content = collect($oldContent ?? [])
+                    ->only([
+                        'messenger_slot',
+                        'linked_slot',
+                        'enabled',
+                        'pinned',
+                        'exhaustion_policy',
+                        'return_mode',
+                        'current_messenger_id',
+                        'last_active_value',
+                        'last_active_url',
+                        'emergency_value',
+                        'emergency_url',
+                    ])
+                    ->merge($content)
+                    ->all();
+                $content['exhaustion_policy'] ??= 'hide';
+            }
 
             $dv->update([
                 'key'           => $this->key,
@@ -202,6 +237,9 @@ class ValueEditor extends Component
     public function overrideForSite(int $valueId, int $siteId): void
     {
         $groupValue = DataValue::findOrFail($valueId);
+        if (! $this->canChangeValue($groupValue) || ! $this->canChangeSite($siteId)) {
+            return;
+        }
 
         // Guard: only override group-scoped values
         if ($groupValue->scope_type !== 'group') {
@@ -239,6 +277,9 @@ class ValueEditor extends Component
     public function delete(): void
     {
         $dv = DataValue::findOrFail($this->valueId);
+        if (! $this->canDeleteValue($dv)) {
+            return;
+        }
 
         // Capture affected sites BEFORE deleting the row (AffectedSites needs the record).
         $affectedSites = app(AffectedSites::class)->for($dv);
@@ -284,6 +325,65 @@ class ValueEditor extends Component
         if ($published > 0) {
             $this->dispatch('toast', message: "Збережено → опубліковано {$published} сайтів");
         }
+    }
+
+    private function messengerUrlFromValue(string $value): ?string
+    {
+        return preg_match('/^https?:\/\//i', $value) ? $value : null;
+    }
+
+    private function canSaveCurrentTarget(): bool
+    {
+        if ($this->valueId) {
+            return $this->canChangeValue(DataValue::find($this->valueId));
+        }
+
+        if (! $this->siteId) {
+            return false;
+        }
+
+        if ($this->scope === 'site') {
+            return $this->canChangeSite($this->siteId);
+        }
+
+        $site = Site::find($this->siteId);
+        if (! $site?->site_group_id) {
+            return false;
+        }
+
+        $access = app(AccessControl::class);
+
+        return $access->canEditGroup(auth()->user(), $site->site_group_id)
+            && $access->canPublishGroup(auth()->user(), $site->site_group_id);
+    }
+
+    private function canChangeSite(int $siteId): bool
+    {
+        $access = app(AccessControl::class);
+
+        return $access->canEditSite(auth()->user(), $siteId)
+            && $access->canPublishSite(auth()->user(), $siteId);
+    }
+
+    private function canChangeValue(?DataValue $value): bool
+    {
+        if (! $value) {
+            return false;
+        }
+
+        $access = app(AccessControl::class);
+
+        return $access->canEditValue(auth()->user(), $value)
+            && $access->canPublishValue(auth()->user(), $value);
+    }
+
+    private function canDeleteValue(?DataValue $value): bool
+    {
+        if (! $value) {
+            return false;
+        }
+
+        return app(AccessControl::class)->canDeleteValue(auth()->user(), $value);
     }
 
     public function render()

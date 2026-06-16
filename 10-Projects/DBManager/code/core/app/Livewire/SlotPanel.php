@@ -2,14 +2,13 @@
 
 namespace App\Livewire;
 
-use App\Admin\AffectedSites;
+use App\Admin\AccessControl;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
 use App\Models\NumberEntry;
 use App\Models\PhoneNumber;
 use App\Models\PhoneSlot;
-use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Failover\SlotResolver;
 use App\Services\Publishing\BridgePublisher;
@@ -30,16 +29,6 @@ class SlotPanel extends Component
     public ?int $editingEntryId = null;
 
     public string $editE164 = '';
-
-    public ?int $editingMessengerId = null;
-
-    public string $editMessengerUrl = '';
-
-    public string $editMessengerValue = '';
-
-    public string $newMessengerNetwork = 'telegram';
-
-    public string $newMessengerValue = '';
 
     public array $geoTagIds = [];
 
@@ -68,15 +57,12 @@ class SlotPanel extends Component
             return;
         }
 
+        $this->dispatch('close-messenger-panel');
         $this->dispatch('close-editor-panel');
         $this->dataValueId      = $dataValueId;
         $this->mode             = 'settings';
         $this->editingEntryId   = null;
         $this->editE164         = '';
-        $this->editingMessengerId = null;
-        $this->editMessengerUrl = '';
-        $this->editMessengerValue = '';
-        $this->newMessengerValue = '';
         $this->geoTagIds        = $value->geoTags->pluck('id')->toArray();
         $this->emergencyNumber  = $value->phoneSlot->emergency_number ?? '';
         $this->open             = true;
@@ -95,6 +81,10 @@ class SlotPanel extends Component
 
     public function addNumber(): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         $e164 = $this->normalizedPhoneInput('newNumber', $this->newNumber);
 
         if (! $e164) {
@@ -176,170 +166,15 @@ class SlotPanel extends Component
     {
         $this->open = false;
         $this->cancelEdit();
-        $this->cancelMessengerEdit();
         $this->mode = 'settings';
-    }
-
-    public function startEditMessenger(int $dataValueId): void
-    {
-        if (! $this->dataValueId) {
-            return;
-        }
-
-        $value = DataValue::find($this->dataValueId);
-        if (! $value) {
-            return;
-        }
-
-        $messengerType = ValueType::where('code', 'messenger')->first();
-
-        $messenger = $messengerType
-            ? DataValue::where('value_type_id', $messengerType->id)
-                ->where('scope_type', $value->scope_type)
-                ->where('scope_id', $value->scope_id)
-                ->find($dataValueId)
-            : null;
-
-        if (! $messenger) {
-            return;
-        }
-
-        $this->editingMessengerId = $messenger->id;
-        $this->editMessengerValue = (string) ($messenger->content['value'] ?? ($messenger->content['url'] ?? ''));
-        $this->editMessengerUrl = (string) ($messenger->content['url'] ?? '');
-    }
-
-    public function cancelMessengerEdit(): void
-    {
-        $this->editingMessengerId = null;
-        $this->editMessengerUrl = '';
-        $this->editMessengerValue = '';
-    }
-
-    public function saveMessengerUrl(): void
-    {
-        $this->saveMessengerValue();
-    }
-
-    public function saveMessengerValue(): void
-    {
-        if (! $this->dataValueId || $this->editingMessengerId === null) {
-            $this->cancelMessengerEdit();
-
-            return;
-        }
-
-        $value = DataValue::find($this->dataValueId);
-        if (! $value) {
-            $this->cancelMessengerEdit();
-
-            return;
-        }
-
-        $messengerType = ValueType::where('code', 'messenger')->first();
-        $messenger = $messengerType
-            ? DataValue::where('value_type_id', $messengerType->id)
-                ->where('scope_type', $value->scope_type)
-                ->where('scope_id', $value->scope_id)
-                ->find($this->editingMessengerId)
-            : null;
-
-        if (! $messenger) {
-            $this->cancelMessengerEdit();
-
-            return;
-        }
-
-        $content = $messenger->content ?? [];
-        $oldContent = $content;
-        $newValue = trim($this->editMessengerValue);
-
-        if ($newValue === '') {
-            $this->addError('editMessengerValue', 'Введіть значення месенджера.');
-
-            return;
-        }
-
-        $content['value'] = $newValue;
-        $content['url'] = $this->messengerUrlFromValue($newValue);
-
-        if ($oldContent !== $content) {
-            $messenger->update(['content' => $content]);
-
-            AuditLog::create([
-                'actor_type'   => 'user',
-                'action'       => 'messenger.value_changed',
-                'subject_type' => 'DataValue',
-                'subject_id'   => $messenger->id,
-                'old'          => $oldContent,
-                'new'          => $content,
-            ]);
-
-            $this->publishDataValue($messenger->fresh());
-        }
-
-        $this->cancelMessengerEdit();
-        $this->dispatch('slot-updated');
-    }
-
-    public function addMessengerReserve(): void
-    {
-        $this->resetErrorBag('newMessengerValue');
-
-        if (! $this->dataValueId) {
-            return;
-        }
-
-        $value = DataValue::with('geoTags')->find($this->dataValueId);
-
-        if (! $value) {
-            return;
-        }
-
-        $messengerValue = trim($this->newMessengerValue);
-        if ($messengerValue === '') {
-            $this->addError('newMessengerValue', 'Введіть посилання, номер або код месенджера.');
-
-            return;
-        }
-
-        $network = trim($this->newMessengerNetwork) ?: 'messenger';
-        $messengerType = ValueType::firstOrCreate(['code' => 'messenger'], ['name' => 'messenger']);
-        $content = [
-            'value'       => $messengerValue,
-            'network'     => $network,
-            'url'         => $this->messengerUrlFromValue($messengerValue),
-            'linked_slot' => $value->key,
-            'enabled'     => true,
-        ];
-
-        $messenger = DataValue::create([
-            'key'           => $this->uniqueMessengerKey($value, $network),
-            'value_type_id' => $messengerType->id,
-            'scope_type'    => $value->scope_type,
-            'scope_id'      => $value->scope_id,
-            'content'       => $content,
-            'status'        => 'active',
-        ]);
-
-        $messenger->geoTags()->sync($value->geoTags->pluck('id')->all());
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'messenger.added',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $messenger->id,
-            'new'          => $content,
-        ]);
-
-        $this->newMessengerValue = '';
-        $this->publishDataValue($messenger);
-        $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Резерв месенджера додано → опубліковано');
     }
 
     public function saveNumber(): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         $e164 = $this->normalizedPhoneInput('editE164', $this->editE164);
 
         if (! $e164) {
@@ -383,6 +218,10 @@ class SlotPanel extends Component
     /** Ручне перемикання номера active|down (§6) — повернути впалий або деактивувати. */
     public function setNumberStatus(int $entryId, string $status): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! in_array($status, ['active', 'down'], true) || ! $this->dataValueId) {
             return;
         }
@@ -405,6 +244,10 @@ class SlotPanel extends Component
 
     public function moveUp(int $entryId): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! $this->dataValueId) {
             return;
         }
@@ -448,6 +291,10 @@ class SlotPanel extends Component
 
     public function moveDown(int $entryId): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! $this->dataValueId) {
             return;
         }
@@ -491,6 +338,10 @@ class SlotPanel extends Component
 
     public function removeNumber(int $entryId): void
     {
+        if (! $this->canDeleteCurrentValue()) {
+            return;
+        }
+
         if (! $this->dataValueId) {
             return;
         }
@@ -529,6 +380,10 @@ class SlotPanel extends Component
 
     public function pin(int $entryId): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! $this->dataValueId) {
             return;
         }
@@ -554,6 +409,10 @@ class SlotPanel extends Component
 
     public function unpin(): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! $this->dataValueId) {
             return;
         }
@@ -571,6 +430,10 @@ class SlotPanel extends Component
 
     public function setReturnMode(string $mode): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! in_array($mode, ['auto', 'sticky'], true)) {
             return;
         }
@@ -593,6 +456,10 @@ class SlotPanel extends Component
 
     public function setExhaustionPolicy(string $policy): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! in_array($policy, ['hide', 'last', 'emergency'], true)) {
             return;
         }
@@ -633,6 +500,10 @@ class SlotPanel extends Component
 
     private function setSlotVisibility(string $status): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! in_array($status, ['active', 'hidden'], true) || ! $this->dataValueId) {
             return;
         }
@@ -674,6 +545,10 @@ class SlotPanel extends Component
 
     private function persistSettings(bool $notify): void
     {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
         if (! $this->dataValueId) {
             return;
         }
@@ -709,7 +584,7 @@ class SlotPanel extends Component
             $changed = true;
         }
 
-        if (! $changed) {
+        if (! $changed && ! $notify) {
             return;
         }
 
@@ -720,215 +595,6 @@ class SlotPanel extends Component
         } else {
             $this->dispatch('slot-updated');
         }
-    }
-
-    public function toggleMessenger(int $dataValueId): void
-    {
-        if (! $this->dataValueId) {
-            return;
-        }
-
-        $value = DataValue::find($this->dataValueId);
-
-        if (! $value) {
-            return;
-        }
-
-        // Load only messengers that are genuinely linked to this slot key
-        $linked = $this->loadLinkedMessengers($value);
-        $messenger = $linked->firstWhere('id', $dataValueId);
-
-        if (! $messenger) {
-            // Not linked to this slot — reject silently
-            return;
-        }
-
-        $content = $messenger->content ?? [];
-        $oldEnabled = $content['enabled'] ?? true;
-        $newEnabled = ! $oldEnabled;
-
-        $content['enabled'] = $newEnabled;
-        $messenger->update(['content' => $content]);
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'messenger.toggled',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $messenger->id,
-            'old'          => ['enabled' => $oldEnabled],
-            'new'          => ['enabled' => $newEnabled],
-        ]);
-
-        $this->publishDataValue($messenger->fresh());
-        $this->dispatch('slot-updated');
-    }
-
-    public function pinMessenger(int $dataValueId): void
-    {
-        if (! $this->dataValueId) {
-            return;
-        }
-
-        $value = DataValue::find($this->dataValueId);
-        $messenger = DataValue::find($dataValueId);
-
-        if (! $value || ! $messenger) {
-            return;
-        }
-
-        $linked = $this->loadLinkedMessengers($value);
-        $targetGroupKey = $messenger->content['linked_slot'] ?? $messenger->key;
-
-        foreach ($linked as $item) {
-            $content = $item->content ?? [];
-            $oldPinned = (bool) ($content['pinned'] ?? false);
-            $newPinned = ($item->id === $messenger->id);
-
-            if ($oldPinned === $newPinned) {
-                continue;
-            }
-
-            $content['pinned'] = $newPinned;
-            $item->update(['content' => $content]);
-
-            AuditLog::create([
-                'actor_type'   => 'user',
-                'action'       => 'messenger.pinned',
-                'subject_type' => 'DataValue',
-                'subject_id'   => $item->id,
-                'old'          => ['pinned' => $oldPinned, 'group' => $targetGroupKey],
-                'new'          => ['pinned' => $newPinned, 'group' => $targetGroupKey],
-            ]);
-        }
-
-        $this->publishDataValue($messenger->fresh());
-        $this->dispatch('slot-updated');
-    }
-
-    public function unpinMessenger(int $dataValueId): void
-    {
-        $messenger = DataValue::find($dataValueId);
-
-        if (! $messenger) {
-            return;
-        }
-
-        $content = $messenger->content ?? [];
-        $oldPinned = (bool) ($content['pinned'] ?? false);
-        if (! $oldPinned) {
-            return;
-        }
-
-        $content['pinned'] = false;
-        $messenger->update(['content' => $content]);
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'messenger.unpinned',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $messenger->id,
-            'old'          => ['pinned' => true],
-            'new'          => ['pinned' => false],
-        ]);
-
-        $this->publishDataValue($messenger->fresh());
-        $this->dispatch('slot-updated');
-    }
-
-    public function linkMessenger(int $messengerId): void
-    {
-        if (! $this->dataValueId) {
-            return;
-        }
-
-        $slotValue = DataValue::find($this->dataValueId);
-        $messenger = DataValue::find($messengerId);
-
-        if (! $slotValue || ! $messenger) {
-            return;
-        }
-
-        $content   = $messenger->content ?? [];
-        $oldLinked = $content['linked_slot'] ?? null;
-        $content['linked_slot'] = $slotValue->key;
-        $messenger->update(['content' => $content]);
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'messenger.linked',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $messenger->id,
-            'old'          => ['linked_slot' => $oldLinked],
-            'new'          => ['linked_slot' => $slotValue->key],
-        ]);
-
-        $this->publishDataValue($messenger->fresh());
-        $this->dispatch('slot-updated');
-    }
-
-    public function unlinkMessenger(int $messengerId): void
-    {
-        $messenger = DataValue::find($messengerId);
-
-        if (! $messenger) {
-            return;
-        }
-
-        $content   = $messenger->content ?? [];
-        $oldLinked = $content['linked_slot'] ?? null;
-        unset($content['linked_slot']);
-        $messenger->update(['content' => $content]);
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'messenger.unlinked',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $messenger->id,
-            'old'          => ['linked_slot' => $oldLinked],
-            'new'          => ['linked_slot' => null],
-        ]);
-
-        if ($this->editingMessengerId === $messenger->id) {
-            $this->cancelMessengerEdit();
-        }
-
-        $this->publishDataValue($messenger->fresh());
-        $this->dispatch('slot-updated');
-    }
-
-    public function removeMessenger(int $messengerId): void
-    {
-        if (! $this->dataValueId) {
-            return;
-        }
-
-        $slotValue = DataValue::find($this->dataValueId);
-        $messenger = $slotValue ? $this->loadLinkedMessengers($slotValue)->firstWhere('id', $messengerId) : null;
-
-        if (! $messenger) {
-            return;
-        }
-
-        $old = $messenger->content ?? [];
-        $affectedSites = app(AffectedSites::class)->for($messenger);
-        $messenger->geoTags()->detach();
-        $messenger->delete();
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'messenger.removed',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $messengerId,
-            'old'          => $old,
-        ]);
-
-        if ($this->editingMessengerId === $messengerId) {
-            $this->cancelMessengerEdit();
-        }
-
-        $this->publishSites($affectedSites);
-        $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Месенджер видалено → опубліковано');
     }
 
     /**
@@ -968,27 +634,6 @@ class SlotPanel extends Component
         return $value;
     }
 
-    private function messengerUrlFromValue(string $value): ?string
-    {
-        return preg_match('/^https?:\/\//i', $value) ? $value : null;
-    }
-
-    private function uniqueMessengerKey(DataValue $slotValue, string $network): string
-    {
-        $base = strtolower((string) preg_replace('/[^a-z0-9_]+/i', '_', $network . '_' . $slotValue->key));
-        $base = trim($base, '_') ?: 'messenger';
-        $next = 1;
-
-        do {
-            $key = $base . '_' . $next++;
-        } while (DataValue::where('key', $key)
-            ->where('scope_type', $slotValue->scope_type)
-            ->where('scope_id', $slotValue->scope_id)
-            ->exists());
-
-        return $key;
-    }
-
     private function publishSlotSites(PhoneSlot $slot): void
     {
         app(FailoverEngine::class)->sitesFor($slot)
@@ -998,19 +643,6 @@ class SlotPanel extends Component
             });
     }
 
-    private function publishDataValue(DataValue $value): void
-    {
-        $this->publishSites(app(AffectedSites::class)->for($value));
-    }
-
-    private function publishSites($sites): void
-    {
-        $sites->each(function ($site) {
-            $pub = app(SitePayloadCompiler::class)->publish($site);
-            app(BridgePublisher::class)->push($pub);
-        });
-    }
-
     private function closeAndRefresh(string $message): void
     {
         $this->close();
@@ -1018,32 +650,35 @@ class SlotPanel extends Component
         $this->dispatch('toast', message: $message);
     }
 
-    /**
-     * Load messenger DataValues whose content.linked_slot matches this slot's key
-     * and whose scope matches the slot DataValue's scope.
-     */
-    private function loadLinkedMessengers(DataValue $slotValue): \Illuminate\Support\Collection
+    private function canChangeCurrentValue(): bool
     {
-        $messengerType = ValueType::where('code', 'messenger')->first();
-
-        if (! $messengerType) {
-            return collect();
+        if (! $this->dataValueId) {
+            return false;
         }
 
-        return DataValue::where('value_type_id', $messengerType->id)
-            ->where('scope_type', $slotValue->scope_type)
-            ->where('scope_id', $slotValue->scope_id)
-            ->with('geoTags', 'type')
-            ->get()
-            ->filter(fn (DataValue $dv) => ($dv->content['linked_slot'] ?? null) === $slotValue->key)
-            ->sortBy(fn (DataValue $dv) => sprintf(
-                '%d_%d_%010d_%010d',
-                (bool) ($dv->content['pinned'] ?? false) ? 0 : 1,
-                ($dv->status ?? 'active') === 'active' && ($dv->content['enabled'] ?? true) ? 0 : 1,
-                $dv->created_at?->getTimestamp() ?? 0,
-                $dv->id
-            ))
-            ->values();
+        $value = DataValue::find($this->dataValueId);
+        if (! $value) {
+            return false;
+        }
+
+        $access = app(AccessControl::class);
+
+        return $access->canEditValue(auth()->user(), $value)
+            && $access->canPublishValue(auth()->user(), $value);
+    }
+
+    private function canDeleteCurrentValue(): bool
+    {
+        if (! $this->dataValueId) {
+            return false;
+        }
+
+        $value = DataValue::find($this->dataValueId);
+        if (! $value) {
+            return false;
+        }
+
+        return app(AccessControl::class)->canDeleteValue(auth()->user(), $value);
     }
 
     public function render()
@@ -1052,8 +687,6 @@ class SlotPanel extends Component
         $slot                = null;
         $entries             = collect();
         $resolved            = null;
-        $messengers          = collect();
-        $availableMessengers = collect();
         $allGeoTags          = GeoTag::orderBy('code')->get();
 
         if ($this->open && $this->dataValueId) {
@@ -1067,17 +700,6 @@ class SlotPanel extends Component
             if ($value && $value->phoneSlot) {
                 $slot       = $value->phoneSlot;
                 $entries    = $slot->entries->sortBy('priority');
-                $messengers = $this->loadLinkedMessengers($value);
-
-                $messengerType = ValueType::where('code', 'messenger')->first();
-                if ($messengerType) {
-                    $availableMessengers = DataValue::where('value_type_id', $messengerType->id)
-                        ->where('scope_type', $value->scope_type)
-                        ->where('scope_id', $value->scope_id)
-                        ->with('geoTags', 'type')
-                        ->get()
-                        ->filter(fn (DataValue $dv) => ($dv->content['linked_slot'] ?? null) === null);
-                }
 
                 try {
                     $resolved = app(SlotResolver::class)->resolve($slot);
@@ -1094,8 +716,6 @@ class SlotPanel extends Component
             'slot'                => $slot,
             'entries'             => $entries,
             'resolved'            => $resolved,
-            'messengers'          => $messengers,
-            'availableMessengers' => $availableMessengers,
             'allGeoTags'          => $allGeoTags,
         ]);
     }

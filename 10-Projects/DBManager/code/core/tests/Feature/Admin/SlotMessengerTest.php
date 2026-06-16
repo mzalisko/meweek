@@ -2,20 +2,21 @@
 
 namespace Tests\Feature\Admin;
 
-use App\Livewire\SlotPanel;
+use App\Admin\SiteGridReader;
+use App\Livewire\MessengerPanel;
+use App\Livewire\ValuesGrid;
 use App\Models\AuditLog;
 use App\Models\DataValue;
+use App\Models\GeoTag;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\Support\BuildsSlots;
 use Tests\TestCase;
 
 class SlotMessengerTest extends TestCase
 {
     use RefreshDatabase;
-    use BuildsSlots;
 
     protected function setUp(): void
     {
@@ -23,198 +24,221 @@ class SlotMessengerTest extends TestCase
         $this->actingAs(User::factory()->create());
     }
 
-    public function test_toggle_messenger_disables_enabled_messenger(): void
+    public function test_messenger_panel_adds_reserve_to_independent_messenger_slot(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $ua = GeoTag::where('code', 'UA')->firstOrFail();
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => [
+                'value' => 'https://t.me/main',
+                'network' => 'telegram',
+                'url' => 'https://t.me/main',
+                'enabled' => true,
+                'exhaustion_policy' => 'hide',
+            ],
+        ]);
+        $main->geoTags()->sync([$ua->id]);
 
-        $msg = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'viber', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
-            ]);
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $main->id)
+            ->set('newValue', 'https://t.me/backup')
+            ->call('addReserve')
+            ->assertSet('newValue', '');
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('toggleMessenger', $msg->id);
+        $reserve = DataValue::whereHas('type', fn ($q) => $q->where('code', 'messenger'))
+            ->where('id', '!=', $main->id)
+            ->sole();
 
-        $this->assertFalse($msg->fresh()->content['enabled']);
-        $this->assertTrue(AuditLog::where('action', 'messenger.toggled')->exists());
+        $this->assertSame('telegram', $reserve->content['network']);
+        $this->assertSame('https://t.me/backup', $reserve->content['value']);
+        $this->assertSame('https://t.me/backup', $reserve->content['url']);
+        $this->assertSame('tg_brand', $reserve->content['messenger_slot']);
+        $this->assertSame(['UA'], $reserve->geoTags->pluck('code')->all());
+        $this->assertTrue(AuditLog::where('action', 'messenger.reserve_added')->exists());
     }
 
-    public function test_toggle_messenger_enables_disabled_messenger(): void
+    public function test_messenger_grid_shows_reserves_as_chain_rows(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
 
-        $msg = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'telegram', 'linked_slot' => 'phone_ua_2', 'enabled' => false],
-            ]);
+        $row = app(SiteGridReader::class)->forSite($site)['messenger'][0];
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('toggleMessenger', $msg->id);
-
-        $this->assertTrue($msg->fresh()->content['enabled']);
+        $this->assertSame('tg_brand', $row['key']);
+        $this->assertSame('Main TG', $row['name']);
+        $this->assertSame('ok', $row['state']);
+        $this->assertSame(1, $row['reserves']);
+        $this->assertSame('#1.1', $row['reserve_rows'][0]['label']);
+        $this->assertSame('Backup TG', $row['reserve_rows'][0]['value']);
+        $this->assertSame($main->id, $row['id']);
     }
 
-    public function test_toggle_twice_returns_to_original_state(): void
+    public function test_deactivating_main_messenger_switches_to_reserve_without_moving_labels(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
 
-        $msg = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'viber', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
-            ]);
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('deactivateMessenger', $main->id);
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('toggleMessenger', $msg->id)
-            ->call('toggleMessenger', $msg->id);
+        $row = app(SiteGridReader::class)->forSite($site)['messenger'][0];
 
-        $this->assertTrue($msg->fresh()->content['enabled']);
+        $this->assertFalse($main->fresh()->content['enabled']);
+        $this->assertSame('on_reserve', $row['state']);
+        $this->assertSame('tg_brand', $row['key']);
+        $this->assertSame('Backup TG', $row['value']);
+        $this->assertSame('Main TG', $row['name']);
+        $this->assertSame($reserve->id, $row['reserve_rows'][0]['id']);
+        $this->assertSame('on_reserve', $row['reserve_rows'][0]['state']);
     }
 
-    public function test_toggle_messenger_writes_audit_log_with_old_and_new(): void
+    public function test_pin_reserve_messenger_marks_it_current(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
 
-        $msg = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'viber', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
-            ]);
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('pinMessenger', $reserve->id);
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('toggleMessenger', $msg->id);
+        $row = app(SiteGridReader::class)->forSite($site)['messenger'][0];
 
-        $log = AuditLog::where('action', 'messenger.toggled')->first();
-        $this->assertNotNull($log);
-        $this->assertTrue($log->old['enabled']);
-        $this->assertFalse($log->new['enabled']);
-        $this->assertSame('DataValue', $log->subject_type);
-        $this->assertSame($msg->id, $log->subject_id);
+        $this->assertTrue($reserve->fresh()->content['pinned']);
+        $this->assertSame('pinned', $row['state']);
+        $this->assertSame('Backup TG', $row['value']);
+        $this->assertTrue($row['reserve_rows'][0]['is_current']);
     }
 
-    public function test_toggle_messenger_not_linked_to_slot_is_ignored(): void
+    public function test_messenger_panel_updates_policy_for_whole_group(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true, 'exhaustion_policy' => 'hide'],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true, 'exhaustion_policy' => 'hide'],
+        ]);
 
-        // Messenger linked to a DIFFERENT slot key
-        $other = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'viber', 'linked_slot' => 'phone_other', 'enabled' => true],
-            ]);
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $main->id)
+            ->call('setExhaustionPolicy', 'last');
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('toggleMessenger', $other->id);
-
-        // Should NOT be toggled
-        $this->assertTrue($other->fresh()->content['enabled']);
-        $this->assertFalse(AuditLog::where('action', 'messenger.toggled')->exists());
+        $this->assertSame('last', $main->fresh()->content['exhaustion_policy']);
+        $this->assertSame('last', $reserve->fresh()->content['exhaustion_policy']);
     }
 
-    public function test_panel_shows_linked_messengers_in_view(): void
+    public function test_messenger_panel_updates_return_mode_for_whole_group(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true, 'return_mode' => 'auto'],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true, 'return_mode' => 'auto'],
+        ]);
 
-        DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'viber', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
-            ]);
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $main->id)
+            ->call('setReturnMode', 'sticky');
 
-        // Назва мережі рендериться через ucfirst (як у макеті: Viber/WhatsApp).
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->assertSee('Viber');
+        $this->assertSame('sticky', $main->fresh()->content['return_mode']);
+        $this->assertSame('sticky', $reserve->fresh()->content['return_mode']);
     }
 
-    public function test_link_messenger_attaches_available_messenger_to_slot(): void
+    public function test_emergency_messenger_value_is_visible_when_all_messengers_are_disabled(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => [
+                'value' => 'Main TG',
+                'network' => 'telegram',
+                'enabled' => false,
+                'exhaustion_policy' => 'emergency',
+                'emergency_value' => 'https://t.me/emergency',
+            ],
+        ]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => [
+                'value' => 'Backup TG',
+                'network' => 'telegram',
+                'messenger_slot' => 'tg_brand',
+                'enabled' => false,
+                'exhaustion_policy' => 'emergency',
+                'emergency_value' => 'https://t.me/emergency',
+            ],
+        ]);
 
-        $msg = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'telegram', 'value' => 'Telegram support', 'url' => 'https://t.me/support', 'enabled' => true],
-            ]);
+        $row = app(SiteGridReader::class)->forSite($site)['messenger'][0];
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('linkMessenger', $msg->id);
-
-        $this->assertSame('phone_ua_2', $msg->fresh()->content['linked_slot'] ?? null);
-        $this->assertNotEmpty(DataValue::where('key', $slot->dataValue->key)->first());
+        $this->assertSame('exhausted', $row['state']);
+        $this->assertSame('https://t.me/emergency', $row['value']);
+        $this->assertSame('https://t.me/emergency', $row['emergency_value']);
     }
 
-    public function test_add_messenger_reserve_creates_linked_messenger_in_slot(): void
+    public function test_messenger_panel_can_hide_and_show_whole_slot(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
 
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->set('newMessengerNetwork', 'telegram')
-            ->set('newMessengerValue', 'https://t.me/support')
-            ->call('addMessengerReserve')
-            ->assertSet('newMessengerValue', '');
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $main->id)
+            ->call('hideSlot');
 
-        $msg = DataValue::whereHas('type', fn ($q) => $q->where('code', 'messenger'))->sole();
+        $this->assertSame('hidden', $main->fresh()->status);
+        $this->assertSame('hidden', $reserve->fresh()->status);
 
-        $this->assertSame('telegram', $msg->content['network']);
-        $this->assertSame('https://t.me/support', $msg->content['value']);
-        $this->assertSame('https://t.me/support', $msg->content['url']);
-        $this->assertSame('phone_ua_2', $msg->content['linked_slot']);
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $main->id)
+            ->call('showSlot');
+
+        $this->assertSame('active', $main->fresh()->status);
+        $this->assertSame('active', $reserve->fresh()->status);
     }
 
-    public function test_edit_messenger_value_updates_value_and_url_when_value_is_link(): void
+    public function test_values_grid_opens_independent_messenger_panel(): void
     {
         $site = Site::factory()->create();
-        [$slot] = $this->slotWithNumbers(['active']);
-        $slot->dataValue->update(['key' => 'phone_ua_2', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
 
-        $msg = DataValue::factory()
-            ->ofType('messenger')
-            ->forSite($site)
-            ->create([
-                'content' => ['network' => 'viber', 'value' => 'old', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
-            ]);
-
-        Livewire::test(SlotPanel::class)
-            ->call('open', $slot->dataValue->id)
-            ->call('startEditMessenger', $msg->id)
-            ->set('editMessengerValue', 'https://viber.example/support')
-            ->call('saveMessengerValue');
-
-        $fresh = $msg->fresh();
-        $this->assertSame('https://viber.example/support', $fresh->content['value']);
-        $this->assertSame('https://viber.example/support', $fresh->content['url']);
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('openMessengerSlot', $main->id)
+            ->assertDispatched('open-messenger-slot', dataValueId: $main->id);
     }
 }

@@ -48,7 +48,7 @@ class ValueEditorEditTest extends TestCase
             ->assertSet('open', true);
     }
 
-    public function test_edit_loads_messenger_value_with_network_and_url(): void
+    public function test_edit_loads_messenger_text_network_and_url(): void
     {
         $this->actingAs(User::factory()->create());
         $type = ValueType::firstOrCreate(['code' => 'messenger'], ['name' => 'messenger']);
@@ -58,14 +58,40 @@ class ValueEditorEditTest extends TestCase
             'value_type_id' => $type->id,
             'scope_type'    => 'site',
             'scope_id'      => $site->id,
-            'content'       => ['value' => 'MyBot', 'network' => 'telegram', 'url' => 'https://t.me/mybot'],
+            'content'       => ['value' => 'Написати в Telegram', 'network' => 'telegram', 'url' => 'https://t.me/mybot'],
             'status'        => 'active',
         ]);
 
         Livewire::test(ValueEditor::class)
             ->call('edit', $dv->id)
+            ->assertSet('value', 'Написати в Telegram')
             ->assertSet('network', 'telegram')
             ->assertSet('url', 'https://t.me/mybot');
+    }
+
+    public function test_save_persists_messenger_text_and_url(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $type = ValueType::firstOrCreate(['code' => 'messenger'], ['name' => 'messenger']);
+        $site = Site::factory()->create();
+        $dv = DataValue::create([
+            'key'           => 'tg_main',
+            'value_type_id' => $type->id,
+            'scope_type'    => 'site',
+            'scope_id'      => $site->id,
+            'content'       => ['value' => 'Написати в Telegram', 'network' => 'telegram'],
+            'status'        => 'active',
+        ]);
+
+        Livewire::test(ValueEditor::class)
+            ->call('edit', $dv->id)
+            ->set('value', 'Написати в Support')
+            ->set('url', 'https://t.me/support_bot')
+            ->call('save');
+
+        $fresh = $dv->fresh();
+        $this->assertSame('Написати в Support', $fresh->content['value'] ?? null);
+        $this->assertSame('https://t.me/support_bot', $fresh->content['url'] ?? null);
     }
 
     public function test_save_updates_existing_value_and_audits(): void

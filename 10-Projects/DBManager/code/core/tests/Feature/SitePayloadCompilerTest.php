@@ -80,7 +80,7 @@ class SitePayloadCompilerTest extends TestCase
         $this->assertNull($item['value']);
     }
 
-    public function test_linked_messenger_follows_slot_and_hides_with_it(): void
+    public function test_linked_messenger_keeps_own_url_and_is_independent_from_phone_failover(): void
     {
         $site = Site::factory()->create();
         [$slot, $entries] = $this->slotWithNumbers(['active']);
@@ -89,16 +89,24 @@ class SitePayloadCompilerTest extends TestCase
         ]);
         DataValue::factory()->ofType('messenger')->forSite($site)->create([
             'key' => 'viber_ua_2',
-            'content' => ['network' => 'viber', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
+            'content' => ['value' => 'Viber support', 'network' => 'viber', 'url' => 'https://viber.example/support', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
         ]);
 
         $compiler = app(SitePayloadCompiler::class);
 
         $item = $this->itemByKey($compiler->compile($site), 'viber_ua_2');
-        $this->assertSame($entries[0]->phoneNumber->e164, $item['value']);
-        $this->assertStringStartsWith('viber://chat?number=%2B', $item['url']);
+        $this->assertSame('Viber support', $item['name']);
+        $this->assertSame('ok', $item['state']);
+        $this->assertSame('https://viber.example/support', $item['url']);
 
         app(FailoverEngine::class)->markNumberDown($entries[0]->phoneNumber);
+
+        $item = $this->itemByKey($compiler->compile($site), 'viber_ua_2');
+        $this->assertSame('ok', $item['state']);
+        $this->assertSame('https://viber.example/support', $item['url']);
+
+        $msg = DataValue::where('key', 'viber_ua_2')->sole();
+        $msg->update(['content' => array_merge($msg->content, ['enabled' => false])]);
 
         $item = $this->itemByKey($compiler->compile($site), 'viber_ua_2');
         $this->assertSame('hidden', $item['state']);
@@ -110,27 +118,65 @@ class SitePayloadCompilerTest extends TestCase
         $site = Site::factory()->create();
         DataValue::factory()->ofType('messenger')->forSite($site)->create([
             'key' => 'tg_brand',
-            'content' => ['network' => 'telegram', 'url' => 'https://t.me/brand'],
+            'content' => ['value' => 'Brand Telegram', 'network' => 'telegram', 'url' => 'https://t.me/brand'],
         ]);
 
         $item = $this->itemByKey(app(SitePayloadCompiler::class)->compile($site), 'tg_brand');
 
         $this->assertSame(['WORLD'], $item['geo']);
+        $this->assertSame('Brand Telegram', $item['name']);
         $this->assertSame('https://t.me/brand', $item['url']);
     }
 
-    public function test_dangling_linked_slot_messenger_is_hidden(): void
+    public function test_linked_messenger_respects_pinned_reserve_in_group(): void
+    {
+        $site = Site::factory()->create();
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_main',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'url' => 'https://t.me/main', 'linked_slot' => 'phone_ua_2', 'enabled' => true],
+        ]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_backup',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'url' => 'https://t.me/backup', 'linked_slot' => 'phone_ua_2', 'enabled' => true, 'pinned' => true],
+        ]);
+
+        $payload = app(SitePayloadCompiler::class)->compile($site);
+        $main = $this->itemByKey($payload, 'tg_main');
+        $backup = $this->itemByKey($payload, 'tg_backup');
+
+        $this->assertSame('on_reserve', $main['state']);
+        $this->assertSame('ok', $backup['state']);
+        $this->assertTrue($backup['is_current']);
+    }
+
+    public function test_hidden_phone_slot_is_omitted_from_payload(): void
+    {
+        $site = Site::factory()->create();
+        [$slot] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update([
+            'key' => 'phone_hidden',
+            'scope_type' => 'site',
+            'scope_id' => $site->id,
+            'status' => 'hidden',
+        ]);
+
+        $payload = app(SitePayloadCompiler::class)->compile($site);
+
+        $this->assertNull($this->itemByKey($payload, 'phone_hidden'));
+    }
+
+    public function test_linked_slot_is_visual_only(): void
     {
         $site = Site::factory()->create();
         DataValue::factory()->ofType('messenger')->forSite($site)->create([
             'key' => 'viber_orphan',
-            'content' => ['network' => 'viber', 'linked_slot' => 'no_such_key', 'enabled' => true],
+            'content' => ['value' => 'Viber support', 'network' => 'viber', 'url' => 'https://viber.example/orphan', 'linked_slot' => 'no_such_key', 'enabled' => true],
         ]);
 
         $item = $this->itemByKey(app(SitePayloadCompiler::class)->compile($site), 'viber_orphan');
 
-        $this->assertSame('hidden', $item['state']);
-        $this->assertNull($item['value']);
+        $this->assertSame('ok', $item['state']);
+        $this->assertSame('https://viber.example/orphan', $item['url']);
     }
 
     public function test_linked_whatsapp_builds_wa_me_url(): void
@@ -142,14 +188,13 @@ class SitePayloadCompilerTest extends TestCase
         ]);
         DataValue::factory()->ofType('messenger')->forSite($site)->create([
             'key' => 'wa_main',
-            'content' => ['network' => 'whatsapp', 'linked_slot' => 'phone_wa', 'enabled' => true],
+            'content' => ['value' => 'WhatsApp support', 'network' => 'whatsapp', 'url' => 'https://wa.me/support', 'linked_slot' => 'phone_wa', 'enabled' => true],
         ]);
 
         $item = $this->itemByKey(app(SitePayloadCompiler::class)->compile($site), 'wa_main');
 
-        $digits = ltrim($entries[0]->phoneNumber->e164, '+');
-        $this->assertSame('https://wa.me/' . $digits, $item['url']);
-        $this->assertSame($entries[0]->phoneNumber->e164, $item['value']);
+        $this->assertSame('https://wa.me/support', $item['url']);
+        $this->assertSame('ok', $item['state']);
     }
 
     public function test_publish_increments_version_per_site(): void

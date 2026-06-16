@@ -24,14 +24,14 @@ class ValueEditorTest extends TestCase
 
         Livewire::test(ValueEditor::class)
             ->call('createFor', $site->id)
-            ->set('type', 'price')->set('key', 'price_basic')->set('value', '1200')->set('scope', 'group')
+            ->set('type', 'messenger')->set('key', 'tg_brand')->set('value', 'https://t.me/brand')->set('network', 'telegram')->set('scope', 'group')
             ->call('save');
 
-        $dv = DataValue::where('key', 'price_basic')->first();
+        $dv = DataValue::where('key', 'tg_brand')->first();
         $this->assertNotNull($dv);
         $this->assertSame('group', $dv->scope_type);
         $this->assertSame($group->id, $dv->scope_id);
-        $this->assertSame('1200', $dv->content['value']);
+        $this->assertSame('https://t.me/brand', $dv->content['value']);
         $this->assertTrue(AuditLog::where('action', 'value.created')->exists());
     }
 
@@ -42,10 +42,10 @@ class ValueEditorTest extends TestCase
 
         Livewire::test(ValueEditor::class)
             ->call('createFor', $site->id)
-            ->set('type', 'text')->set('key', 'addr')->set('value', 'вул. Хрещатик, 1')->set('scope', 'site')
+            ->set('type', 'messenger')->set('key', 'tg_site')->set('value', 'https://t.me/site')->set('network', 'telegram')->set('scope', 'site')
             ->call('save');
 
-        $dv = DataValue::where('key', 'addr')->first();
+        $dv = DataValue::where('key', 'tg_site')->first();
         $this->assertSame('site', $dv->scope_type);
         $this->assertSame($site->id, $dv->scope_id);
     }

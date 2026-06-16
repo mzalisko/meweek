@@ -4,7 +4,6 @@ namespace App\Admin;
 
 use App\Models\DataValue;
 use App\Models\Site;
-use App\Models\ValueType;
 use App\Services\Failover\SlotResolver;
 use Illuminate\Support\Collection;
 
@@ -46,7 +45,7 @@ class SiteGridReader
         foreach ($effective as $value) {
             $scope = $ownKeys->has($value->key) ? 'site' : 'group';
             if ($value->type->code === 'messenger') {
-                $groupKey = $value->content['linked_slot'] ?? $value->key;
+                $groupKey = $value->content['messenger_slot'] ?? $value->key;
                 $messengerGroups[$groupKey] ??= ['scope' => $scope, 'values' => collect()];
                 $messengerGroups[$groupKey]['values']->push($value);
                 continue;
@@ -56,8 +55,29 @@ class SiteGridReader
             $rows[$value->type->code][] = $row;
         }
 
-        foreach ($messengerGroups as $group) {
-            $rows['messenger'][] = $this->buildMessengerRow($group['values'], $group['scope'], $effective);
+        $linkedMessengersByPhone = [];
+        foreach ($messengerGroups as $groupKey => $group) {
+            $row = $this->buildMessengerRow($group['values'], $group['scope']);
+            $rows['messenger'][] = $row;
+
+            $primary = $group['values']->first(fn (DataValue $v) => ! isset($v->content['messenger_slot']));
+            $raw = $primary ? ($primary->content['linked_slot'] ?? null) : null;
+            $linkedSlots = is_array($raw) ? $raw : (is_string($raw) && $raw !== '' ? [$raw] : []);
+            foreach ($linkedSlots as $linkedSlot) {
+                $linkedMessengersByPhone[$linkedSlot][] = [
+                    'id'          => $row['id'],
+                    'network'     => $row['network'] ?? 'msg',
+                    'linked_slot' => $linkedSlot,
+                ];
+            }
+        }
+
+        if (isset($rows['phone'])) {
+            foreach ($rows['phone'] as &$phoneRow) {
+                $phoneRow['messengers'] = $linkedMessengersByPhone[$phoneRow['key']] ?? [];
+            }
+            unset($phoneRow);
+            usort($rows['phone'], fn ($a, $b) => strcmp($a['key'], $b['key']));
         }
 
         return $rows;
@@ -77,20 +97,13 @@ class SiteGridReader
             'state'            => 'ok',
             'value'            => $value->content['value'] ?? null,
             'url'              => $value->content['url'] ?? null,
-            'linked_slot'      => $value->content['linked_slot'] ?? null,
+            'linked_slot'      => null,
             'pinned'           => (bool) ($value->content['pinned'] ?? false),
             'exhaustion_policy'=> null,
-            'messengers'       => [],
         ];
-
-        if ($value->type->code === 'messenger') {
-            return $this->buildMessengerRow($value, $base, $all);
-        }
 
         $slot = $value->phoneSlot;
         if ($slot) {
-            $base['messengers'] = $this->linkedMessengers($value);
-
             if (($value->status ?? 'active') === 'hidden') {
                 $base['state'] = 'hidden';
                 $base['value'] = null;
@@ -127,43 +140,68 @@ class SiteGridReader
         return $base;
     }
 
-    private function buildMessengerRow(Collection $group, string $scope, Collection $all): array
+    private function buildMessengerRow(Collection $group, string $scope): array
     {
         $first = $group->first();
-        $groupKey = $first ? ($first->content['linked_slot'] ?? $first->key) : '';
+        $groupKey = $first ? ($first->content['messenger_slot'] ?? $first->key) : '';
+        $policy = $first->content['exhaustion_policy'] ?? 'hide';
+        $returnMode = $first->content['return_mode'] ?? 'auto';
+        $currentMessengerId = $first->content['current_messenger_id'] ?? null;
 
         $groupMembers = $group->sortBy(fn (DataValue $dv) => sprintf(
-            '%d_%d_%010d_%010d',
-            (bool) ($dv->content['pinned'] ?? false) ? 0 : 1,
-            ($dv->status ?? 'active') === 'active' && ($dv->content['enabled'] ?? true) ? 0 : 1,
+            '%010d_%010d',
             $dv->created_at?->getTimestamp() ?? 0,
             $dv->id
         ))->values();
 
         /** @var DataValue $value */
-        $value = $groupMembers
-            ->first(fn (DataValue $dv) => ($dv->status ?? 'active') === 'active' && ($dv->content['enabled'] ?? true))
-            ?? $groupMembers->first();
+        $value = $groupMembers->first();
+        $current = $groupMembers
+            ->first(fn (DataValue $dv) => (bool) ($dv->content['pinned'] ?? false)
+                && ($dv->status ?? 'active') === 'active'
+                && ($dv->content['enabled'] ?? true))
+            ?? ($returnMode === 'sticky' && $currentMessengerId
+                ? $groupMembers->first(fn (DataValue $dv) => (int) $dv->id === (int) $currentMessengerId
+                    && ($dv->status ?? 'active') === 'active'
+                    && ($dv->content['enabled'] ?? true))
+                : null)
+            ?? $groupMembers
+                ->first(fn (DataValue $dv) => ($dv->status ?? 'active') === 'active' && ($dv->content['enabled'] ?? true));
+        $hasVisible = (bool) $current;
 
         $content = $value->content ?? [];
+        $currentContent = $current?->content ?? [];
+        $currentValue = $current
+            ? ($currentContent['value'] ?? ($currentContent['name'] ?? $current->key))
+            : match ($policy) {
+                'emergency' => $content['emergency_value'] ?? null,
+                'last' => $content['last_active_value'] ?? ($content['value'] ?? ($content['name'] ?? $value->key)),
+                default => null,
+            };
         $base = [
             'id'               => $value->id,
-            'key'              => $value->key,
+            'key'              => $groupKey,
             'type'             => $value->type->code,
             'geo'              => $value->geoTags->pluck('code')->all() ?: ['WORLD'],
             'scope'            => $scope,
             'reserves'         => 0,
             'state'            => 'ok',
-            'value'            => $content['value'] ?? ($content['name'] ?? $value->key),
-            'url'              => $content['url'] ?? null,
-            'linked_slot'      => $content['linked_slot'] ?? null,
+            'value'            => $currentValue,
+            'url'              => $currentContent['url'] ?? ($content['url'] ?? null),
+            'linked_slot'      => (function ($raw) {
+                if (is_array($raw)) {
+                    return array_values(array_filter($raw));
+                }
+                return (is_string($raw) && $raw !== '') ? [$raw] : [];
+            })($content['linked_slot'] ?? null),
             'pinned'           => (bool) ($content['pinned'] ?? false),
-            'exhaustion_policy'=> null,
-            'messengers'       => [],
+            'exhaustion_policy'=> $policy,
+            'return_mode'      => $returnMode,
+            'emergency_value'  => $content['emergency_value'] ?? null,
             'name'             => $content['value'] ?? ($content['name'] ?? $value->key),
             'network'          => $content['network'] ?? 'unknown',
             'enabled'          => $content['enabled'] ?? true,
-            'is_current'       => true,
+            'is_current'       => $current?->id === $value->id,
             'group_key'        => $groupKey,
             'chain_label'      => '#1',
         ];
@@ -172,7 +210,7 @@ class SiteGridReader
         $base['reserve_rows'] = $groupMembers
             ->filter(fn (DataValue $dv) => $dv->id !== $value->id)
             ->values()
-            ->map(function (DataValue $dv, int $index) use ($value) {
+            ->map(function (DataValue $dv, int $index) use ($current) {
                 $content = $dv->content ?? [];
 
                 return [
@@ -183,49 +221,28 @@ class SiteGridReader
                     'network' => $content['network'] ?? 'unknown',
                     'value' => $content['value'] ?? null,
                     'url' => $content['url'] ?? null,
-                    'state' => (($dv->status ?? 'active') === 'active' && ($content['enabled'] ?? true)) ? (($dv->id === $value->id) ? 'ok' : 'on_reserve') : 'hidden',
+                    'state' => (($dv->status ?? 'active') === 'active' && ($content['enabled'] ?? true))
+                        ? (($dv->id === $current?->id) ? 'on_reserve' : 'ok')
+                        : 'hidden',
                     'pinned' => (bool) ($content['pinned'] ?? false),
+                    'is_current' => $dv->id === $current?->id,
                 ];
             })
             ->all();
 
-        if (($value->status ?? 'active') === 'hidden' || ! $base['enabled']) {
-            $base['state'] = 'hidden';
-            $base['value'] = null;
+        if (! $hasVisible) {
+            $base['state'] = in_array($policy, ['last', 'emergency'], true) ? 'exhausted' : 'hidden';
             return $base;
         }
 
-        $base['state'] = 'ok';
-        $base['is_current'] = true;
+        $base['state'] = match (true) {
+            (bool) ($currentContent['pinned'] ?? false) => 'pinned',
+            $current?->id !== $value->id => 'on_reserve',
+            default => 'ok',
+        };
+        $base['is_current'] = $current?->id === $value->id;
         $base['group_key'] = $groupKey;
 
         return $base;
-    }
-
-    private function linkedMessengers(DataValue $slotValue): array
-    {
-        $messengerTypeId = ValueType::where('code', 'messenger')->value('id');
-        if (! $messengerTypeId) {
-            return [];
-        }
-
-        return DataValue::with(['geoTags', 'type'])
-            ->where('value_type_id', $messengerTypeId)
-            ->where('scope_type', $slotValue->scope_type)
-            ->where('scope_id', $slotValue->scope_id)
-            ->get()
-            ->filter(fn (DataValue $dv) => ($dv->content['linked_slot'] ?? null) === $slotValue->key)
-            ->map(fn (DataValue $dv) => [
-                'id' => $dv->id,
-                'key' => $dv->key,
-                'name' => $dv->content['value'] ?? ($dv->content['name'] ?? $dv->key),
-                'network' => $dv->content['network'] ?? 'unknown',
-                'url' => $dv->content['url'] ?? null,
-                'linked_slot' => $dv->content['linked_slot'] ?? null,
-                'enabled' => $dv->content['enabled'] ?? true,
-                'geo' => $dv->geoTags->pluck('code')->all() ?: ['WORLD'],
-            ])
-            ->values()
-            ->all();
     }
 }

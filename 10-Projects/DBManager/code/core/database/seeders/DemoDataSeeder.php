@@ -13,18 +13,23 @@ use App\Models\PhoneSlot;
 use App\Models\Publication;
 use App\Models\Site;
 use App\Models\SiteGroup;
+use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Демо-дані для адмінки (НЕ викликається з DatabaseSeeder — лише вручну:
- * php artisan db:seed --class=DemoDataSeeder). У local/testing робить
- * demo-reset і створює два сайти в одній групі: RO/UA однакові на обох,
- * RU перекритий на другому.
+ * php artisan db:seed --class=DemoDataSeeder). У local/testing оновлює
+ * лише власні demo-дані (Brand A + domen.ro/domen.ua) і створює два сайти:
+ * RO/UA однакові на обох, RU перекритий на другому.
  */
 class DemoDataSeeder extends Seeder
 {
+    private const DEMO_GROUP = 'Brand A';
+
+    private const DEMO_DOMAINS = ['domen.ro', 'domen.ua'];
+
     public function run(): void
     {
         if (! app()->environment(['local', 'testing'])) {
@@ -41,7 +46,7 @@ class DemoDataSeeder extends Seeder
         DB::transaction(function () {
             $this->wipeDemoData();
 
-            $group = SiteGroup::factory()->create(['name' => 'Brand A']);
+            $group = SiteGroup::factory()->create(['name' => self::DEMO_GROUP]);
             Site::factory()->for($group, 'group')->create([
                 'name' => 'Domen RO',
                 'domain' => 'domen.ro',
@@ -102,6 +107,36 @@ class DemoDataSeeder extends Seeder
                     ['+74957654321', 'RU для domen.ua'],
                 ],
             );
+
+            $messengerType = ValueType::where('code', 'messenger')->sole();
+
+            DataValue::create([
+                'key' => 'tg_brand',
+                'value_type_id' => $messengerType->id,
+                'scope_type' => 'group',
+                'scope_id' => $group->id,
+                'content' => [
+                    'value' => 'Написати в Telegram',
+                    'network' => 'telegram',
+                    'url' => 'https://t.me/brand',
+                    'linked_slot' => 'phone_ro_1',
+                ],
+                'status' => 'active',
+            ])->geoTags()->sync([$world->id, $ua->id]);
+
+            DataValue::create([
+                'key' => 'viber_ro_1',
+                'value_type_id' => $messengerType->id,
+                'scope_type' => 'group',
+                'scope_id' => $group->id,
+                'content' => [
+                    'value' => 'Viber підтримка',
+                    'network' => 'viber',
+                    'messenger_slot' => 'tg_brand',
+                    'exhaustion_policy' => 'hide',
+                ],
+                'status' => 'active',
+            ])->geoTags()->sync([$world->id]);
         });
 
         $this->command?->info('DemoDataSeeder: створено Brand A + domen.ro/domen.ua; RO/UA групові, RU перекритий на domen.ua.');
@@ -128,11 +163,10 @@ class DemoDataSeeder extends Seeder
         ]);
 
         foreach ($numbers as $priority => [$e164, $label]) {
-            $phone = PhoneNumber::create([
-                'e164' => $e164,
-                'label' => $label,
-                'status' => 'active',
-            ]);
+            $phone = PhoneNumber::updateOrCreate(
+                ['e164' => $e164],
+                ['label' => $label, 'status' => 'active', 'down_since' => null],
+            );
 
             NumberEntry::create([
                 'phone_slot_id'   => $slot->id,
@@ -150,17 +184,59 @@ class DemoDataSeeder extends Seeder
 
     private function wipeDemoData(): void
     {
-        Publication::query()->delete();
-        ApiToken::query()->delete();
-        AuditLog::query()->delete();
-        Incident::query()->delete();
-        NumberEntry::query()->delete();
-        PhoneSlot::query()->delete();
-        DataValue::query()->delete();
-        PhoneNumber::query()->delete();
-        Site::query()->delete();
-        SiteGroup::query()->delete();
+        $groups = SiteGroup::where('name', self::DEMO_GROUP)
+            ->with('sites')
+            ->get();
+        $sites = Site::whereIn('domain', self::DEMO_DOMAINS)->get();
 
-        $this->command?->info('DemoDataSeeder: попередні робочі дані видалено.');
+        $groupIds = $groups->pluck('id')
+            ->merge($sites->pluck('site_group_id')->filter())
+            ->unique()
+            ->values();
+        $siteIds = $groups->flatMap->sites->pluck('id')
+            ->merge($sites->pluck('id'))
+            ->unique()
+            ->values();
+
+        DataValue::where(function ($query) use ($groupIds, $siteIds) {
+            $query->where(fn ($q) => $q->where('scope_type', 'group')->whereIn('scope_id', $groupIds))
+                ->orWhere(fn ($q) => $q->where('scope_type', 'site')->whereIn('scope_id', $siteIds));
+        })
+            ->with(['phoneSlot.entries.phoneNumber', 'geoTags'])
+            ->get()
+            ->each(fn (DataValue $value) => $this->deleteDataValue($value));
+
+        Publication::whereIn('site_id', $siteIds)->delete();
+        ApiToken::whereIn('site_id', $siteIds)->delete();
+
+        Site::whereIn('id', $siteIds)->delete();
+        SiteGroup::whereIn('id', $groupIds)
+            ->whereDoesntHave('sites')
+            ->delete();
+
+        $this->command?->info('DemoDataSeeder: попередні demo-дані оновлено без очищення сторонніх записів.');
+    }
+
+    private function deleteDataValue(DataValue $value): void
+    {
+        $value->geoTags()->detach();
+
+        if ($value->phoneSlot) {
+            foreach ($value->phoneSlot->entries as $entry) {
+                $phoneNumber = $entry->phoneNumber;
+                $entry->delete();
+
+                if ($phoneNumber && ! NumberEntry::where('phone_number_id', $phoneNumber->id)->exists()) {
+                    $phoneNumber->delete();
+                }
+            }
+
+            Incident::where('subject_type', 'phone_slot')->where('subject_id', $value->phoneSlot->id)->delete();
+            AuditLog::where('subject_type', 'phone_slot')->where('subject_id', $value->phoneSlot->id)->delete();
+            $value->phoneSlot->delete();
+        }
+
+        AuditLog::where('subject_type', 'DataValue')->where('subject_id', $value->id)->delete();
+        $value->delete();
     }
 }

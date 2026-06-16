@@ -45,7 +45,8 @@ class SlotPinTest extends TestCase
         Livewire::test(SlotPanel::class)
             ->call('open', $slot->dataValue->id)
             ->call('pin', $entries[1]->id)
-            ->assertSee($entries[1]->phoneNumber->e164);
+            ->assertSee('Ручний режим')
+            ->assertSee('активний');
     }
 
     public function test_pin_rejects_entry_not_belonging_to_slot(): void
