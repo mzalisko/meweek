@@ -21,6 +21,16 @@ class SitesManager extends Component
 
     public string $groupName = '';
 
+    public ?int $editingSiteId = null;
+
+    public string $siteName = '';
+
+    public string $siteDomain = '';
+
+    public string $siteCountryHint = '';
+
+    public ?int $siteGroupId = null;
+
     public function mount(): void
     {
         $this->authorizeSiteManagement();
@@ -145,11 +155,127 @@ class SitesManager extends Component
         $this->dispatch('toast', message: 'Групу відновлено');
     }
 
+    public function startCreateSite(?int $groupId = null): void
+    {
+        $this->authorizeSiteManagement();
+        $this->panelMode = 'site';
+        $this->editingSiteId = null;
+        $this->siteName = '';
+        $this->siteDomain = '';
+        $this->siteCountryHint = '';
+        $this->siteGroupId = $groupId;
+        $this->resetValidation();
+    }
+
+    public function editSite(int $id): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::withTrashed()->findOrFail($id);
+        $this->panelMode = 'site';
+        $this->editingSiteId = $site->id;
+        $this->siteName = $site->name;
+        $this->siteDomain = $site->domain;
+        $this->siteCountryHint = $site->country_hint ?? '';
+        $this->siteGroupId = $site->site_group_id;
+        $this->resetValidation();
+    }
+
+    public function saveSite(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $validated = $this->validate([
+            'siteName' => ['required', 'string', 'max:255'],
+            'siteDomain' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('sites', 'domain')->ignore($this->editingSiteId),
+            ],
+            'siteCountryHint' => ['nullable', 'string', 'max:8'],
+            'siteGroupId' => ['nullable', 'integer', 'exists:site_groups,id'],
+        ]);
+
+        $site = $this->editingSiteId
+            ? Site::withTrashed()->findOrFail($this->editingSiteId)
+            : new Site();
+
+        $old = $site->exists
+            ? $site->only(['name', 'domain', 'country_hint', 'site_group_id'])
+            : null;
+
+        $site->name = $validated['siteName'];
+        $site->domain = $validated['siteDomain'];
+        $site->country_hint = $validated['siteCountryHint'] !== '' ? $validated['siteCountryHint'] : null;
+        $site->site_group_id = $validated['siteGroupId'];
+        $site->save();
+
+        $this->editingSiteId = $site->id;
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => auth()->id(),
+            'action' => $old ? 'site.updated' : 'site.created',
+            'subject_type' => 'Site',
+            'subject_id' => $site->id,
+            'old' => $old,
+            'new' => $site->only(['name', 'domain', 'country_hint', 'site_group_id']),
+        ]);
+
+        $this->dispatch('toast', message: 'Сайт збережено');
+    }
+
+    public function archiveSite(int $id): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($id);
+        $site->delete();
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => auth()->id(),
+            'action' => 'site.archived',
+            'subject_type' => 'Site',
+            'subject_id' => $site->id,
+        ]);
+
+        if ($this->editingSiteId === $id) {
+            $this->closePanel();
+        }
+
+        $this->dispatch('toast', message: 'Сайт заархівовано');
+    }
+
+    public function restoreSite(int $id): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::withTrashed()->findOrFail($id);
+        $site->restore();
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => auth()->id(),
+            'action' => 'site.restored',
+            'subject_type' => 'Site',
+            'subject_id' => $site->id,
+        ]);
+
+        $this->dispatch('toast', message: 'Сайт відновлено');
+    }
+
     public function closePanel(): void
     {
         $this->panelMode = null;
         $this->editingGroupId = null;
         $this->groupName = '';
+        $this->editingSiteId = null;
+        $this->siteName = '';
+        $this->siteDomain = '';
+        $this->siteCountryHint = '';
+        $this->siteGroupId = null;
         $this->resetValidation();
     }
 
@@ -176,6 +302,7 @@ class SitesManager extends Component
             'groups' => $groups,
             'ungroupedSites' => $ungroupedSites,
             'valueCounts' => $this->valueCounts(),
+            'groupOptions' => SiteGroup::orderBy('name')->pluck('name', 'id'),
         ])->layout('components.layouts.admin');
     }
 

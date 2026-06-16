@@ -80,4 +80,72 @@ class SitesManagerTest extends TestCase
         $this->assertDatabaseHas('sites', ['id' => $site->id, 'deleted_at' => null]);
         $this->assertTrue(AuditLog::where('action', 'group.restored')->exists());
     }
+
+    public function test_create_site_persists_and_audits(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $group = SiteGroup::factory()->create();
+
+        Livewire::test(SitesManager::class)
+            ->call('startCreateSite', $group->id)
+            ->assertSet('siteGroupId', $group->id)
+            ->set('siteName', 'Новий сайт')
+            ->set('siteDomain', 'new.test')
+            ->set('siteCountryHint', 'UA')
+            ->call('saveSite')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sites', [
+            'name' => 'Новий сайт',
+            'domain' => 'new.test',
+            'country_hint' => 'UA',
+            'site_group_id' => $group->id,
+        ]);
+        $this->assertTrue(AuditLog::where('action', 'site.created')->exists());
+    }
+
+    public function test_edit_site_persists_and_audits(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $site = Site::factory()->create(['domain' => 'old.test', 'name' => 'Старий']);
+
+        Livewire::test(SitesManager::class)
+            ->call('editSite', $site->id)
+            ->assertSet('siteDomain', 'old.test')
+            ->set('siteName', 'Оновлений')
+            ->call('saveSite')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sites', ['id' => $site->id, 'name' => 'Оновлений']);
+        $this->assertTrue(AuditLog::where('action', 'site.updated')->exists());
+    }
+
+    public function test_site_domain_must_be_unique(): void
+    {
+        $this->actingAs(User::factory()->create());
+        Site::factory()->create(['domain' => 'taken.test']);
+
+        Livewire::test(SitesManager::class)
+            ->call('startCreateSite')
+            ->set('siteName', 'Дубль')
+            ->set('siteDomain', 'taken.test')
+            ->call('saveSite')
+            ->assertHasErrors('siteDomain');
+
+        $this->assertDatabaseMissing('sites', ['name' => 'Дубль']);
+    }
+
+    public function test_archive_and_restore_site_audits(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $site = Site::factory()->create();
+
+        Livewire::test(SitesManager::class)->call('archiveSite', $site->id);
+        $this->assertSoftDeleted('sites', ['id' => $site->id]);
+        $this->assertTrue(AuditLog::where('action', 'site.archived')->exists());
+
+        Livewire::test(SitesManager::class)->call('restoreSite', $site->id);
+        $this->assertDatabaseHas('sites', ['id' => $site->id, 'deleted_at' => null]);
+        $this->assertTrue(AuditLog::where('action', 'site.restored')->exists());
+    }
 }

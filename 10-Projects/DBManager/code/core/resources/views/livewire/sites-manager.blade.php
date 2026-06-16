@@ -22,8 +22,12 @@
                 Показати архів
             </label>
             <button type="button" wire:click="startCreateGroup"
-                class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                class="inline-flex items-center gap-1.5 rounded-lg border border-[#dfe3e0] px-3 py-2 text-xs font-semibold text-acc-tx hover:border-acc hover:bg-acc-bg">
                 @svg('plus') Створити групу
+            </button>
+            <button type="button" wire:click="startCreateSite"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                @svg('plus') Створити сайт
             </button>
         </div>
     </div>
@@ -50,6 +54,10 @@
                                 @svg('check') Відновити
                             </button>
                         @else
+                            <button type="button" wire:click="startCreateSite({{ $group->id }})"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-[#dfe3e0] px-2 text-[11px] font-semibold text-acc-tx hover:border-acc hover:bg-acc-bg">
+                                @svg('plus') Сайт
+                            </button>
                             <button type="button" wire:click="editGroup({{ $group->id }})" aria-label="Редагувати групу"
                                 class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#dfe3e0] text-mut hover:border-acc hover:bg-acc-bg hover:text-acc-tx">
                                 @svg('edit')
@@ -106,6 +114,73 @@
                     <input wire:model="groupName" type="text" autofocus
                         class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
                     @error('groupName')
+                        <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="flex gap-2 pt-1">
+                    <button type="submit"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                        Зберегти
+                    </button>
+                    <button type="button" wire:click="closePanel"
+                        class="rounded-lg border border-[#dfe3e0] px-3 py-2 text-xs font-semibold text-mut hover:border-acc hover:text-acc-tx">
+                        Скасувати
+                    </button>
+                </div>
+            </form>
+        </aside>
+    @endif
+
+    @if($panelMode === 'site')
+        <div class="fixed inset-0 z-20 bg-[rgba(20,26,22,0.28)]" wire:click="closePanel"></div>
+        <aside wire:click.stop
+            class="fixed right-0 top-0 bottom-0 z-30 w-[460px] max-w-[calc(100vw-24px)] overflow-y-auto border-l border-[#dfe3e0] bg-white text-[13px] shadow-[-18px_0_40px_rgba(28,34,30,0.12)]">
+            <div class="flex items-center justify-between border-b border-[#edf0ed] px-4 py-3">
+                <h2 class="text-[15px] font-semibold text-acc-tx">
+                    {{ $editingSiteId ? 'Редагувати сайт' : 'Новий сайт' }}
+                </h2>
+                <button type="button" wire:click="closePanel" class="text-mut hover:text-ink shrink-0" aria-label="Закрити">@svg('x')</button>
+            </div>
+
+            <form wire:submit="saveSite" class="space-y-4 px-4 py-4">
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Назва</label>
+                    <input wire:model="siteName" type="text"
+                        class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                    @error('siteName')
+                        <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Домен</label>
+                    <input wire:model="siteDomain" type="text" placeholder="example.com"
+                        class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                    @error('siteDomain')
+                        <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Код країни (необов’язково)</label>
+                    <input wire:model="siteCountryHint" type="text" maxlength="8" placeholder="UA"
+                        class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                    @error('siteCountryHint')
+                        <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Група</label>
+                    <select wire:model="siteGroupId"
+                        class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                        <option value="">Без групи</option>
+                        @foreach($groupOptions as $id => $name)
+                            <option value="{{ $id }}">{{ $name }}</option>
+                        @endforeach
+                    </select>
+                    @error('siteGroupId')
                         <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
                     @enderror
                 </div>
