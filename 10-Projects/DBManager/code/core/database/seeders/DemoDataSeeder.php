@@ -184,10 +184,11 @@ class DemoDataSeeder extends Seeder
 
     private function wipeDemoData(): void
     {
-        $groups = SiteGroup::where('name', self::DEMO_GROUP)
-            ->with('sites')
+        $groups = SiteGroup::withTrashed()
+            ->where('name', self::DEMO_GROUP)
+            ->with(['sites' => fn ($query) => $query->withTrashed()])
             ->get();
-        $sites = Site::whereIn('domain', self::DEMO_DOMAINS)->get();
+        $sites = Site::withTrashed()->whereIn('domain', self::DEMO_DOMAINS)->get();
 
         $groupIds = $groups->pluck('id')
             ->merge($sites->pluck('site_group_id')->filter())
@@ -209,10 +210,10 @@ class DemoDataSeeder extends Seeder
         Publication::whereIn('site_id', $siteIds)->delete();
         ApiToken::whereIn('site_id', $siteIds)->delete();
 
-        Site::whereIn('id', $siteIds)->delete();
+        Site::whereIn('id', $siteIds)->forceDelete();
         SiteGroup::whereIn('id', $groupIds)
             ->whereDoesntHave('sites')
-            ->delete();
+            ->forceDelete();
 
         $this->command?->info('DemoDataSeeder: попередні demo-дані оновлено без очищення сторонніх записів.');
     }

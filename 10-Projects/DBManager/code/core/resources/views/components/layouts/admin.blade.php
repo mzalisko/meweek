@@ -42,7 +42,7 @@
                 $nav = [
                     ['Дашборд',          'grid',  null],
                     ['Значення',         'tag',   route('admin.values')],
-                    ['Сайти і групи',    'sites', null],
+                    ['Сайти і групи',    'sites', route('admin.sites')],
                     ['Інциденти',        'alert', null],
                     ['Аудит',            'audit', null],
                 ];

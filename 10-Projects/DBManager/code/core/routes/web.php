@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\AccessManager;
+use App\Livewire\SitesManager;
 use App\Livewire\ValuesGrid;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,7 @@ Route::view('profile', 'profile')
 // Admin routes — protected by auth middleware.
 Route::middleware(['auth', 'admin.access'])->group(function () {
     Route::get('/admin', ValuesGrid::class)->name('admin.values');
+    Route::get('/admin/sites', SitesManager::class)->name('admin.sites');
     Route::get('/admin/access', AccessManager::class)->name('admin.access');
 });
 
