@@ -27,4 +27,15 @@ class SiteContextTest extends TestCase
             ->set('site', $b->id)
             ->assertSee('only_b')->assertDontSee('only_a');
     }
+
+    public function test_archived_site_is_not_opened_for_data_management(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $active = Site::factory()->create(['domain' => 'active.ua']);
+        $archived = Site::factory()->create(['domain' => 'archived.ua']);
+        $archived->delete();
+
+        Livewire::test(ValuesGrid::class, ['site' => $archived->id])
+            ->assertSet('site', $active->id);
+    }
 }

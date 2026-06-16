@@ -22,6 +22,10 @@
                 @svg('check') Відновити
             </button>
         @else
+            <a href="{{ route('admin.values', ['site' => $site->id]) }}" wire:navigate
+                class="inline-flex h-7 items-center gap-1 rounded-md bg-acc px-2.5 text-[11px] font-semibold text-white hover:opacity-90">
+                @svg('grid') Керувати даними
+            </a>
             <button type="button" wire:click="editSite({{ $site->id }})" aria-label="Редагувати сайт"
                 class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#dfe3e0] text-mut hover:border-acc hover:bg-acc-bg hover:text-acc-tx">
                 @svg('edit')

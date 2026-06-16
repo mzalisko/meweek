@@ -148,4 +148,13 @@ class SitesManagerTest extends TestCase
         $this->assertDatabaseHas('sites', ['id' => $site->id, 'deleted_at' => null]);
         $this->assertTrue(AuditLog::where('action', 'site.restored')->exists());
     }
+
+    public function test_site_row_links_to_value_management(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $site = Site::factory()->create(['domain' => 'manage.test']);
+
+        Livewire::test(SitesManager::class)
+            ->assertSeeHtml('href="'.route('admin.values', ['site' => $site->id]).'"');
+    }
 }
