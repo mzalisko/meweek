@@ -1,229 +1,304 @@
 <div>
-<aside class="w-[420px] shrink-0 bg-white border-l border-[#e3e5e1] overflow-y-auto text-[13px]">
 @if($open && $value && $slot)
-<div class="p-4">
-
-    {{-- Header --}}
-    <div class="flex justify-between items-center">
-        <b class="text-acc-tx flex items-center gap-1.5">@svg('phone') Слот: {{ $value->key }}</b>
-        <button wire:click="$set('open', false)" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
-    </div>
-    <div class="text-[11px] text-mut mt-1 flex items-center gap-1">
-        @if($value->scope_type === 'site')<span class="text-acc-tx">@svg('edit')</span> Перекриття цього сайта @else Значення групи @endif
-    </div>
-
-    {{-- Гео-мітки --}}
-    <div class="mt-4">
-        <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Гео-мітки</div>
-        <div class="flex flex-wrap gap-1.5">
-            @foreach($allGeoTags as $gt)
-                <label class="cursor-pointer inline-flex items-center rounded-[9px] border px-2.5 py-0.5 text-[11px] transition-colors
-                    {{ in_array($gt->id, $geoTagIds) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
-                    <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
-                    {{ $gt->code }}
-                </label>
-            @endforeach
-        </div>
-        @if(count($geoTagIds) === 0)
-            <p class="mt-1 text-[11px] text-bad-tx">Вибери хоча б одну гео-мітку (напр. WORLD).</p>
-        @endif
-    </div>
-
-    {{-- Ланцюг номерів --}}
-    <div class="mt-4">
-        <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Ланцюг номерів</div>
-
-        {{-- Поточний стан слота --}}
-        @php
-            $activeCount   = $entries->filter(fn($e) => ($e->phoneNumber->status ?? '') === 'active')->count();
-            $totalCount    = $entries->count();
-            $resolvedState = $resolved?->state ?? 'exhausted';
-        @endphp
-
-        @if($totalCount === 0)
-            <div class="mb-3 flex items-center gap-2 rounded-[10px] border border-[#dfe3e0] bg-[#fafbfa] px-3 py-2 text-[12px] text-mut">
-                @svg('alert') Додайте хоча б один номер щоб слот почав працювати.
-            </div>
-        @elseif($resolvedState === 'exhausted')
-            <div class="mb-3 rounded-[10px] border border-bad-tx/30 bg-bad-bg px-3 py-2 text-[12px]">
-                <div class="flex items-center gap-2 text-bad-tx font-medium">@svg('alert') Слот не показується — всі номери впали</div>
-                <div class="mt-1 text-mut">
-                    @if($totalCount === 1) Єдиний номер деактивований. Поверніть його або додайте резервний.
-                    @else Всі {{ $totalCount }} номери позначені «down».
-                    @endif
-                </div>
-            </div>
-        @elseif($resolvedState === 'pinned')
-            <div class="mb-3 flex items-center gap-2 rounded-[10px] border border-acc-bd bg-acc-bg px-3 py-2 text-[12px] text-acc-tx font-medium">
-                @svg('pin') Ручний режим: {{ $resolved->number }}
-            </div>
-        @elseif($resolvedState === 'on_reserve')
-            <div class="mb-3 rounded-[10px] border border-warn-tx/25 bg-warn-bg px-3 py-2 text-[12px]">
-                <div class="flex items-center gap-2 text-warn-tx font-medium">@svg('alert') Показується резерв (основний впав)</div>
-                <div class="mt-0.5 font-mono text-ink">{{ $resolved->number }}</div>
-            </div>
-        @else
-            {{-- ok: нічого не показуємо — все штатно --}}
-        @endif
-
-        @foreach($entries as $i => $entry)
-            @php
-                $isCurrent = $resolved && $resolved->entryId === $entry->id;
-                $status    = $entry->phoneNumber->status ?? 'unknown';
-                $e164      = $entry->phoneNumber->e164 ?? '—';
-                $isPinned  = $slot->pinned_number_entry_id === $entry->id;
-                $editing   = $editingEntryId === $entry->id;
-            @endphp
-            <div class="border rounded-[10px] px-3 py-2 mt-1.5
-                @if($isCurrent) border-[1.5px] border-[#5f7d6e] bg-[#eef4f0]
-                @elseif($status !== 'active') border-[#e3e5e1] bg-[#fafbfa] opacity-[0.55]
-                @else border-[#e3e5e1] bg-[#fafbfa] @endif">
-
-                {{-- Рядок 1: номер + статус --}}
-                <div class="flex items-center gap-2">
-                    <span class="text-mut shrink-0">@svg('grip')</span>
-                    <b class="shrink-0">#{{ $i }} {{ $i === 0 ? 'основний' : 'резерв' }}</b>
-                    @if($editing)
-                        <input type="text" wire:model="editE164"
-                            class="flex-1 min-w-0 border border-[#dfe3e0] rounded px-2 py-0.5 text-[12px] focus:outline-none focus:border-acc">
-                        <button wire:click="saveNumber" class="shrink-0 text-ok-tx hover:opacity-80 px-0.5" title="Зберегти" aria-label="Зберегти номер">@svg('check')</button>
-                        <button wire:click="cancelEdit" class="shrink-0 text-mut hover:text-ink px-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
+    <div class="fixed inset-0 z-40" wire:click="close">
+    <aside wire:click.stop class="fixed right-0 top-0 bottom-0 w-[420px] max-w-[calc(100vw-24px)] bg-white border-l border-[#dfe3e0] shadow-[-18px_0_40px_rgba(28,34,30,0.12)] overflow-y-auto text-[13px]">
+        <div class="p-4">
+            <div class="flex justify-between items-start gap-3">
+                <div class="min-w-0">
+                    @if($mode === 'number')
+                        @php
+                            $editingEntry = $entries->firstWhere('id', $editingEntryId);
+                            $editingPriority = $editingEntry?->priority ?? 0;
+                            $numberLabel = $editingPriority === 0 ? '#1 основний' : '#1.' . $editingPriority . ' резерв';
+                            $numberStatus = $editingEntry?->phoneNumber?->status ?? 'active';
+                            $isPinnedNumber = $editingEntry && $slot->pinned_number_entry_id === $editingEntry->id;
+                        @endphp
+                        <b class="text-acc-tx flex items-center gap-1.5">@svg('phone') {{ $numberLabel }}</b>
+                        <div class="text-[11px] text-mut mt-1 truncate">{{ $value->key }}</div>
                     @else
-                        <span class="text-ink truncate">{{ $e164 }}</span>
-                        @if($isPinned)<span class="text-acc-tx shrink-0" title="Закріплено">@svg('pin')</span>@endif
-                        @if($isCurrent)
-                            <span class="ml-auto shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold bg-ok-bg text-ok-tx whitespace-nowrap">● показується</span>
-                        @elseif($status !== 'active')
-                            <span class="ml-auto shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold bg-bad-bg text-bad-tx">down</span>
-                        @endif
+                        <b class="text-acc-tx flex items-center gap-1.5">@svg('phone') Слот: {{ $value->key }}</b>
+                        <div class="text-[11px] text-mut mt-1 flex items-center gap-1">
+                    @if($value->scope_type === 'site')<span class="text-acc-tx">@svg('edit')</span> Перекриття цього сайта @else Значення групи @endif
+                        </div>
+                    @endif
+                </div>
+                <button wire:click="close" class="text-mut hover:text-ink shrink-0" aria-label="Закрити">@svg('x')</button>
+            </div>
+
+            @if($mode === 'settings')
+                @php
+                    $resolvedState = $resolved?->state ?? null;
+                    $resolvedNumber = $resolved?->number ?? null;
+                @endphp
+                @if($resolvedState === 'exhausted')
+                    <div class="mt-4 rounded-[10px] border border-bad-tx/30 bg-bad-bg px-3 py-2 text-[12px]">
+                        <div class="flex items-center gap-2 text-bad-tx font-medium">@svg('alert') Всі номери вичерпано</div>
+                        <div class="mt-1 text-mut">
+                            @if($slot->exhaustion_policy === 'emergency')
+                                Зараз показується аварійний номер:
+                                <span class="font-mono text-ink">{{ $resolvedNumber ?? '—' }}</span>
+                            @elseif($slot->exhaustion_policy === 'last')
+                                Зараз показується останній активний номер:
+                                <span class="font-mono text-ink">{{ $resolvedNumber ?? '—' }}</span>
+                            @else
+                                Вивід приховано.
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            @endif
+
+            @if(($value->status ?? 'active') === 'hidden')
+                <div class="mt-4 rounded-[10px] border border-bad-tx/30 bg-bad-bg px-3 py-2 text-[12px]">
+                    <div class="flex items-center gap-2 text-bad-tx font-medium">@svg('eye-off') Слот приховано</div>
+                    <div class="mt-1 text-mut">У публікації цей слот не віддається. Номер і резерви залишаються в адмінці.</div>
+                </div>
+            @endif
+
+            @if($mode === 'number')
+                @if($editingEntry)
+                    <div class="mt-5">
+                        <label class="text-[11px] uppercase tracking-[.06em] text-mut block mb-1.5">Номер</label>
+                        <input type="text"
+                            wire:model="editE164"
+                            placeholder="+380441112233"
+                            class="w-full border border-[#dfe3e0] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-acc">
+                        @error('editE164')<p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Дії</div>
+                        <div class="flex flex-wrap gap-1.5">
+                            @if($numberStatus === 'down')
+                                <button wire:click="setNumberStatus({{ $editingEntry->id }}, 'active')"
+                                    class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] border border-ok-tx/50 text-ok-tx hover:bg-ok-bg">@svg('check') Повернути</button>
+                            @else
+                                <button wire:click="setNumberStatus({{ $editingEntry->id }}, 'down')" wire:confirm="Приховати номер і позначити його неактивним?"
+                                    class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] border border-bad-tx/30 text-bad-tx hover:bg-bad-bg">@svg('eye-off') Приховати</button>
+                            @endif
+
+                            @if($isPinnedNumber)
+                                <button wire:click="unpin"
+                                    class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] border border-acc text-acc-tx bg-acc-bg">@svg('pin') Закріплено</button>
+                            @elseif($numberStatus === 'active')
+                                <button wire:click="pin({{ $editingEntry->id }})"
+                                    class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] border border-acc text-acc-tx hover:bg-acc-bg">@svg('pin') Показувати цей</button>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="mt-5 flex items-center gap-2">
+                        <button wire:click="saveNumber" class="bg-acc text-white rounded-lg px-4 py-1.5 font-semibold hover:opacity-90">Зберегти</button>
+                        <button wire:click="close" class="border border-[#dfe3e0] text-mut rounded-lg px-3 py-1.5 hover:border-acc hover:text-acc-tx">Відхилити</button>
+                        <button wire:click="removeNumber({{ $editingEntry->id }})" wire:confirm="Видалити цей номер із ланцюга?"
+                            class="ml-auto text-bad-tx hover:opacity-80 px-1.5 py-1" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+                    </div>
+                @else
+                    <div class="mt-5 rounded-lg border border-bad-tx/30 bg-bad-bg px-3 py-2 text-bad-tx text-[12px]">Номер не знайдено.</div>
+                @endif
+            @else
+                <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Гео-мітки</div>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach($allGeoTags as $gt)
+                            <label class="cursor-pointer inline-flex items-center rounded-[9px] border px-2.5 py-0.5 text-[11px] transition-colors
+                                {{ in_array($gt->id, $geoTagIds) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
+                                <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
+                                {{ $gt->code }}
+                            </label>
+                        @endforeach
+                    </div>
+                    @if(count($geoTagIds) === 0)
+                        <p class="mt-1 text-[11px] text-bad-tx">Вибери хоча б одну гео-мітку.</p>
                     @endif
                 </div>
 
-                {{-- Рядок 2: дії --}}
-                @unless($editing)
-                <div class="flex items-center gap-0.5 mt-1.5 text-[#9aa39c]">
-                    <div class="flex items-center gap-1.5 mr-auto">
-                        @if($status === 'down')
-                            <button wire:click="setNumberStatus({{ $entry->id }}, 'active')" class="border border-ok-tx/50 text-ok-tx rounded-md px-2 py-0.5 text-[11px] hover:bg-ok-bg whitespace-nowrap">Повернути</button>
+                <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Додати резерв</div>
+                    <p class="text-[11px] text-mut mb-1.5">Резерв успадковує гео-мітки основного слота.</p>
+                    <div class="flex items-center gap-2">
+                        <input type="text"
+                            wire:model="newNumber"
+                            placeholder="+380441112233"
+                            class="flex-1 min-w-0 border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
+                        <button wire:click="addNumber"
+                            class="shrink-0 inline-flex items-center gap-1 bg-acc text-white rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 whitespace-nowrap">@svg('plus') додати</button>
+                    </div>
+                    @error('newNumber')<p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Поведінка</div>
+
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-mut">Повернення:</span>
+                        <button wire:click="setReturnMode('auto')"
+                            class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ $slot->return_mode === 'auto' ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">Авто</button>
+                        <button wire:click="setReturnMode('sticky')"
+                            class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ $slot->return_mode === 'sticky' ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">Sticky</button>
+                    </div>
+
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-mut">Ручний режим:</span>
+                        @if($slot->pinned_number_entry_id)
+                            <span class="text-acc-tx font-medium">активний</span>
+                            <button wire:click="unpin" class="border border-acc text-acc-tx rounded-lg px-2.5 py-0.5 text-[11px] hover:bg-acc-bg">Зняти</button>
                         @else
-                            @if(! $isCurrent)
-                                <button wire:click="pin({{ $entry->id }})" class="border border-acc text-acc-tx rounded-md px-2 py-0.5 text-[11px] hover:bg-acc-bg whitespace-nowrap">Показувати цей</button>
-                            @endif
-                            <button wire:click="setNumberStatus({{ $entry->id }}, 'down')" wire:confirm="Позначити номер неактивним?" class="text-[11px] text-mut hover:text-bad-tx whitespace-nowrap">деактивувати</button>
+                            <span class="text-mut">не активний</span>
                         @endif
                     </div>
-                    <button wire:click="startEditNumber({{ $entry->id }})" class="hover:text-acc-tx px-1 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
-                    @if($i > 0)
-                    <button wire:click="moveUp({{ $entry->id }})" class="hover:text-ink px-1 py-0.5" title="Вгору" aria-label="Вгору">@svg('chevron-up')</button>
-                    @else
-                    <span class="px-1 py-0.5 w-5"></span>{{-- placeholder to keep layout --}}
-                    @endif
-                    <button wire:click="moveDown({{ $entry->id }})" class="hover:text-ink px-1 py-0.5" title="Вниз" aria-label="Вниз">@svg('chevron-down')</button>
-                    <button wire:click="removeNumber({{ $entry->id }})" wire:confirm="Видалити цей номер із ланцюга?" class="hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+
+                    <div>
+                        <span class="text-mut block mb-1">Якщо всі впали:</span>
+                        <div class="flex gap-1.5 flex-wrap">
+                            @foreach(['hide' => 'Прибрати вивід', 'last' => 'Показувати останній', 'emergency' => 'Аварійний'] as $p => $lbl)
+                                <button wire:click="setExhaustionPolicy('{{ $p }}')"
+                                    class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ $slot->exhaustion_policy === $p ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">{{ $lbl }}</button>
+                            @endforeach
+                        </div>
+                        @if($slot->exhaustion_policy === 'emergency')
+                        <div class="mt-2">
+                            <label class="text-mut text-[11px] block mb-1">Аварійний номер:</label>
+                            <input type="text" wire:model.live.debounce.500ms="emergencyNumber"
+                                placeholder="+380XXXXXXXXX"
+                                class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
+                        </div>
+                        @endif
+                    </div>
+
+                    <div class="mt-3">
+                        <span class="text-mut block mb-1">Дії слота:</span>
+                        <div class="flex gap-1.5 flex-wrap">
+                            <button wire:click="showSlot"
+                                class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ ($value->status ?? 'active') === 'active' ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">Показати слот</button>
+                            <button wire:click="hideSlot"
+                                class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ ($value->status ?? 'active') === 'hidden' ? 'bg-bad-tx text-white border-bad-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-bad-tx' }}">Приховати слот</button>
+                        </div>
+                    </div>
                 </div>
-                @endunless
-            </div>
-        @endforeach
-        @error('editE164')<p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
 
-        {{-- Додати резерв --}}
-        <div class="mt-2 flex items-center gap-2">
-            <input type="text"
-                wire:model="newNumber"
-                placeholder="+380XXXXXXXXX"
-                class="flex-1 min-w-0 border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
-            <button wire:click="addNumber"
-                class="shrink-0 inline-flex items-center gap-1 bg-acc text-white rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 whitespace-nowrap">@svg('plus') додати резерв</button>
-        </div>
-        @error('newNumber')
-            <p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>
-        @enderror
-    </div>
+                <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Месенджери</div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <select wire:model="newMessengerNetwork"
+                            class="w-28 shrink-0 border border-[#dfe3e0] rounded-lg px-2 py-1.5 text-[12px] focus:outline-none focus:border-acc">
+                            <option value="telegram">Telegram</option>
+                            <option value="viber">Viber</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="messenger">Messenger</option>
+                        </select>
+                        <input type="text"
+                            wire:model="newMessengerValue"
+                            placeholder="посилання, номер або код"
+                            class="flex-1 min-w-0 border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
+                        <button wire:click="addMessengerReserve"
+                            class="shrink-0 inline-flex items-center gap-1 bg-acc text-white rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 whitespace-nowrap">@svg('plus') додати</button>
+                    </div>
+                    @error('newMessengerValue')<p class="mb-2 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
 
-    {{-- Прив'язані месенджери --}}
-    @if($messengers->isNotEmpty())
-    <div class="mt-4">
-        <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Прив'язані месенджери</div>
-        @foreach($messengers as $m)
-            @php $enabled = $m->content['enabled'] ?? true; $network = $m->content['network'] ?? '—'; @endphp
-            <div class="flex items-center gap-2 border border-[#e3e5e1] rounded-[10px] px-3 py-2 mt-1.5 bg-[#fafbfa] {{ $enabled ? '' : 'opacity-[0.55]' }}">
-                <span class="flex-1 flex items-center gap-1.5 truncate"><span class="text-mut shrink-0">@svg('msg')</span> {{ ucfirst($network) }}</span>
-                <button wire:click="toggleMessenger({{ $m->id }})"
-                    class="shrink-0 text-[11px] font-semibold rounded-md px-2 py-0.5 {{ $enabled ? 'bg-ok-bg text-ok-tx' : 'bg-[#eef1ee] text-mut' }}">
-                    {{ $enabled ? 'увімкнено' : 'вимкнено' }}
-                </button>
-                <button wire:click="unlinkMessenger({{ $m->id }})" wire:confirm="Від'язати цей месенджер від слота?"
-                    class="shrink-0 text-mut hover:text-bad-tx px-0.5" title="Від'язати">@svg('x')</button>
-            </div>
-        @endforeach
-    </div>
-    @endif
+                    @if($messengers->isEmpty())
+                        <div class="rounded-md border border-dashed border-[#dfe3e0] px-3 py-2 text-[12px] text-mut">Резервів месенджера ще немає.</div>
+                    @endif
 
-    {{-- Доступні для прив'язки месенджери --}}
-    @if($availableMessengers->isNotEmpty())
-    <div class="mt-3">
-        <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Прив'язати месенджер</div>
-        @foreach($availableMessengers as $m)
-            @php $network = $m->content['network'] ?? '—'; @endphp
-            <div class="flex items-center gap-2 border border-[#e3e5e1] rounded-[10px] px-3 py-2 mt-1.5 bg-[#fafbfa]">
-                <span class="flex-1 flex items-center gap-1.5 truncate text-mut"><span class="shrink-0">@svg('msg')</span> {{ ucfirst($network) }}</span>
-                <button wire:click="linkMessenger({{ $m->id }})"
-                    class="shrink-0 text-[11px] font-semibold rounded-md px-2 py-0.5 border border-acc text-acc-tx hover:bg-acc-bg whitespace-nowrap">Прив'язати</button>
-            </div>
-        @endforeach
-    </div>
-    @endif
+                    @foreach($messengers as $m)
+                        @php
+                            $isEditingMessenger = $editingMessengerId === $m->id;
+                            $enabled = $m->content['enabled'] ?? true;
+                            $network = $m->content['network'] ?? '—';
+                            $name = $m->content['value'] ?? ($m->content['name'] ?? $m->key);
+                            $isPinned = (bool) ($m->content['pinned'] ?? false);
+                            $isCurrent = $loop->first && $enabled;
+                            $label = $loop->index === 0 ? '#1' : '#1.' . $loop->index;
+                        @endphp
+                        <div class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 mt-1 {{ $isCurrent ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $enabled ? '' : 'opacity-70' }}">
+                            @if($isEditingMessenger)
+                                <span class="w-12 shrink-0 text-[10px] uppercase tracking-wide text-acc-tx font-semibold pt-1">{{ $label }}</span>
+                                <span class="w-20 shrink-0 text-[11px] text-mut pt-1">{{ ucfirst($network) }}</span>
+                                <input type="text"
+                                    wire:model="editMessengerValue"
+                                    placeholder="посилання, номер або код"
+                                    class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none">
+                                <span class="ml-auto shrink-0 flex items-center gap-1">
+                                    <button wire:click="saveMessengerValue" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
+                                    <button wire:click="cancelMessengerEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
+                                    <button wire:click="removeMessenger({{ $m->id }})" wire:confirm="Видалити цей месенджер із слота?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+                                </span>
+                            @else
+                                <span class="w-12 shrink-0 text-[10px] uppercase tracking-wide {{ $isCurrent ? 'text-acc-tx font-semibold' : 'text-mut' }} pt-1">{{ $label }}</span>
+                                <span class="w-20 shrink-0 text-[11px] {{ $isCurrent ? 'text-acc-tx font-semibold' : 'text-mut' }} pt-1">{{ ucfirst($network) }}</span>
+                                <span class="min-w-0 truncate text-ink pt-0.5" title="{{ $name }}">{{ $name }}</span>
+                                <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                    @if($isCurrent)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-ok-bg px-1.5 py-0.5 text-[10px] font-semibold text-ok-tx">● показується</span>
+                                    @elseif($enabled)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-warn-bg px-1.5 py-0.5 text-[10px] font-semibold text-warn-tx">● резерв</span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● приховано</span>
+                                    @endif
+                                        @if($isPinned)
+                                            <button wire:click="unpinMessenger({{ $m->id }})"
+                                                class="text-acc-tx hover:opacity-80 px-1 py-0.5" title="Зняти ручний режим" aria-label="Зняти ручний режим">@svg('pin')</button>
+                                        @else
+                                            <button wire:click="pinMessenger({{ $m->id }})"
+                                                class="text-mut hover:text-acc-tx px-1 py-0.5" title="Показувати цей" aria-label="Показувати цей">@svg('pin')</button>
+                                        @endif
+                                        <button wire:click="toggleMessenger({{ $m->id }})"
+                                            class="text-mut hover:text-bad-tx px-1 py-0.5" title="{{ $enabled ? 'Деактивувати' : 'Показати' }}" aria-label="{{ $enabled ? 'Деактивувати' : 'Показати' }}">@svg('ban')</button>
+                                        <button wire:click="startEditMessenger({{ $m->id }})"
+                                            class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати" aria-label="Редагувати">@svg('edit')</button>
+                                </span>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
 
-    {{-- Поведінка --}}
-    <div class="mt-4">
-        <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Поведінка</div>
+                @if($availableMessengers->isNotEmpty())
+                <div class="mt-3">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Додати резерв месенджера</div>
+                    @foreach($availableMessengers as $m)
+                        @php
+                            $network = $m->content['network'] ?? '—';
+                            $name = $m->content['value'] ?? ($m->content['name'] ?? $m->key);
+                        @endphp
+                        <div class="flex items-center gap-2 border border-[#e3e5e1] rounded-[10px] px-3 py-2 mt-1.5 bg-[#fafbfa]">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5 truncate text-mut">
+                                    <span class="shrink-0">@svg('msg')</span>
+                                    <span class="font-medium truncate">{{ $name }}</span>
+                                    <span class="text-mut">·</span>
+                                    <span>{{ ucfirst($network) }}</span>
+                                </div>
+                                <div class="mt-0.5">
+                                    <span class="inline-flex items-center rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[11px] text-mut" title="Ключ месенджера: {{ $m->key }}">
+                                        {{ ucfirst($network) }}
+                                    </span>
+                                </div>
+                                @if($m->geoTags->isNotEmpty())
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @foreach($m->geoTags as $geo)
+                                            <span class="rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut">{{ $geo->code }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="shrink-0 flex items-center gap-1">
+                                <button wire:click="startEditMessenger({{ $m->id }})"
+                                    class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати URL" aria-label="Редагувати URL">@svg('edit')</button>
+                                <button wire:click="linkMessenger({{ $m->id }})"
+                                    class="text-[11px] font-semibold rounded-md px-2 py-0.5 border border-acc text-acc-tx hover:bg-acc-bg whitespace-nowrap">Додати резерв</button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                @endif
 
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-mut">Повернення:</span>
-            <button wire:click="setReturnMode('auto')"
-                class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ $slot->return_mode === 'auto' ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">Авто</button>
-            <button wire:click="setReturnMode('sticky')"
-                class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ $slot->return_mode === 'sticky' ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">Sticky</button>
-        </div>
-
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-mut">Ручний режим:</span>
-            @if($slot->pinned_number_entry_id)
-                <span class="text-acc-tx font-medium">активний</span>
-                <button wire:click="unpin" class="border border-acc text-acc-tx rounded-lg px-2.5 py-0.5 text-[11px] hover:bg-acc-bg">Зняти</button>
-            @else
-                <span class="text-mut">не активний</span>
+                <div class="mt-5 flex items-center gap-3">
+                    <button wire:click="close" class="border border-[#dfe3e0] text-mut rounded-lg px-3 py-1.5 hover:border-acc hover:text-acc-tx">Закрити</button>
+                    <span class="text-[11px] text-mut">зберігається автоматично</span>
+                </div>
             @endif
         </div>
-
-        <div>
-            <span class="text-mut block mb-1">Якщо всі впали:</span>
-            <div class="flex gap-1.5 flex-wrap">
-                @foreach(['hide' => 'Прибрати вивід', 'last' => 'Показувати останній', 'emergency' => 'Аварійний'] as $p => $lbl)
-                    <button wire:click="setExhaustionPolicy('{{ $p }}')"
-                        class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ $slot->exhaustion_policy === $p ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">{{ $lbl }}</button>
-                @endforeach
-            </div>
-            @if($slot->exhaustion_policy === 'emergency')
-            <div class="mt-2">
-                <label class="text-mut text-[11px] block mb-1">Аварійний номер (показується коли всі впали):</label>
-                <input type="text" wire:model="emergencyNumber"
-                    placeholder="+380XXXXXXXXX"
-                    class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
-            </div>
-            @endif
-        </div>
+    </aside>
     </div>
-
-    {{-- Зберегти --}}
-    <div class="mt-5 flex items-center gap-3">
-        <button wire:click="save" class="bg-acc text-white rounded-lg px-4 py-1.5 font-semibold hover:opacity-90">Зберегти</button>
-        <span class="text-[11px] text-mut">→ аудит + push</span>
-    </div>
-
-</div>
-@else
-<div class="h-full flex items-center justify-center p-6 text-center text-mut text-[12px]">Оберіть рядок, щоб редагувати</div>
 @endif
-</aside>
 </div>
