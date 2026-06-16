@@ -58,6 +58,18 @@ class ValueEditFromGridTest extends TestCase
             ->assertDispatched('open-slot', dataValueId: $dv->id);
     }
 
+    public function test_phone_pencil_starts_inline_number_edit(): void
+    {
+        $site = Site::factory()->create();
+        [$slot, $entries] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update(['key' => 'phone_main', 'scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('startInlinePhoneEdit', $entries[0]->id)
+            ->assertSet('editingPhoneEntryId', $entries[0]->id)
+            ->assertSet('editingPhoneNumber', $entries[0]->phoneNumber->e164);
+    }
+
     public function test_inline_phone_edit_updates_current_number_and_audits(): void
     {
         $site = Site::factory()->create();
@@ -89,6 +101,22 @@ class ValueEditFromGridTest extends TestCase
             ->assertHasErrors('editingPhoneNumber');
     }
 
+    public function test_inline_phone_remove_deletes_entry_and_audits(): void
+    {
+        $site = Site::factory()->create();
+        [$slot, $entries] = $this->slotWithNumbers(['active', 'active']);
+        $slot->dataValue->update(['scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('startInlinePhoneEdit', $entries[1]->id)
+            ->call('removeInlinePhoneNumber', $entries[1]->id)
+            ->assertSet('editingPhoneEntryId', null)
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseMissing('number_entries', ['id' => $entries[1]->id]);
+        $this->assertTrue(AuditLog::where('action', 'number.removed')->exists());
+    }
+
     public function test_phone_chain_labels_show_reserve_belongs_to_primary(): void
     {
         $site = Site::factory()->create();
@@ -98,5 +126,31 @@ class ValueEditFromGridTest extends TestCase
         Livewire::test(ValuesGrid::class, ['site' => $site->id])
             ->assertSee('#1 основний')
             ->assertSee('#1.1 резерв');
+    }
+
+    public function test_down_phone_status_is_rendered_in_ukrainian(): void
+    {
+        $site = Site::factory()->create();
+        [$slot] = $this->slotWithNumbers(['down', 'active']);
+        $slot->dataValue->update(['key' => 'phone_main', 'scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->assertSee('● неактивний')
+            ->assertDontSee('>down<', false);
+    }
+
+    public function test_exhausted_emergency_slot_shows_fallback_badge_in_grid(): void
+    {
+        $site = Site::factory()->create();
+        [$slot] = $this->slotWithNumbers(['down', 'down']);
+        $slot->dataValue->update(['key' => 'phone_main', 'scope_type' => 'site', 'scope_id' => $site->id]);
+        $slot->update([
+            'exhaustion_policy' => 'emergency',
+            'emergency_number' => '+380991112233',
+        ]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->assertSee('аварійний')
+            ->assertSee('+380991112233');
     }
 }

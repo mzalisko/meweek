@@ -48,12 +48,14 @@
     @endif
 
     {{-- Add value button --}}
-    <div class="flex justify-end mb-2">
-        <button wire:click="addValue"
-            class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-acc text-white hover:bg-acc/90 transition-colors">
-            + Додати значення
-        </button>
-    </div>
+    @if($canEditCurrentSite)
+        <div class="flex justify-end mb-2">
+            <button wire:click="addValue"
+                class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-acc text-white hover:bg-acc/90 transition-colors">
+                + Додати значення
+            </button>
+        </div>
+    @endif
 
     {{-- Filter chips (Task 5: interactive wire:model.live bindings) --}}
     <div class="flex gap-2 items-center text-mut text-xs mb-3 flex-wrap">
@@ -157,8 +159,8 @@
         @endphp
 
         @foreach($rows as $type => $items)
-            <div class="mt-3 overflow-hidden border border-[#dfe3e0] bg-white rounded-lg">
-                <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] text-[10px] uppercase tracking-wide text-mut">
+            <div class="mt-3 border border-[#dfe3e0] bg-white rounded-lg">
+                <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] rounded-t-lg text-[10px] uppercase tracking-wide text-mut">
                     <div></div>
                     <div class="flex gap-1.5 items-center">
                         @svg($typeLabels[$type][1] ?? 'tag')
@@ -176,7 +178,7 @@
                     @php
                         $st = $stateMap[$r['state']] ?? 'ok';
                     @endphp
-                    <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 hover:bg-[#fafbfa] transition-colors">
+                    <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
                         {{-- Row checkbox --}}
                         <input type="checkbox"
                             wire:click.stop="toggleSelect({{ $r['id'] }})"
@@ -184,7 +186,7 @@
                             class="cursor-pointer accent-acc">
 
                         {{-- Key --}}
-                        <span class="font-medium text-ink truncate pt-1" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
+                        <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate block mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
 
                         {{-- Geo --}}
                         <span class="min-w-0 flex flex-wrap gap-1 text-mut text-[11px] pt-1" title="{{ implode(', ', $r['geo']) }}">
@@ -194,7 +196,7 @@
                         </span>
 
                         {{-- Status badge --}}
-                        <span class="min-w-0 pt-0.5">
+                        <span class="min-w-0">
                             <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold text-[11px] bg-{{ $st }}-bg text-{{ $st }}-tx">
                                 ● {{ $stateLabels[$r['state']] ?? $r['state'] }}
                             </span>
@@ -230,7 +232,7 @@
                                                     <button wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
                                                 </span>
                                             @else
-                                                <span class="min-w-0 truncate text-ink pt-0.5">{{ $number['e164'] }}</span>
+                                                <span class="min-w-0 truncate text-ink">{{ $number['e164'] }}</span>
                                                 <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
                                                     @if($isInactive)
                                                         <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
@@ -247,6 +249,7 @@
                                                         @endif
                                                         <button wire:click.stop="deactivatePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Приховати номер і позначити його неактивним?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Приховати / деактивувати" aria-label="Приховати номер">@svg('ban')</button>
                                                     @endif
+                                                    <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('link')</span>
                                                     <button wire:click.stop="startInlinePhoneEdit({{ $number['entry_id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
                                                 </span>
                                             @endif
@@ -263,26 +266,14 @@
                                             <span class="font-mono text-ink">{{ $r['value'] ?? '—' }}</span>
                                         </span>
                                     @endif
-
                                     @if(!empty($r['messengers']))
-                                        <div class="mt-1.5 flex flex-col gap-1">
-                                            <div class="text-[10px] uppercase tracking-wide text-mut">Месенджери під номером</div>
-                                            @foreach($r['messengers'] as $m)
-                                                <div class="flex flex-wrap items-center gap-1.5 rounded-md border border-[#dfe3e0] bg-[#fcfcfb] px-2 py-1 text-[10px] text-mut">
-                                                    <span class="font-semibold text-ink">{{ $m['name'] }}</span>
-                                                    <span>·</span>
-                                                    <span>{{ ucfirst($m['network']) }}</span>
-                                                    @if(!empty($m['linked_slot']))
-                                                        <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5" title="Ключ месенджера: {{ $m['key'] }}">
-                                                            {{ ucfirst($m['network'] ?? 'msg') }}
-                                                        </span>
-                                                    @endif
-                                                    @if(!empty($m['url']))
-                                                        <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5">
-                                                            URL <span class="font-mono text-ink truncate max-w-[180px]">{{ $m['url'] }}</span>
-                                                        </span>
-                                                    @endif
-                                                </div>
+                                        <div class="flex flex-wrap gap-1 mt-1.5 pl-2">
+                                            @foreach($r['messengers'] as $lm)
+                                                <button wire:click.stop="startInlineMessengerEdit({{ $lm['id'] }})"
+                                                    class="inline-flex items-center gap-1 rounded-full border border-[#dfe3e0] bg-white px-2 py-0.5 text-[10px] text-mut hover:border-acc hover:text-acc-tx transition-colors">
+                                                    @svg('msg')
+                                                    {{ ucfirst($lm['network']) }}
+                                                </button>
                                             @endforeach
                                         </div>
                                     @endif
@@ -295,18 +286,93 @@
                                         </span>
                                     @endif
                                     @if($type === 'messenger')
-                                        <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }}">
+                                        @php
+                                            $isEditingMessenger = $editingMessengerId === $r['id'];
+                                            $isInactiveMessenger = !($r['enabled'] ?? true);
+                                        @endphp
+                                        <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveMessenger ? 'opacity-70' : '' }}">
                                             <span class="w-12 shrink-0 text-[10px] uppercase tracking-wide {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">#1</span>
                                             <span class="w-20 shrink-0 text-[11px] {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ ucfirst($r['network'] ?? 'msg') }}</span>
-                                            @if($r['value'] !== null)
-                                                <span class="text-ink truncate">{{ $r['value'] }}</span>
+                                            @if($isEditingMessenger)
+                                                <input
+                                                    wire:model.defer="editingMessengerValue"
+                                                    wire:keydown.enter="saveInlineMessengerValue"
+                                                    wire:keydown.escape="cancelInlineMessengerEdit"
+                                                    type="text"
+                                                    class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
+                                                    aria-label="Редагувати месенджер"
+                                                >
                                             @else
-                                                <span class="text-mut">—</span>
+                                                @if($r['value'] !== null)
+                                                    <span class="min-w-0 truncate text-ink">{{ $r['value'] }}</span>
+                                                @else
+                                                    <span class="text-mut">—</span>
+                                                @endif
                                             @endif
-                                            @if(!empty($r['pinned']))
-                                                <span class="ml-auto shrink-0 text-acc-tx" title="закріплено">@svg('pin')</span>
-                                            @endif
+                                            <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                                @if($isEditingMessenger)
+                                                    <button wire:click.stop="saveInlineMessengerValue" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
+                                                    <button wire:click.stop="cancelInlineMessengerEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
+                                                    <button wire:click.stop="removeMessenger({{ $r['id'] }})" wire:confirm="Видалити цей месенджер?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+                                                @else
+                                                    @if($isInactiveMessenger)
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
+                                                        <button wire:click.stop="restoreMessenger({{ $r['id'] }})" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Показати" aria-label="Показати">@svg('eye')</button>
+                                                        <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('ban')</span>
+                                                    @else
+                                                        @if($r['is_current'] ?? false)
+                                                            <span class="inline-flex items-center gap-1 rounded-md bg-ok-bg px-1.5 py-0.5 text-[10px] font-semibold text-ok-tx">● показується</span>
+                                                        @endif
+                                                        @if(!empty($r['pinned']))
+                                                            <button wire:click.stop="unpinMessenger({{ $r['id'] }})" class="text-acc-tx hover:opacity-80 px-1 py-0.5" title="Зняти ручний режим" aria-label="Зняти ручний режим">@svg('pin')</button>
+                                                        @else
+                                                            <button wire:click.stop="pinMessenger({{ $r['id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Показувати цей" aria-label="Показувати цей">@svg('pin')</button>
+                                                        @endif
+                                                        <button wire:click.stop="deactivateMessenger({{ $r['id'] }})" wire:confirm="Деактивувати цей месенджер?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Деактивувати" aria-label="Деактивувати">@svg('ban')</button>
+                                                    @endif
+                                                    {{-- Chain link: dropdown для прив'язки до 1+ телефонів --}}
+                                                    @php
+                                                        $linkedSlots = $r['linked_slot'] ?? [];
+                                                        $availableToLink = array_values(array_diff($phoneKeys, $linkedSlots));
+                                                    @endphp
+                                                    @if(!empty($linkedSlots) || !empty($phoneKeys))
+                                                        <div class="relative" x-data="{ open: false }">
+                                                            <button @click.stop="open = !open"
+                                                                class="{{ !empty($linkedSlots) ? 'text-acc-tx' : 'text-mut' }} hover:text-acc-tx px-1 py-0.5"
+                                                                title="{{ !empty($linkedSlots) ? implode(', ', $linkedSlots) : 'Прив\'язати до телефону' }}"
+                                                                aria-label="Прив'язка до телефону">@svg('link')</button>
+                                                            <div x-show="open" @click.outside="open = false" x-cloak
+                                                                class="absolute right-0 top-full mt-1 z-20 bg-white border border-[#dfe3e0] rounded-lg shadow-md py-1 min-w-[160px]">
+                                                                @foreach($linkedSlots as $lk)
+                                                                    <div class="flex items-center justify-between px-3 py-1 gap-2">
+                                                                        <span class="text-[11px] font-mono text-acc-tx truncate">{{ $lk }}</span>
+                                                                        <button wire:click.stop="unlinkMessengerFromPhone({{ $r['id'] }}, '{{ $lk }}')" @click="open = false"
+                                                                            class="text-mut hover:text-bad-tx text-xs leading-none shrink-0">×</button>
+                                                                    </div>
+                                                                @endforeach
+                                                                @if(!empty($linkedSlots) && !empty($availableToLink))
+                                                                    <div class="border-t border-[#edf0ed] my-1"></div>
+                                                                @endif
+                                                                @foreach($availableToLink as $pk)
+                                                                    <button wire:click.stop="linkMessengerToPhone({{ $r['id'] }}, '{{ $pk }}')" @click="open = false"
+                                                                        class="w-full text-left px-3 py-1 text-[11px] font-mono text-ink hover:bg-acc-bg hover:text-acc-tx transition-colors">
+                                                                        + {{ $pk }}
+                                                                    </button>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    @else
+                                                        <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('link')</span>
+                                                    @endif
+                                                    <button wire:click.stop="startInlineMessengerEdit({{ $r['id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати" aria-label="Редагувати">@svg('edit')</button>
+                                                @endif
+                                            </span>
                                         </span>
+                                        @if($isEditingMessenger)
+                                            @error('editingMessengerValue')
+                                                <span class="ml-[8rem] text-[11px] text-bad-tx">{{ $message }}</span>
+                                            @enderror
+                                        @endif
                                     @else
                                         <span class="flex items-center gap-2 min-w-0">
                                             @if($r['value'] !== null)
@@ -317,23 +383,84 @@
                                         </span>
                                     @endif
                                     @if($type === 'messenger' && !empty($r['reserve_rows']))
-                                        <div class="mt-1.5 flex flex-col gap-1">
+                                        <div class="flex flex-col gap-1">
                                             @foreach($r['reserve_rows'] as $reserve)
-                                                <div class="flex flex-wrap items-center gap-1.5 rounded-md border border-[#dfe3e0] bg-[#fcfcfb] px-2 py-1 text-[10px] text-mut">
-                                                    <span class="inline-flex items-center rounded-md bg-[#eef1ee] px-1.5 py-0.5 font-semibold text-mut">{{ $reserve['label'] }}</span>
-                                                    <span class="font-semibold text-ink">{{ ucfirst($reserve['network']) }}</span>
-                                                    <span class="text-mut">·</span>
-                                                    <span class="truncate max-w-[240px]">{{ $reserve['value'] ?? '—' }}</span>
-                                                    @if(!empty($reserve['url']))
-                                                        <span class="inline-flex items-center rounded-md bg-[#eef1ee] px-1.5 py-0.5" title="{{ $reserve['url'] }}">
-                                                            посилання
-                                                        </span>
+                                                @php
+                                                    $isEditingReserve = $editingMessengerId === $reserve['id'];
+                                                    $isInactiveReserve = $reserve['state'] === 'hidden';
+                                                @endphp
+                                                <div class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($reserve['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveReserve ? 'opacity-70' : '' }}">
+                                                    <span class="w-12 shrink-0 text-[10px] uppercase tracking-wide {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ $reserve['label'] }}</span>
+                                                    <span class="w-20 shrink-0 text-[11px] {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ ucfirst($reserve['network']) }}</span>
+                                                    @if($isEditingReserve)
+                                                        <input
+                                                            wire:model.defer="editingMessengerValue"
+                                                            wire:keydown.enter="saveInlineMessengerValue"
+                                                            wire:keydown.escape="cancelInlineMessengerEdit"
+                                                            type="text"
+                                                            class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
+                                                            aria-label="Редагувати резерв месенджера"
+                                                        >
+                                                    @else
+                                                        <span class="min-w-0 truncate text-ink">{{ $reserve['value'] ?? '—' }}</span>
                                                     @endif
-                                                    <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 bg-{{ $reserve['state'] === 'on_reserve' ? 'warn' : 'bad' }}-bg text-{{ $reserve['state'] === 'on_reserve' ? 'warn' : 'bad' }}-tx">
-                                                        ● {{ $reserve['state'] === 'on_reserve' ? 'резерв' : 'приховано' }}
+                                                    <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                                        @if($isEditingReserve)
+                                                            <button wire:click.stop="saveInlineMessengerValue" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
+                                                            <button wire:click.stop="cancelInlineMessengerEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
+                                                            <button wire:click.stop="removeMessenger({{ $reserve['id'] }})" wire:confirm="Видалити цей резерв месенджера?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+                                                        @else
+                                                            @if($isInactiveReserve)
+                                                                <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
+                                                                <button wire:click.stop="restoreMessenger({{ $reserve['id'] }})" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Показати" aria-label="Показати">@svg('eye')</button>
+                                                                <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('ban')</span>
+                                                            @else
+                                                                @if($reserve['is_current'] ?? false)
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-ok-bg px-1.5 py-0.5 text-[10px] font-semibold text-ok-tx">● показується</span>
+                                                                @endif
+                                                                @if(!empty($reserve['pinned']))
+                                                                    <button wire:click.stop="unpinMessenger({{ $reserve['id'] }})" class="text-acc-tx hover:opacity-80 px-1 py-0.5" title="Зняти ручний режим" aria-label="Зняти ручний режим">@svg('pin')</button>
+                                                                @else
+                                                                    <button wire:click.stop="pinMessenger({{ $reserve['id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Показувати цей" aria-label="Показувати цей">@svg('pin')</button>
+                                                                @endif
+                                                                <button wire:click.stop="deactivateMessenger({{ $reserve['id'] }})" wire:confirm="Деактивувати цей резерв месенджера?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Деактивувати" aria-label="Деактивувати">@svg('ban')</button>
+                                                            @endif
+                                                            <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('link')</span>
+                                                            <button wire:click.stop="startInlineMessengerEdit({{ $reserve['id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати" aria-label="Редагувати">@svg('edit')</button>
+                                                        @endif
                                                     </span>
                                                 </div>
                                             @endforeach
+                                        </div>
+                                    @endif
+                                    @if(false && $type === 'messenger')
+                                        <div class="mt-1.5 flex items-center gap-2">
+                                            <select wire:model="newMessengerNetwork.{{ $r['id'] }}"
+                                                class="w-24 shrink-0 border border-[#dfe3e0] rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-acc">
+                                                <option value="">мережа</option>
+                                                <option value="telegram">Telegram</option>
+                                                <option value="viber">Viber</option>
+                                                <option value="whatsapp">WhatsApp</option>
+                                                <option value="messenger">Messenger</option>
+                                            </select>
+                                            <input
+                                                wire:model.defer="newMessengerValue.{{ $r['id'] }}"
+                                                type="text"
+                                                placeholder="резерв: посилання, номер або код"
+                                                class="flex-1 min-w-0 border border-[#dfe3e0] rounded-md px-2 py-1 text-xs text-ink focus:outline-none focus:border-acc"
+                                            >
+                                            <button wire:click.stop="addMessengerReserve({{ $r['id'] }})"
+                                                class="shrink-0 text-mut hover:text-acc-tx px-1 py-0.5" title="Додати резерв" aria-label="Додати резерв">@svg('plus')</button>
+                                        </div>
+                                        @error('newMessengerValue.' . $r['id'])
+                                            <span class="text-[11px] text-bad-tx">{{ $message }}</span>
+                                        @enderror
+                                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-mut">
+                                            <span>Якщо всі впали:</span>
+                                            <button wire:click.stop="setMessengerExhaustionPolicy({{ $r['id'] }}, 'hide')"
+                                                class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'hide' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">прибрати</button>
+                                            <button wire:click.stop="setMessengerExhaustionPolicy({{ $r['id'] }}, 'last')"
+                                                class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'last' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">останній</button>
                                         </div>
                                     @endif
                                 </span>
@@ -353,6 +480,8 @@
                         <span class="text-right pt-1">
                             @if($type === 'phone' && isset($r['id']))
                                 <button wire:click="openSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування слота" aria-label="Налаштування слота">@svg('edit')</button>
+                            @elseif($type === 'messenger' && isset($r['id']))
+                                <button wire:click="openMessengerSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування месенджера" aria-label="Налаштування месенджера">@svg('edit')</button>
                             @elseif($type !== 'phone' && isset($r['id']))
                                 <button wire:click="editValue({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Редагувати значення" aria-label="Редагувати значення">@svg('edit')</button>
                             @endif
@@ -364,5 +493,6 @@
     @endif
 </div>
 <livewire:slot-panel />
+<livewire:messenger-panel />
 <livewire:value-editor />
 </div>
