@@ -230,7 +230,7 @@
 
         @foreach($rows as $type => $items)
             <div class="mt-3 border border-[#dfe3e0] bg-white rounded-lg">
-                <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] rounded-t-lg text-[10px] uppercase tracking-wide text-mut">
+                <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_68px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] rounded-t-lg text-[10px] uppercase tracking-wide text-mut">
                     <div class="flex gap-1.5 items-center">
                         @svg($typeLabels[$type][1] ?? 'tag')
                         <span>{{ $typeLabels[$type][0] ?? $type }}</span>
@@ -247,7 +247,7 @@
                     @php
                         $st = $stateMap[$r['state']] ?? 'ok';
                     @endphp
-                    <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
+                    <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_68px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
                         {{-- Key --}}
                         <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate inline-block w-fit mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
 
@@ -566,6 +566,13 @@
 
                         {{-- Details --}}
                         <span class="inline-flex items-center justify-end gap-1.5 pt-1">
+                            @if(isset($r['id']))
+                                @if($r['state'] === 'hidden')
+                                    <button wire:click="toggleSlotVisibility({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Показати слот" aria-label="Показати слот">@svg('eye')</button>
+                                @else
+                                    <button wire:click="toggleSlotVisibility({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Приховати слот" aria-label="Приховати слот">@svg('eye-off')</button>
+                                @endif
+                            @endif
                             @if($type === 'phone' && isset($r['id']))
                                 <button wire:click="openSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування слота" aria-label="Налаштування слота">@svg('edit')</button>
                             @elseif($type === 'messenger' && isset($r['id']))

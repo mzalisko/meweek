@@ -29,10 +29,10 @@ class FailoverEngine
         $this->audit($source, 'number.down', 'phone_number', $number->id, null, ['e164' => $number->e164]);
 
         return $slots
-            ->filter(function (PhoneSlot $slot) use ($source, $befores) {
+            ->filter(function (PhoneSlot $slot) use ($source, $befores, $number) {
                 $slot->unsetRelations();
 
-                return $this->recompute($slot, $source, $befores[$slot->id]);
+                return $this->recompute($slot, $source, $befores[$slot->id], $number, 'down');
             })
             ->values();
     }
@@ -52,10 +52,10 @@ class FailoverEngine
         $this->audit($source, 'number.recovered', 'phone_number', $number->id, null, ['e164' => $number->e164]);
 
         return $slots
-            ->filter(function (PhoneSlot $slot) use ($source, $befores) {
+            ->filter(function (PhoneSlot $slot) use ($source, $befores, $number) {
                 $slot->unsetRelations();
 
-                return $this->recompute($slot, $source, $befores[$slot->id]);
+                return $this->recompute($slot, $source, $befores[$slot->id], $number, 'active');
             })
             ->values();
     }
@@ -85,8 +85,13 @@ class FailoverEngine
      *
      * @param  ResolvedSlot|null  $before  Знімок до зміни; якщо null — обчислюється через резолвер.
      */
-    public function recompute(PhoneSlot $slot, string $source = 'system', ?ResolvedSlot $before = null): bool
-    {
+    public function recompute(
+        PhoneSlot $slot,
+        string $source = 'system',
+        ?ResolvedSlot $before = null,
+        ?PhoneNumber $triggerNumber = null,
+        ?string $triggerStatus = null,
+    ): bool {
         if ($slot->pinned_number_entry_id) {
             return false; // закріплений слот не перемикається автоматично
         }
@@ -132,8 +137,8 @@ class FailoverEngine
         }
 
         $this->audit($source, 'failover.switch', 'phone_slot', $slot->id,
-            ['number' => $before->number, 'state' => $before->state],
-            ['number' => $after->number, 'state' => $after->state]);
+            $this->failoverPayload($slot, $before, $triggerNumber, $triggerStatus),
+            $this->failoverPayload($slot, $after, $triggerNumber, $triggerStatus));
 
         // Вичерпання → критичний інцидент ЗАВЖДИ, незалежно від політики видимості
         if ($after->state === 'exhausted' && $before->state !== 'exhausted') {
@@ -155,11 +160,54 @@ class FailoverEngine
     /** Сайти, яких стосується слот (через область дії його значення). */
     public function sitesFor(PhoneSlot $slot): Collection
     {
-        $value = $slot->dataValue;
+        return $this->affectedSitesFor($slot);
+    }
 
-        return $value->scope_type === 'site'
-            ? Site::where('id', $value->scope_id)->get()
-            : Site::where('site_group_id', $value->scope_id)->get();
+    private function affectedSitesFor(PhoneSlot $slot): Collection
+    {
+        $value = $slot->dataValue;
+        if (! $value) {
+            return collect();
+        }
+
+        if ($value->scope_type === 'site') {
+            return Site::where('id', (int) $value->scope_id)->orderBy('domain')->get();
+        }
+
+        return Site::where('site_group_id', $value->scope_id)->orderBy('domain')->get();
+    }
+
+    private function failoverPayload(
+        PhoneSlot $slot,
+        ResolvedSlot $resolved,
+        ?PhoneNumber $triggerNumber,
+        ?string $triggerStatus,
+    ): array {
+        $slot->loadMissing('dataValue');
+        $value = $slot->dataValue;
+        $sites = $this->affectedSitesFor($slot)
+            ->map(fn (Site $site) => [
+                'id' => (int) $site->id,
+                'domain' => $site->domain,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'slot_id' => (int) $slot->id,
+            'slot_key' => $value?->key,
+            'scope_type' => $value?->scope_type,
+            'scope_id' => $value?->scope_id ? (int) $value->scope_id : null,
+            'sites' => $sites,
+            'site_ids' => array_column($sites, 'id'),
+            'site_count' => count($sites),
+            'number' => $resolved->number,
+            'state' => $resolved->state,
+            'current_entry_id' => $resolved->entryId,
+            'visible' => $resolved->visible,
+            'trigger_number' => $triggerNumber?->e164,
+            'trigger_status' => $triggerStatus,
+        ];
     }
 
     private function audit(string $actorType, string $action, ?string $subjectType, ?int $subjectId, ?array $old, ?array $new): void

@@ -102,7 +102,6 @@ class ValueEditor extends Component
         $rules = [
             'key'   => ['required', 'regex:/^[a-z0-9_]+$/'],
             'type'  => ['required', $this->valueId ? 'in:text,price,messenger,address,social,phone' : 'in:phone,messenger'],
-            'scope' => ['required', 'in:group,site'],
         ];
 
         if ($this->type !== 'phone') {
@@ -184,24 +183,18 @@ class ValueEditor extends Component
                 ]);
             }
         } else {
-            // CREATE new value — resolve scope_id
-            if ($this->scope === 'site') {
-                $scopeId = $this->siteId;
-            } else {
-                $site = Site::find($this->siteId);
-                if (! $site || ! $site->site_group_id) {
-                    $this->addError('scope', 'Сайт не належить до жодної групи.');
+            // CREATE new value — сайт обов'язковий як база
+            if (! $this->siteId) {
+                $this->addError('key', 'Потрібен сайт для створення значення.');
 
-                    return;
-                }
-                $scopeId = $site->site_group_id;
+                return;
             }
 
             $dv = DataValue::create([
                 'key'           => $this->key,
                 'value_type_id' => $valueType->id,
-                'scope_type'    => $this->scope,
-                'scope_id'      => $scopeId,
+                'scope_type'    => 'site',
+                'scope_id'      => (int) $this->siteId,
                 'content'       => $content,
                 'status'        => 'active',
             ]);
@@ -234,46 +227,6 @@ class ValueEditor extends Component
         $this->publishAffected($dv);
     }
 
-    public function overrideForSite(int $valueId, int $siteId): void
-    {
-        $groupValue = DataValue::findOrFail($valueId);
-        if (! $this->canChangeValue($groupValue) || ! $this->canChangeSite($siteId)) {
-            return;
-        }
-
-        // Guard: only override group-scoped values
-        if ($groupValue->scope_type !== 'group') {
-            return;
-        }
-
-        // Guard: site must belong to the group
-        $site = Site::find($siteId);
-        if (! $site || $site->site_group_id !== $groupValue->scope_id) {
-            return;
-        }
-
-        $siteValue = DataValue::create([
-            'key'           => $groupValue->key,
-            'value_type_id' => $groupValue->value_type_id,
-            'scope_type'    => 'site',
-            'scope_id'      => $siteId,
-            'content'       => $groupValue->content,
-            'status'        => 'active',
-        ]);
-
-        AuditLog::create([
-            'actor_type'   => 'user',
-            'action'       => 'value.overridden',
-            'subject_type' => 'DataValue',
-            'subject_id'   => $siteValue->id,
-            'old'          => ['scope_type' => 'group', 'scope_id' => $groupValue->scope_id],
-            'new'          => ['scope_type' => 'site', 'scope_id' => $siteId],
-        ]);
-
-        $this->dispatch('value-saved');
-        $this->publishAffected($siteValue);
-    }
-
     public function delete(): void
     {
         $dv = DataValue::findOrFail($this->valueId);
@@ -281,7 +234,6 @@ class ValueEditor extends Component
             return;
         }
 
-        // Capture affected sites BEFORE deleting the row (AffectedSites needs the record).
         $affectedSites = app(AffectedSites::class)->for($dv);
 
         AuditLog::create([
@@ -289,7 +241,7 @@ class ValueEditor extends Component
             'action'       => 'value.deleted',
             'subject_type' => 'DataValue',
             'subject_id'   => $dv->id,
-            'old'          => $dv->content,
+            'old'          => \App\Services\Audit\AuditRestorer::serializeValue($dv),
             'new'          => null,
         ]);
 
@@ -299,7 +251,6 @@ class ValueEditor extends Component
         $this->open    = false;
         $this->dispatch('value-saved');
 
-        // Publish outside the transaction; a failed push is non-fatal.
         $published = 0;
         $affectedSites->each(function ($site) use (&$published) {
             $publication = app(SitePayloadCompiler::class)->publish($site);
@@ -342,19 +293,7 @@ class ValueEditor extends Component
             return false;
         }
 
-        if ($this->scope === 'site') {
-            return $this->canChangeSite($this->siteId);
-        }
-
-        $site = Site::find($this->siteId);
-        if (! $site?->site_group_id) {
-            return false;
-        }
-
-        $access = app(AccessControl::class);
-
-        return $access->canEditGroup(auth()->user(), $site->site_group_id)
-            && $access->canPublishGroup(auth()->user(), $site->site_group_id);
+        return $this->canChangeSite($this->siteId);
     }
 
     private function canChangeSite(int $siteId): bool
@@ -396,10 +335,8 @@ class ValueEditor extends Component
             $phoneTypeId = ValueType::where('code', 'phone')->value('id');
             if ($phoneTypeId && $site) {
                 $availableSlots = DataValue::where('value_type_id', $phoneTypeId)
-                    ->where(fn ($q) => $q
-                        ->where(fn ($q2) => $q2->where('scope_type', 'site')->where('scope_id', $site->id))
-                        ->orWhere(fn ($q2) => $q2->where('scope_type', 'group')->where('scope_id', $site->site_group_id))
-                    )
+                    ->where('scope_type', 'site')
+                    ->where('scope_id', $site->id)
                     ->pluck('key');
             }
         }

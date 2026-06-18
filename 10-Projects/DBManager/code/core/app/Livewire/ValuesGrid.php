@@ -797,6 +797,89 @@ class ValuesGrid extends Component
         $this->dispatch('toast', message: 'Слот прибрано з цього сайту → опубліковано');
     }
 
+    public function toggleSlotVisibility(int $dataValueId): void
+    {
+        $value = DataValue::find($dataValueId);
+        if (! $value) {
+            return;
+        }
+
+        $value = $this->materializeDataValueForCurrentSite($value);
+        if (! $value || ! $this->canChangeValue($value)) {
+            $this->dispatch('toast', message: 'Помилка доступу');
+            return;
+        }
+
+        $oldStatus = $value->status ?? 'active';
+        $newStatus = $oldStatus === 'hidden' ? 'active' : 'hidden';
+
+        if ($this->deferForScope('toggleSlotVisibility', [$dataValueId], $value)) {
+            return;
+        }
+
+        $valueType = $value->type->code;
+
+        if ($valueType === 'phone') {
+            $value->update(['status' => $newStatus]);
+            $value->refresh()->load('phoneSlot');
+            if ($value->phoneSlot) {
+                app(FailoverEngine::class)->recompute($value->phoneSlot, 'user');
+                $this->publishSlots(collect([$value->phoneSlot]));
+            }
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => $newStatus === 'hidden' ? 'slot.hidden' : 'slot.shown',
+                'subject_type' => 'DataValue',
+                'subject_id'   => $value->id,
+                'old'          => ['status' => $oldStatus],
+                'new'          => ['status' => $newStatus],
+            ]);
+        } elseif ($valueType === 'messenger') {
+            $groupKey = $value->messenger_slot ?? $value->key;
+            $items = DataValue::where('scope_type', $value->scope_type)
+                ->where('scope_id', $value->scope_id)
+                ->where('value_type_id', $value->value_type_id)
+                ->where(function ($q) use ($groupKey) {
+                    $q->where('messenger_slot', $groupKey)->orWhere('key', $groupKey);
+                })
+                ->get();
+
+            $affectedSites = app(AffectedSites::class)->for($value);
+            foreach ($items as $item) {
+                $oldItemStatus = $item->status ?? 'active';
+                if ($oldItemStatus === $newStatus) {
+                    continue;
+                }
+                $item->update(['status' => $newStatus]);
+                AuditLog::create([
+                    'actor_type' => 'user',
+                    'action' => $newStatus === 'hidden' ? 'messenger.slot_hidden' : 'messenger.slot_shown',
+                    'subject_type' => 'DataValue',
+                    'subject_id' => $item->id,
+                    'old' => ['status' => $oldItemStatus],
+                    'new' => ['status' => $newStatus],
+                ]);
+            }
+            $this->publishSites($affectedSites);
+        } else {
+            $value->update(['status' => $newStatus]);
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => $newStatus === 'hidden' ? 'value.frozen' : 'value.updated',
+                'subject_type' => 'DataValue',
+                'subject_id'   => $value->id,
+                'old'          => ['status' => $oldStatus],
+                'new'          => ['status' => $newStatus],
+            ]);
+            $this->publishDataValue($value);
+        }
+
+        $this->dispatch('slot-updated');
+        $this->dispatch('toast', message: $newStatus === 'hidden' ? 'Слот приховано' : 'Слот показано');
+    }
+
     public function setMessengerExhaustionPolicy(int $dataValueId, string $policy): void
     {
         if (! in_array($policy, ['hide', 'last'], true)) {
@@ -883,19 +966,7 @@ class ValuesGrid extends Component
                 ],
             ]);
 
-            $collapsedSite = app(PhoneSlotInheritance::class)->collapseOverrideIfMatchesSource($entry);
-
-            if ($collapsedSite) {
-                $this->publishSites(collect([$collapsedSite]));
-            } else {
-                $this->publishSlots(collect([$entry->slot->fresh()]));
-            }
-        } else {
-            $collapsedSite = app(PhoneSlotInheritance::class)->collapseOverrideIfMatchesSource($entry);
-
-            if ($collapsedSite) {
-                $this->publishSites(collect([$collapsedSite]));
-            }
+            $this->publishSlots(collect([$entry->slot->fresh()]));
         }
 
         $this->cancelInlinePhoneEdit();
@@ -1170,35 +1241,7 @@ class ValuesGrid extends Component
 
     private function materializeDataValueForCurrentSite(?DataValue $value): ?DataValue
     {
-        if (! $value || ! $this->site) {
-            return null;
-        }
-
-        if ($this->valueBelongsToCurrentSite($value)) {
-            return $value;
-        }
-
-        $site = Site::find($this->site);
-        if (! $site) {
-            return null;
-        }
-
-        if (! $this->canMaterializeValueFromSource($value, $site)) {
-            return null;
-        }
-
-        if (! $this->ensureCanEditCurrentSite()) {
-            return null;
-        }
-
-        $copy = app(ValueScope::class)->forkToSite($value, (int) $site->id);
-
-        return $copy
-            ?: DataValue::with(['type', 'geoTags', 'phoneSlot.entries.phoneNumber'])
-                ->where('scope_type', 'site')
-                ->where('scope_id', $site->id)
-                ->where('key', $value->key)
-                ->first();
+        return $value;
     }
 
     private function valueBelongsToCurrentSite(?DataValue $value): bool

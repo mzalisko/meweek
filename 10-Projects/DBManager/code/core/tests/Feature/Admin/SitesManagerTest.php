@@ -4,6 +4,9 @@ namespace Tests\Feature\Admin;
 
 use App\Livewire\SitesManager;
 use App\Models\AuditLog;
+use App\Models\DataValue;
+use App\Models\NumberEntry;
+use App\Models\PhoneSlot;
 use App\Models\Site;
 use App\Models\SiteGroup;
 use App\Models\User;
@@ -104,6 +107,27 @@ class SitesManagerTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'site.created')->exists());
     }
 
+    public function test_create_child_site_persists_parent_site(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $group = SiteGroup::factory()->create();
+        $parent = Site::factory()->for($group, 'group')->create(['domain' => 'main.test']);
+
+        Livewire::test(SitesManager::class)
+            ->call('startCreateSite', $group->id)
+            ->set('siteName', 'Сателіт')
+            ->set('siteDomain', 'child.test')
+            ->set('parentSiteId', $parent->id)
+            ->call('saveSite')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sites', [
+            'domain' => 'child.test',
+            'parent_site_id' => $parent->id,
+            'site_group_id' => $group->id,
+        ]);
+    }
+
     public function test_edit_site_persists_and_audits(): void
     {
         $this->actingAs(User::factory()->create());
@@ -149,12 +173,103 @@ class SitesManagerTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'site.restored')->exists());
     }
 
+    public function test_archived_site_can_be_purged_with_exact_domain_confirmation(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $site = Site::factory()->create(['domain' => 'purge.test']);
+
+        Livewire::test(SitesManager::class)->call('archiveSite', $site->id);
+
+        Livewire::test(SitesManager::class)
+            ->call('confirmPurgeSite', $site->id)
+            ->set('purgingSiteConfirmation', 'purge.test')
+            ->call('purgeSite')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseMissing('sites', ['id' => $site->id]);
+        $this->assertTrue(AuditLog::where('action', 'site.purged')->exists());
+    }
+
     public function test_site_row_links_to_value_management(): void
     {
         $this->actingAs(User::factory()->create());
         $site = Site::factory()->create(['domain' => 'manage.test']);
 
         Livewire::test(SitesManager::class)
-            ->assertSeeHtml('href="'.route('admin.values', ['site' => $site->id]).'"');
+            ->assertSeeHtml('href="'.route('admin.site', ['site' => $site->id]).'"');
+    }
+
+    public function test_clone_parent_data(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $parent = Site::factory()->create(['domain' => 'parent.test']);
+        $child = Site::factory()->create(['domain' => 'sat.test', 'parent_site_id' => $parent->id]);
+
+        $parentValue = DataValue::create([
+            'key' => 'phone_main',
+            'value_type_id' => \App\Models\ValueType::firstOrCreate(['code' => 'phone'], ['name' => 'Phone'])->id,
+            'scope_type' => 'site',
+            'scope_id' => $parent->id,
+            'content' => null,
+            'status' => 'active',
+        ]);
+        $geo = \App\Models\GeoTag::firstOrCreate(['code' => 'WORLD'], ['name' => 'World']);
+        $parentValue->geoTags()->sync([$geo->id]);
+
+        $slot = PhoneSlot::create([
+            'data_value_id' => $parentValue->id,
+            'return_mode' => 'auto',
+            'exhaustion_policy' => 'hide',
+        ]);
+
+        $phone = \App\Models\PhoneNumber::create(['e164' => '+380441112233', 'label' => 'Main', 'status' => 'active']);
+        NumberEntry::create(['phone_slot_id' => $slot->id, 'phone_number_id' => $phone->id, 'priority' => 0]);
+
+        Livewire::test(SitesManager::class)
+            ->set('editingSiteId', $child->id)
+            ->set('parentSiteId', $parent->id)
+            ->assertSet('editingSiteId', $child->id)
+            ->call('cloneParentData')
+            ->assertHasNoErrors();
+
+        $childValue = DataValue::where('scope_type', 'site')->where('scope_id', $child->id)->where('key', 'phone_main')->first();
+        $this->assertNotNull($childValue);
+        $this->assertSame('phone_main', $childValue->key);
+        $this->assertCount(1, $childValue->geoTags);
+        $this->assertNotNull($childValue->phoneSlot);
+        $this->assertCount(1, $childValue->phoneSlot->entries);
+        $this->assertSame('+380441112233', $childValue->phoneSlot->entries->first()->phoneNumber->e164);
+    }
+
+    public function test_searching_group_name_reveals_its_sites_and_satellites(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $group = SiteGroup::factory()->create(['name' => 'Brand A']);
+        $parent = Site::factory()->for($group, 'group')->create(['domain' => 'parent.test']);
+        Site::factory()->for($group, 'group')->create(['domain' => 'sat.test', 'parent_site_id' => $parent->id]);
+
+        Livewire::test(SitesManager::class)
+            ->set('siteSearch', 'Bran')
+            ->assertSee('Brand A')
+            ->assertSee('parent.test')
+            ->assertSee('sat.test')
+            ->assertSee('2 сайт(ів)')
+            ->assertDontSee('Немає сайтів у групі');
+    }
+
+    public function test_groups_render_collapsible_accordion_scaffold(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $group = SiteGroup::factory()->create(['name' => 'Бренд']);
+        Site::factory()->for($group, 'group')->create(['domain' => 'live.test']);
+
+        Livewire::test(SitesManager::class)
+            ->assertSeeHtml('x-data="{ open: true }"') // обгортка-акордеон
+            ->assertSeeHtml('@click="open = ! open"')   // кнопка-перемикач
+            ->assertSeeHtml('x-show="open')             // тіло групи згортається
+            ->assertSee('live.test');                   // сайт лишається в DOM
     }
 }

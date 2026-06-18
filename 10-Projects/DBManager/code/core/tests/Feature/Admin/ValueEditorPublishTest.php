@@ -26,31 +26,6 @@ class ValueEditorPublishTest extends TestCase
         ]);
     }
 
-    public function test_saving_group_value_publishes_all_group_sites(): void
-    {
-        Http::fake(['*' => Http::response(['stored_version' => 1], 200)]);
-        $this->actingAs(User::factory()->create());
-
-        $group = SiteGroup::factory()->create();
-        $a     = Site::factory()->for($group, 'group')->create(['domain' => 'a.ua']);
-        $b     = Site::factory()->for($group, 'group')->create(['domain' => 'b.ua']);
-
-        app(SiteProvisioner::class)->issueToken($a);
-        app(SiteProvisioner::class)->issueToken($b);
-
-        Livewire::test(ValueEditor::class)
-            ->call('createFor', $a->id)
-            ->set('type', 'messenger')
-            ->set('key', 'tg_brand')
-            ->set('value', 'https://t.me/brand')
-            ->set('network', 'telegram')
-            ->set('scope', 'group')
-            ->call('save');
-
-        Http::assertSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'a.ua');
-        Http::assertSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'b.ua');
-    }
-
     public function test_saving_site_value_publishes_only_that_site(): void
     {
         Http::fake(['*' => Http::response(['stored_version' => 1], 200)]);
@@ -93,20 +68,5 @@ class ValueEditorPublishTest extends TestCase
         Http::assertSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'del.ua');
     }
 
-    public function test_override_for_site_publishes_that_site(): void
-    {
-        Http::fake(['*' => Http::response(['stored_version' => 1], 200)]);
-        $this->actingAs(User::factory()->create());
 
-        $group = SiteGroup::factory()->create();
-        $site  = Site::factory()->for($group, 'group')->create(['domain' => 'over.ua']);
-        app(SiteProvisioner::class)->issueToken($site);
-
-        $groupValue = DataValue::factory()->forGroup($group)->create(['key' => 'over_key']);
-
-        Livewire::test(ValueEditor::class)
-            ->call('overrideForSite', $groupValue->id, $site->id);
-
-        Http::assertSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'over.ua');
-    }
 }

@@ -12,7 +12,7 @@ class AffectedSites
     public function for(DataValue $value): Collection
     {
         return $value->scope_type === 'site'
-            ? Site::where('id', $value->scope_id)->get()
+            ? Site::whereIn('id', app(SiteHierarchy::class)->descendantIds((int) $value->scope_id))->get()
             : Site::where('site_group_id', $value->scope_id)->get();
     }
 }

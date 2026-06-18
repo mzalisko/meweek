@@ -17,7 +17,7 @@ class AuditManager extends Component
     use WithPagination;
 
     #[Url(as: 'tab')]
-    public string $activeTab = 'changes'; // 'changes' | 'systems'
+    public string $activeTab = 'changes'; // changes | failover | users | systems
 
     // Фільтри
     #[Url(as: 'q')]
@@ -48,19 +48,26 @@ class AuditManager extends Component
         'messenger.slot_renamed', 'messenger.reserve_added', 'messenger.exhaustion_policy_changed',
         'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.geo_changed',
         'messenger.slot_hidden', 'messenger.slot_shown', 'messenger.materialized',
-        'slot.removed', 'slot.suppressed', 'slot.renamed',
+        'slot.removed', 'slot.suppressed', 'slot.renamed', 'slot.hidden', 'slot.shown',
         'phone.materialized', 'phone.override_collapsed',
         'number.added', 'number.removed', 'number.reordered', 'number.status_changed', 'number.edited',
         'audit.restored'
     ];
 
-    public const SYSTEM_ACTIONS = [
+    public const FAILOVER_ACTIONS = [
+        'number.down', 'number.recovered', 'failover.switch',
+    ];
+
+    public const USER_ACTIONS = [
         'user.login', 'user.logout', 'user.login_failed',
         'user.created', 'user.updated', 'user.deleted', 'user.activated', 'user.deactivated', 'user.password_reset', 'user.sessions_revoked',
+    ];
+
+    public const SYSTEM_ACTIONS = [
         'group.created', 'group.updated', 'group.archived', 'group.restored',
         'site.created', 'site.updated', 'site.archived', 'site.restored', 'site.purged',
         'site.token_issued', 'site.token_revoked', 'site.token_rotated',
-        'number.down', 'number.recovered', 'slot.pinned', 'slot.unpinned', 'failover.switch',
+        'slot.pinned', 'slot.unpinned',
         'webhook.unknown_number'
     ];
 
@@ -119,8 +126,23 @@ class AuditManager extends Component
         $ac = app(AccessControl::class);
         $user = auth()->user();
 
-        // 1. Отримуємо список дозволених сайтів та груп
-        $allSites = Site::all()->filter(fn ($s) => $ac->canViewSite($user, $s));
+        $auditAccess = [
+            'changes' => $ac->canViewHistory($user),
+            'failover' => $ac->canViewFailover($user),
+            'users' => $ac->canViewUserLogs($user),
+            'systems' => $ac->canViewSystemLogs($user),
+        ];
+
+        if (! in_array(true, $auditAccess, true)) {
+            abort(403, 'Доступ до аудиту заборонено.');
+        }
+
+        if (! ($auditAccess[$this->activeTab] ?? false)) {
+            $this->activeTab = array_key_first(array_filter($auditAccess));
+        }
+
+        // 1. Отримуємо список сайтів, історію яких можна бачити
+        $allSites = Site::all()->filter(fn ($s) => $ac->canViewHistory($user, $s));
         $allGroups = SiteGroup::all()->filter(fn ($g) => $ac->canEditGroup($user, $g));
 
         if ($this->activeTab === 'changes') {
@@ -131,6 +153,7 @@ class AuditManager extends Component
                     'logs' => $logs,
                     'allSites' => $allSites,
                     'allGroups' => $allGroups,
+                    'auditAccess' => $auditAccess,
                     'siteModel' => $this->selectedSiteId ? Site::find($this->selectedSiteId) : null,
                     'groupModel' => $this->selectedGroupId ? SiteGroup::find($this->selectedGroupId) : null,
                 ])->layout('components.layouts.admin');
@@ -142,6 +165,27 @@ class AuditManager extends Component
                 'summary' => $summary,
                 'allSites' => $allSites,
                 'allGroups' => $allGroups,
+                'auditAccess' => $auditAccess,
+            ])->layout('components.layouts.admin');
+        }
+
+        if ($this->activeTab === 'failover') {
+            $logs = $this->queryFailoverLogs();
+            return view('livewire.audit-manager', [
+                'logs' => $logs,
+                'allSites' => $allSites,
+                'allGroups' => $allGroups,
+                'auditAccess' => $auditAccess,
+            ])->layout('components.layouts.admin');
+        }
+
+        if ($this->activeTab === 'users') {
+            $logs = $this->queryUserLogs();
+            return view('livewire.audit-manager', [
+                'logs' => $logs,
+                'allSites' => $allSites,
+                'allGroups' => $allGroups,
+                'auditAccess' => $auditAccess,
             ])->layout('components.layouts.admin');
         }
 
@@ -151,6 +195,7 @@ class AuditManager extends Component
             'logs' => $logs,
             'allSites' => $allSites,
             'allGroups' => $allGroups,
+            'auditAccess' => $auditAccess,
         ])->layout('components.layouts.admin');
     }
 
@@ -243,6 +288,13 @@ class AuditManager extends Component
             $site = Site::find($this->selectedSiteId);
             $groupId = $site?->site_group_id;
 
+            if (! $site || ! app(AccessControl::class)->canViewHistory(auth()->user(), $site)) {
+                $query->whereRaw('1 = 0');
+                $this->applyFilters($query);
+
+                return $query->orderBy('created_at', 'desc')->paginate(20);
+            }
+
             // Збираємо існуючі DataValue цього сайту чи групи
             $existingIds = DataValue::where(function ($q) use ($site, $groupId) {
                 $q->where(function ($q2) use ($site) {
@@ -271,6 +323,13 @@ class AuditManager extends Component
                 }
             });
         } elseif ($this->selectedGroupId) {
+            if (! app(AccessControl::class)->canViewGroupHistory(auth()->user(), $this->selectedGroupId)) {
+                $query->whereRaw('1 = 0');
+                $this->applyFilters($query);
+
+                return $query->orderBy('created_at', 'desc')->paginate(20);
+            }
+
             $existingIds = DataValue::where('scope_type', 'group')
                 ->where('scope_id', $this->selectedGroupId)
                 ->pluck('id')
@@ -289,11 +348,65 @@ class AuditManager extends Component
     }
 
     /**
+     * Запит failover-подій телефонних ліній.
+     */
+    private function queryFailoverLogs()
+    {
+        $query = AuditLog::whereIn('action', self::FAILOVER_ACTIONS);
+        $ac = app(AccessControl::class);
+        $user = auth()->user();
+
+        if (! $ac->canManageAccess($user)) {
+            $siteIds = Site::all()
+                ->filter(fn (Site $site) => $ac->canViewFailover($user, $site))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if ($siteIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($q) use ($siteIds): void {
+                    foreach ($siteIds as $siteId) {
+                        $q->orWhereJsonContains('old->site_ids', $siteId)
+                            ->orWhereJsonContains('new->site_ids', $siteId);
+                    }
+                });
+            }
+        }
+
+        $this->applyFilters($query);
+
+        return $query->orderBy('created_at', 'desc')->paginate(20);
+    }
+
+    /**
+     * Запит подій користувачів, сесій і доступів.
+     */
+    private function queryUserLogs()
+    {
+        $query = AuditLog::whereIn('action', self::USER_ACTIONS);
+
+        if (! app(AccessControl::class)->canViewUserLogs(auth()->user())) {
+            $query->whereRaw('1 = 0');
+        }
+
+        $this->applyFilters($query);
+
+        return $query->orderBy('created_at', 'desc')->paginate(20);
+    }
+
+    /**
      * Запит системних логів подій.
      */
     private function querySystemLogs()
     {
         $query = AuditLog::whereIn('action', self::SYSTEM_ACTIONS);
+
+        if (! app(AccessControl::class)->canViewSystemLogs(auth()->user())) {
+            $query->whereRaw('1 = 0');
+        }
 
         $this->applyFilters($query);
 

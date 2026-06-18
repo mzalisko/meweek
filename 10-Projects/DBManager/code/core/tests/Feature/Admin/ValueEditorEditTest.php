@@ -146,7 +146,7 @@ class ValueEditorEditTest extends TestCase
             ->where('subject_id', $dvId)
             ->first();
         $this->assertNotNull($audit);
-        $this->assertSame('to_delete', $audit->old['value']);
+        $this->assertSame('to_delete', $audit->old['content']['value']);
     }
 
     public function test_delete_dispatches_value_saved_and_closes(): void

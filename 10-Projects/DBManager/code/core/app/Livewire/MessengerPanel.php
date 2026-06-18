@@ -22,6 +22,8 @@ class MessengerPanel extends Component
 
     public string $newValue = '';
 
+    public string $slotName = '';
+
     public string $emergencyValue = '';
 
     public array $geoTagIds = [];
@@ -49,6 +51,7 @@ class MessengerPanel extends Component
         $this->dispatch('close-editor-panel');
         $this->dataValueId = $primary->id;
         $this->newValue = '';
+        $this->slotName = $this->messengerGroupKey($primary);
         $this->emergencyValue = (string) ($primary->content['emergency_value'] ?? '');
         $this->geoTagIds = $primary->geoTags->pluck('id')->all();
         $this->resetValidation();
@@ -60,6 +63,65 @@ class MessengerPanel extends Component
         $this->open = false;
         $this->newValue = '';
         $this->resetValidation();
+    }
+
+    /**
+     * Перейменувати слот месенджера (його groupKey = messenger_slot). Щоб резерви
+     * не «розсипались», нове ім'я проставляється всім учасникам групи в межах
+     * поточної області. Ключі (key) окремих значень лишаються недоторканими.
+     */
+    public function renameSlot(): void
+    {
+        if (! $this->canChangeCurrentValue()) {
+            return;
+        }
+
+        $primary = $this->primaryValue();
+        if (! $primary) {
+            return;
+        }
+
+        $newName = trim($this->slotName);
+        $this->resetErrorBag('slotName');
+
+        if (! preg_match('/^[a-z0-9_]+$/', $newName)) {
+            $this->addError('slotName', 'Імʼя слота: лише малі латинські літери, цифри та підкреслення.');
+
+            return;
+        }
+
+        $oldKey = $this->messengerGroupKey($primary);
+        if ($newName === $oldKey) {
+            return;
+        }
+
+        $group = $this->messengerGroup($primary);
+
+        if ($this->slotNameTakenInScope($primary, $newName, $group)) {
+            $this->addError('slotName', 'Слот месенджера з таким імʼям уже існує на цьому рівні.');
+
+            return;
+        }
+
+        foreach ($group as $item) {
+            $content = $item->content ?? [];
+            $content['messenger_slot'] = $newName;
+            $item->update(['content' => $content]);
+        }
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'action' => 'messenger.slot_renamed',
+            'subject_type' => 'DataValue',
+            'subject_id' => $primary->id,
+            'old' => ['messenger_slot' => $oldKey],
+            'new' => ['messenger_slot' => $newName],
+        ]);
+
+        $this->slotName = $newName;
+        $this->publishDataValue($primary->fresh());
+        $this->dispatch('slot-updated');
+        $this->dispatch('toast', message: 'Імʼя слота месенджера змінено → опубліковано');
     }
 
     public function addReserve(): void
@@ -377,6 +439,25 @@ class MessengerPanel extends Component
                 $item->id
             ))
             ->values();
+    }
+
+    /**
+     * Чи зайнято ім'я слота іншою месенджер-групою в межах тієї самої області.
+     * Учасники поточної групи виключаються, щоб перейменування саме на себе
+     * (та власні резерви) не вважалося колізією.
+     */
+    private function slotNameTakenInScope(DataValue $primary, string $newName, $group): bool
+    {
+        $groupIds = $group->pluck('id')->all();
+        $typeId = ValueType::where('code', 'messenger')->value('id');
+
+        return DataValue::where('value_type_id', $typeId)
+            ->where('scope_type', $primary->scope_type)
+            ->where('scope_id', $primary->scope_id)
+            ->whereIn('status', ['active', 'hidden'])
+            ->whereNotIn('id', $groupIds)
+            ->get()
+            ->contains(fn (DataValue $item) => $this->messengerGroupKey($item) === $newName);
     }
 
     private function messengerUrlFromValue(string $value): ?string

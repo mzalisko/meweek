@@ -20,6 +20,16 @@ class Site extends Model
         return $this->belongsTo(SiteGroup::class, 'site_group_id');
     }
 
+    public function parentSite(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_site_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_site_id');
+    }
+
     public function tokens(): HasMany
     {
         return $this->hasMany(ApiToken::class);

@@ -10,6 +10,7 @@ class SiteFactory extends Factory
     {
         return [
             'site_group_id' => null,
+            'parent_site_id' => null,
             'name' => fake()->company(),
             'domain' => fake()->unique()->domainName(),
             'country_hint' => null,

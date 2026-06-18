@@ -30,6 +30,74 @@ class AccessControl
         return $this->isSuperAdmin($user);
     }
 
+    public function canViewHistory(?User $user, Site|int|null $site = null): bool
+    {
+        if (! $this->isActiveKnownRole($user)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        if ($site !== null) {
+            return $this->canForSite($user, $site, 'can_view_history');
+        }
+
+        $hasSiteHistory = $user->siteAccess()->where('can_view_history', true)->exists();
+        $hasGroupHistory = $user->siteGroupAccess()->where('can_view_history', true)->exists();
+
+        return $hasSiteHistory || $hasGroupHistory;
+    }
+
+    public function canViewFailover(?User $user, Site|int|null $site = null): bool
+    {
+        if (! $this->isActiveKnownRole($user)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        if ($site !== null) {
+            return $this->canForSite($user, $site, 'can_view_failover');
+        }
+
+        $hasSiteFailover = $user->siteAccess()->where('can_view_failover', true)->exists();
+        $hasGroupFailover = $user->siteGroupAccess()->where('can_view_failover', true)->exists();
+
+        return $hasSiteFailover || $hasGroupFailover;
+    }
+
+    public function canViewGroupHistory(?User $user, SiteGroup|int|null $group): bool
+    {
+        return $this->canForGroup($user, $group, 'can_view_history');
+    }
+
+    public function canViewGroupFailover(?User $user, SiteGroup|int|null $group): bool
+    {
+        return $this->canForGroup($user, $group, 'can_view_failover');
+    }
+
+    public function canViewUserLogs(?User $user): bool
+    {
+        if (! $this->isActiveKnownRole($user)) {
+            return false;
+        }
+
+        return $this->isSuperAdmin($user) || (bool) $user->can_view_user_logs;
+    }
+
+    public function canViewSystemLogs(?User $user): bool
+    {
+        if (! $this->isActiveKnownRole($user)) {
+            return false;
+        }
+
+        return $this->isSuperAdmin($user) || (bool) $user->can_view_system_logs;
+    }
+
     public function canViewSite(?User $user, Site|int|null $site): bool
     {
         return $this->canForSite($user, $site, 'can_view');
@@ -91,12 +159,15 @@ class AccessControl
             return Site::with('group')->orderBy('id')->get();
         }
 
+        $siteIds = collect($this->siteAccessIds($user))
+            ->merge($this->groupAccessibleSiteIds($user))
+            ->unique()
+            ->values()
+            ->all();
+
         return Site::query()
             ->with('group')
-            ->where(function ($query) use ($user): void {
-                $query->whereIn('id', $this->siteAccessIds($user))
-                    ->orWhereIn('site_group_id', $this->groupAccessIds($user));
-            })
+            ->whereIn('id', $this->expandDescendantSiteIds($siteIds))
             ->orderBy('id')
             ->get();
     }
@@ -153,6 +224,16 @@ class AccessControl
 
         if ($siteAccess && $this->permissionGranted($siteAccess, $permission)) {
             return true;
+        }
+
+        foreach ($this->ancestorSiteIds($siteModel) as $ancestorId) {
+            $ancestorAccess = $user->siteAccess()
+                ->where('site_id', $ancestorId)
+                ->first();
+
+            if ($ancestorAccess && $this->permissionGranted($ancestorAccess, $permission)) {
+                return true;
+            }
         }
 
         if ($siteModel->site_group_id) {
@@ -216,6 +297,24 @@ class AccessControl
             ->all();
     }
 
+    /**
+     * @return array<int, int>
+     */
+    private function groupAccessibleSiteIds(User $user): array
+    {
+        $groupIds = $this->groupAccessIds($user);
+
+        if ($groupIds === []) {
+            return [];
+        }
+
+        return Site::query()
+            ->whereIn('site_group_id', $groupIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     /** @return array<int, int> */
     private function groupAccessIds(User $user): array
     {
@@ -229,5 +328,41 @@ class AccessControl
             ->pluck('site_group_id')
             ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    /**
+     * @param array<int, int> $siteIds
+     * @return array<int, int>
+     */
+    private function expandDescendantSiteIds(array $siteIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $siteIds)));
+        $frontier = $ids;
+
+        while ($frontier !== []) {
+            $children = Site::query()
+                ->whereIn('parent_site_id', $frontier)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $newIds = array_values(array_diff($children, $ids));
+            if ($newIds === []) {
+                break;
+            }
+
+            $ids = array_values(array_unique(array_merge($ids, $newIds)));
+            $frontier = $newIds;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function ancestorSiteIds(Site $site): array
+    {
+        return app(SiteHierarchy::class)->ancestorIds($site);
     }
 }

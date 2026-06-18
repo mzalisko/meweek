@@ -1,8 +1,10 @@
 <x-slot name="breadcrumb">
-    <span class="text-mut text-xs">›</span>
-    <span class="text-mut text-xs">Усі сайти</span>
-    <span class="text-mut text-xs">›</span>
-    <span class="text-xs font-semibold text-ink">Користувачі</span>
+    <div class="flex items-center gap-3 ml-2">
+        <span class="text-mut text-sm select-none">/</span>
+        <div class="inline-flex items-center bg-[#f4f5f3] px-3 py-1.5 rounded-lg border border-[#e3e5e1] text-xs font-bold text-ink select-none">
+            Користувачі
+        </div>
+    </div>
 </x-slot>
 
 <x-slot name="context">
@@ -25,10 +27,10 @@
         </button>
     </div>
 
-    <div class="mb-3 flex items-center gap-2 rounded-lg bg-[#eef1ee] border border-transparent px-3 py-2 w-[360px] max-w-full focus-within:bg-white focus-within:border-acc">
+    <div class="mb-3 flex items-center gap-2 rounded-lg bg-[#eef1ee] px-3 py-2 w-[360px] max-w-full focus-within:bg-white">
         <span class="text-mut shrink-0">@svg('search')</span>
         <input wire:model.live.debounce.250ms="userSearch" type="text" placeholder="Пошук за ім’ям або email"
-            class="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder-mut">
+            class="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder-mut border-0 shadow-none focus:ring-0 focus:outline-none">
         @if($userSearch !== '')
             <button wire:click="$set('userSearch', '')" class="text-mut hover:text-ink" aria-label="Очистити пошук">@svg('x')</button>
         @endif
@@ -54,8 +56,11 @@
                     <tr class="border-b border-[#edf0ed] last:border-b-0 hover:bg-[#fafbfa]">
                         <td class="px-3 py-3 align-middle">
                             <div class="flex items-center gap-2 min-w-0">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-acc-bg text-[12px] font-semibold text-acc-tx">
+                                <span class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-acc-bg text-[12px] font-semibold text-acc-tx">
                                     {{ mb_substr($user->name, 0, 1) }}
+                                    @if($isOnline)
+                                        <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-ok-tx" aria-hidden="true"></span>
+                                    @endif
                                 </span>
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2 min-w-0">
@@ -176,11 +181,20 @@
                             @error('email')<span class="text-[11px] text-bad-tx">{{ $message }}</span>@enderror
                         </label>
 
-                        <label class="block">
-                            <span class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Пароль</span>
-                            <input wire:model="password" type="text" placeholder="порожньо = згенерувати для нового" class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:outline-none focus:border-acc">
+                        <div class="block">
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <span class="block text-mut uppercase tracking-[.06em] text-[11px]">Пароль</span>
+                                <span class="shrink-0 text-[10px] text-mut">{{ $selectedUserId ? 'порожньо = без змін' : 'згенеровано' }}</span>
+                            </div>
+                            <div class="grid grid-cols-[minmax(0,1fr)_38px] gap-2">
+                                <input wire:model="password" type="text" placeholder="{{ $selectedUserId ? 'новий пароль або порожньо' : 'можна змінити вручну' }}" class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:outline-none focus:border-acc">
+                                <button type="button" wire:click="generatePassword" title="Згенерувати пароль" aria-label="Згенерувати пароль"
+                                    class="inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-[#dfe3e0] text-mut hover:border-acc hover:bg-acc-bg hover:text-acc-tx">
+                                    @svg('refresh')
+                                </button>
+                            </div>
                             @error('password')<span class="text-[11px] text-bad-tx">{{ $message }}</span>@enderror
-                        </label>
+                        </div>
 
                         <div class="grid grid-cols-[minmax(0,1fr)_132px] gap-3">
                             <label class="block">
@@ -201,20 +215,47 @@
                     </div>
                 </section>
 
+                @php
+                    $permissionGridStyle = 'min-width: 780px; grid-template-columns: minmax(190px, 1fr) repeat(6, 80px);';
+                @endphp
+
                 <section class="mt-4 rounded-lg border border-[#dfe3e0]">
                     <div class="border-b border-[#edf0ed] bg-[#f6f8f6] px-3 py-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div class="text-[11px] uppercase tracking-wide text-mut">Сесії й пароль</div>
                         @if($selectedUser)
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <button type="button" wire:click="resetPassword({{ $selectedUser->id }})" wire:confirm="Скинути пароль і завершити активні сесії?"
-                                    class="whitespace-nowrap rounded-lg border border-[#dfe3e0] px-2.5 py-1 text-[11px] text-mut hover:border-acc hover:text-acc-tx">Скинути пароль</button>
+                                <button type="button" wire:click="resetPassword({{ $selectedUser->id }})" wire:confirm="Створити тимчасовий пароль і завершити активні сесії?"
+                                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-[#dfe3e0] px-2.5 py-1 text-[11px] text-mut hover:border-acc hover:text-acc-tx">@svg('key') Тимчасовий пароль</button>
                                 <button type="button" wire:click="logoutUser({{ $selectedUser->id }})" wire:confirm="Завершити всі сесії цього користувача?"
                                     class="whitespace-nowrap rounded-lg border border-[#dfe3e0] px-2.5 py-1 text-[11px] text-mut hover:border-bad-tx hover:text-bad-tx">Викинути з сесій</button>
                             </div>
                         @endif
                     </div>
                     <div class="p-3 text-[12px] text-mut">
-                        Паролі зберігаються hash-ем. Поточний пароль не показується; новий тимчасовий пароль видно один раз після створення або скидання.
+                        Паролі зберігаються hash-ем. Поточний пароль не показується; новий тимчасовий пароль видно один раз після створення або генерації.
+                    </div>
+                </section>
+
+                <section class="mt-4 rounded-lg border border-[#dfe3e0]">
+                    <div class="border-b border-[#edf0ed] bg-[#f6f8f6] px-3 py-2">
+                        <div class="text-[11px] uppercase tracking-wide text-mut">Доступ до логів</div>
+                        <div class="mt-0.5 text-[11px] text-mut">Глобальні вкладки аудиту. Історія змін і Failover для конкретних сайтів налаштовуються нижче в матриці.</div>
+                    </div>
+                    <div class="grid grid-cols-1 gap-2 p-3 md:grid-cols-2">
+                        <label class="flex items-start gap-2 rounded-lg border border-[#dfe3e0] px-3 py-2">
+                            <input wire:model="canViewUserLogs" type="checkbox" @disabled($role === 'superadmin') class="mt-0.5 h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
+                            <span>
+                                <span class="block text-[12px] font-semibold text-ink">Логи користувачів</span>
+                                <span class="block text-[11px] text-mut">Входи, виходи, невдалі входи, паролі й сесії.</span>
+                            </span>
+                        </label>
+                        <label class="flex items-start gap-2 rounded-lg border border-[#dfe3e0] px-3 py-2">
+                            <input wire:model="canViewSystemLogs" type="checkbox" @disabled($role === 'superadmin') class="mt-0.5 h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
+                            <span>
+                                <span class="block text-[12px] font-semibold text-ink">Системні логи</span>
+                                <span class="block text-[11px] text-mut">Сайти, групи, токени, вебхуки та службові події.</span>
+                            </span>
+                        </label>
                     </div>
                 </section>
 
@@ -230,10 +271,10 @@
                             @endif
                         </div>
 
-                        <div class="mt-2 flex items-center gap-2 rounded-lg bg-white border border-[#dfe3e0] px-3 py-1.5 max-w-[360px] focus-within:border-acc">
+                        <div class="mt-2 flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 max-w-[360px]">
                             <span class="text-mut">@svg('search')</span>
                             <input wire:model.live.debounce.250ms="permissionSearch" type="text" placeholder="Пошук групи або домену"
-                                class="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder-mut">
+                                class="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder-mut border-0 shadow-none focus:ring-0 focus:outline-none">
                             @if($permissionSearch !== '')
                                 <button type="button" wire:click="$set('permissionSearch', '')" class="text-mut hover:text-ink" aria-label="Очистити пошук">@svg('x')</button>
                             @endif
@@ -243,7 +284,7 @@
                     <div class="max-h-[520px] overflow-y-auto p-3 space-y-3">
                         @foreach($groups as $group)
                             @php
-                                $gp = $groupPermissions[$group->id] ?? ['can_view' => false, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false];
+                                $gp = $groupPermissions[$group->id] ?? ['can_view' => false, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false];
                                 $groupLevel = $gp['can_publish'] ? 'publish' : ($gp['can_delete'] ? 'delete' : ($gp['can_edit'] ? 'edit' : ($gp['can_view'] ? 'view' : 'none')));
                                 $groupLevelLabels = ['none' => 'немає', 'view' => 'перегляд', 'edit' => 'редагування', 'delete' => 'видалення', 'publish' => 'повний'];
                             @endphp
@@ -256,29 +297,38 @@
                                         </div>
                                         <div class="text-[10px] text-mut">{{ $group->sites->count() }} сайтів у поточному фільтрі</div>
                                     </div>
-                                    <div class="flex shrink-0 gap-1">
-                                        @foreach(['none' => 'Немає', 'view' => 'Перегляд', 'edit' => 'Редаг.', 'delete' => 'Видал.', 'publish' => 'Повний'] as $level => $label)
-                                            <button type="button" wire:click="applyGroupPreset({{ $group->id }}, '{{ $level }}')" @disabled($role === 'superadmin')
-                                                class="whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] disabled:opacity-40 {{ $groupLevel === $level ? 'border-acc bg-acc text-white font-semibold' : 'border-[#c8cec9] bg-white text-mut hover:border-acc hover:text-acc-tx' }}">{{ $label }}</button>
-                                        @endforeach
-                                    </div>
                                 </div>
 
-                                <div class="grid min-w-[620px] grid-cols-[minmax(190px,1fr)_88px_88px_88px_88px] gap-2 bg-[#fafbfa] px-3 py-1.5 text-[10px] uppercase tracking-wide text-mut">
-                                    <div>Сайт</div>
+                                <div class="grid gap-2 bg-[#fafbfa] px-3 py-1.5 text-[10px] uppercase tracking-wide text-mut" style="{{ $permissionGridStyle }}">
+                                    <div>Сайт / Ресурс</div>
                                     <div class="text-center whitespace-nowrap">Перегляд</div>
                                     <div class="text-center whitespace-nowrap">Редаг.</div>
                                     <div class="text-center whitespace-nowrap">Видал.</div>
                                     <div class="text-center whitespace-nowrap">Публ.</div>
+                                    <div class="text-center whitespace-nowrap">Історія</div>
+                                    <div class="text-center whitespace-nowrap">Failover</div>
+                                </div>
+
+                                {{-- Рядок для налаштування всієї групи --}}
+                                <div class="grid gap-2 items-center bg-[#f0f4f1] border-b border-[#edf0ed] px-3 py-2" style="{{ $permissionGridStyle }}">
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-acc-tx truncate">Уся група: {{ $group->name }}</div>
+                                        <div class="text-[10px] text-mut truncate">Налаштування для всієї групи</div>
+                                    </div>
+                                    @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover'] as $permission)
+                                        <label class="flex justify-center">
+                                            <input wire:model="groupPermissions.{{ $group->id }}.{{ $permission }}" type="checkbox" @disabled($role === 'superadmin') class="h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
+                                        </label>
+                                    @endforeach
                                 </div>
 
                                 @foreach($group->sites as $site)
-                                    <div class="grid min-w-[620px] grid-cols-[minmax(190px,1fr)_88px_88px_88px_88px] gap-2 items-center border-t border-[#edf0ed] px-3 py-2">
+                                    <div class="grid gap-2 items-center border-t border-[#edf0ed] px-3 py-2" style="{{ $permissionGridStyle }}">
                                         <div class="min-w-0">
                                             <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }}</div>
                                             <div class="text-[10px] text-mut truncate">{{ $site->name }}</div>
                                         </div>
-                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish'] as $permission)
+                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover'] as $permission)
                                             <label class="flex justify-center">
                                                 <input wire:model="sitePermissions.{{ $site->id }}.{{ $permission }}" type="checkbox" @disabled($role === 'superadmin') class="h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
                                             </label>
@@ -291,13 +341,22 @@
                         @if($ungroupedSites->isNotEmpty())
                             <div class="rounded-lg border border-[#dfe3e0] overflow-x-auto">
                                 <div class="bg-[#f6f8f6] border-b border-[#edf0ed] px-3 py-2 font-semibold text-acc-tx">Без групи</div>
+                                <div class="grid gap-2 bg-[#fafbfa] px-3 py-1.5 text-[10px] uppercase tracking-wide text-mut border-b border-[#dfe3e0]" style="{{ $permissionGridStyle }}">
+                                    <div>Сайт</div>
+                                    <div class="text-center whitespace-nowrap">Перегляд</div>
+                                    <div class="text-center whitespace-nowrap">Редаг.</div>
+                                    <div class="text-center whitespace-nowrap">Видал.</div>
+                                    <div class="text-center whitespace-nowrap">Публ.</div>
+                                    <div class="text-center whitespace-nowrap">Історія</div>
+                                    <div class="text-center whitespace-nowrap">Failover</div>
+                                </div>
                                 @foreach($ungroupedSites as $site)
-                                    <div class="grid min-w-[620px] grid-cols-[minmax(190px,1fr)_88px_88px_88px_88px] gap-2 items-center border-t border-[#edf0ed] px-3 py-2">
+                                    <div class="grid gap-2 items-center border-t border-[#edf0ed] px-3 py-2" style="{{ $permissionGridStyle }}">
                                         <div class="min-w-0">
                                             <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }}</div>
                                             <div class="text-[10px] text-mut truncate">{{ $site->name }}</div>
                                         </div>
-                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish'] as $permission)
+                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover'] as $permission)
                                             <label class="flex justify-center">
                                                 <input wire:model="sitePermissions.{{ $site->id }}.{{ $permission }}" type="checkbox" @disabled($role === 'superadmin') class="h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
                                             </label>

@@ -81,6 +81,31 @@ class SlotMessengerTest extends TestCase
         $this->assertSame($main->id, $row['id']);
     }
 
+    public function test_removing_reserve_messenger_removes_it_from_the_group(): void
+    {
+        $site = Site::factory()->create();
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('removeMessenger', $reserve->id);
+
+        $this->assertDatabaseMissing('data_values', ['id' => $reserve->id]);
+
+        $row = app(SiteGridReader::class)->forSite($site)['messenger'][0];
+
+        $this->assertSame($main->id, $row['id']);
+        $this->assertSame('ok', $row['state']);
+        $this->assertSame(0, $row['reserves']);
+        $this->assertSame([], $row['reserve_rows']);
+    }
+
     public function test_deactivating_main_messenger_switches_to_reserve_without_moving_labels(): void
     {
         $site = Site::factory()->create();
@@ -240,5 +265,70 @@ class SlotMessengerTest extends TestCase
         Livewire::test(ValuesGrid::class, ['site' => $site->id])
             ->call('openMessengerSlot', $main->id)
             ->assertDispatched('open-messenger-slot', dataValueId: $main->id);
+    }
+
+    public function test_messenger_panel_renames_slot_for_whole_group(): void
+    {
+        $site = Site::factory()->create();
+        $main = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Main TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        $reserve = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand_1',
+            'content' => ['value' => 'Backup TG', 'network' => 'telegram', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
+
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $main->id)
+            ->assertSet('slotName', 'tg_brand')
+            ->set('slotName', 'main_telegram')
+            ->call('renameSlot')
+            ->assertHasNoErrors();
+
+        $this->assertSame('main_telegram', $main->fresh()->content['messenger_slot']);
+        $this->assertSame('main_telegram', $reserve->fresh()->content['messenger_slot']);
+
+        // Грід групує за новим іменем, резерв лишається в групі.
+        $row = app(SiteGridReader::class)->forSite($site)['messenger'][0];
+        $this->assertSame('main_telegram', $row['key']);
+        $this->assertSame(1, $row['reserves']);
+        $this->assertTrue(AuditLog::where('action', 'messenger.slot_renamed')->exists());
+    }
+
+    public function test_messenger_slot_rename_rejected_when_name_taken_in_scope(): void
+    {
+        $site = Site::factory()->create();
+        $tg = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'wa_brand',
+            'content' => ['value' => 'WA', 'network' => 'whatsapp', 'enabled' => true],
+        ]);
+
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $tg->id)
+            ->set('slotName', 'wa_brand')
+            ->call('renameSlot')
+            ->assertHasErrors('slotName');
+
+        $this->assertArrayNotHasKey('messenger_slot', $tg->fresh()->content ?? []);
+    }
+
+    public function test_messenger_slot_rename_rejects_invalid_characters(): void
+    {
+        $site = Site::factory()->create();
+        $tg = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'TG', 'network' => 'telegram', 'enabled' => true],
+        ]);
+
+        Livewire::test(MessengerPanel::class)
+            ->call('open', $tg->id)
+            ->set('slotName', 'Має Пробіл')
+            ->call('renameSlot')
+            ->assertHasErrors('slotName');
     }
 }

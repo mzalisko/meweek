@@ -13,14 +13,12 @@
     <div class="mb-3">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Тип</label>
         <select wire:model.live="type" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-acc">
-            @if($valueId)
-                <option value="text">Текст</option>
-                <option value="price">Ціна</option>
-                <option value="address">Адреса</option>
-                <option value="social">Соцмережа</option>
-            @endif
             <option value="phone">Телефон</option>
             <option value="messenger">Месенджер</option>
+            <option value="text">Текст</option>
+            <option value="price">Ціна</option>
+            <option value="address">Адреса</option>
+            <option value="social">Соцмережа</option>
         </select>
         @error('type')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
@@ -70,21 +68,7 @@
     </div>
     @endif
 
-    {{-- Scope --}}
-    <div class="mb-4">
-        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1.5">Область дії</label>
-        <div class="flex gap-3">
-            <label class="flex-1 flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-1.5 {{ $scope === 'site' ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut' }}">
-                <input wire:model.live="scope" type="radio" value="site" class="accent-[#54708c]" />
-                Цей сайт
-            </label>
-            <label class="flex-1 flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-1.5 {{ $scope === 'group' ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut' }}">
-                <input wire:model.live="scope" type="radio" value="group" class="accent-[#54708c]" />
-                Уся група
-            </label>
-        </div>
-        @error('scope')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
-    </div>
+
 
     {{-- Buttons --}}
     <div class="flex justify-between gap-2 items-center">
@@ -102,4 +86,5 @@
 </div>
 </aside>
 @endif
+
 </div>

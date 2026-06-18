@@ -22,6 +22,8 @@
         'slot.removed' => 'Видалено слот',
         'slot.suppressed' => 'Пригнічено слот',
         'slot.renamed' => 'Перейменовано слот',
+        'slot.hidden' => 'Приховано слот',
+        'slot.shown' => 'Показано слот',
         'phone.materialized' => 'Матеріалізовано телефон',
         'phone.override_collapsed' => 'Згорнуто оверайд',
         'number.added' => 'Додано номер',
@@ -77,6 +79,7 @@
             'return_mode' => 'Режим повернення',
             'enabled' => 'Активний',
             'pinned' => 'Закріплений',
+            'status' => 'Стан',
             'key' => 'Ключ',
             'linked_slot' => 'Прив\'язаний телефон',
             'current_messenger_id' => 'Активний месенджер',
@@ -93,7 +96,7 @@
                 '</div>';
         }
 
-        if (in_array($action, ['value.updated', 'messenger.toggled', 'messenger.pinned', 'messenger.unpinned', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown'])) {
+        if (in_array($action, ['value.updated', 'messenger.toggled', 'messenger.pinned', 'messenger.unpinned', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'slot.hidden', 'slot.shown'])) {
             if (is_array($old) && is_array($new)) {
                 $changes = [];
                 $allKeys = array_unique(array_merge(array_keys($old), array_keys($new)));
@@ -328,6 +331,65 @@
         }
         return '—';
     };
+
+    $failoverStateLabels = [
+        'ok' => 'Основний',
+        'on_reserve' => 'Резерв',
+        'pinned' => 'Закріплено',
+        'exhausted' => 'Вичерпано',
+    ];
+
+    $renderFailoverDetails = function($log) use ($failoverStateLabels) {
+        $old = is_array($log->old) ? $log->old : [];
+        $new = is_array($log->new) ? $log->new : [];
+        $triggerStatus = $new['trigger_status'] ?? $old['trigger_status'] ?? null;
+        $triggerNumber = $new['trigger_number'] ?? $old['trigger_number'] ?? ($old['number'] ?? null);
+        $activeNumber = $new['number'] ?? null;
+
+        if ($log->action === 'number.down') {
+            return '<div class="inline-flex items-center gap-2 rounded-lg border border-[#f3e5e2] bg-bad-bg px-3 py-1.5 text-xs text-bad-tx">' .
+                '<span class="font-bold uppercase tracking-wider text-[10px]">Впав номер</span>' .
+                '<span class="font-mono font-bold">' . htmlspecialchars($new['e164'] ?? '—') . '</span>' .
+                '</div>';
+        }
+
+        if ($log->action === 'number.recovered') {
+            return '<div class="inline-flex items-center gap-2 rounded-lg border border-[#cbeed2] bg-ok-bg px-3 py-1.5 text-xs text-ok-tx">' .
+                '<span class="font-bold uppercase tracking-wider text-[10px]">Номер відновлено</span>' .
+                '<span class="font-mono font-bold">' . htmlspecialchars($new['e164'] ?? '—') . '</span>' .
+                '</div>';
+        }
+
+        $eventLabel = match ($triggerStatus) {
+            'down' => 'Номер впав',
+            'active' => 'Номер відновився',
+            default => 'Перерахунок лінії',
+        };
+        $eventClass = match ($triggerStatus) {
+            'down' => 'border-[#f3e5e2] bg-bad-bg text-bad-tx',
+            'active' => 'border-[#cbeed2] bg-ok-bg text-ok-tx',
+            default => 'border-[#eed8a0] bg-warn-bg text-warn-tx',
+        };
+        $oldState = $failoverStateLabels[$old['state'] ?? ''] ?? ($old['state'] ?? '—');
+        $newState = $failoverStateLabels[$new['state'] ?? ''] ?? ($new['state'] ?? '—');
+
+        return '<div class="flex flex-wrap items-center gap-2">' .
+            '<span class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold ' . $eventClass . '">' .
+                '<span>' . htmlspecialchars($eventLabel) . '</span>' .
+                '<span class="font-mono">' . htmlspecialchars($triggerNumber ?? '—') . '</span>' .
+            '</span>' .
+            '<span class="inline-flex items-center gap-2 rounded-lg border border-[#e3e5e1] bg-[#f4f5f3] px-3 py-1.5 text-xs">' .
+                '<span class="text-mut font-bold uppercase tracking-wider text-[10px]">Було</span>' .
+                '<span class="font-mono text-bad-tx">' . htmlspecialchars($old['number'] ?? '—') . '</span>' .
+                '<span class="text-mut">(' . htmlspecialchars($oldState) . ')</span>' .
+            '</span>' .
+            '<span class="inline-flex items-center gap-2 rounded-lg border border-[#cbeed2] bg-ok-bg px-3 py-1.5 text-xs">' .
+                '<span class="text-ok-tx font-bold uppercase tracking-wider text-[10px]">Активний зараз</span>' .
+                '<span class="font-mono font-bold text-ok-tx">' . htmlspecialchars($activeNumber ?? '—') . '</span>' .
+                '<span class="text-ok-tx">(' . htmlspecialchars($newState) . ')</span>' .
+            '</span>' .
+        '</div>';
+    };
 @endphp
 
 <x-slot name="breadcrumb">
@@ -342,14 +404,30 @@
 <div class="flex-1 min-h-0 p-5 overflow-y-auto">
     {{-- Tabs --}}
     <div class="flex border-b border-[#dfe3e0] mb-5 gap-6">
-        <button wire:click="$set('activeTab', 'changes')"
-            class="pb-3 text-sm font-bold transition-colors {{ $activeTab === 'changes' ? 'border-b-2 border-acc text-acc-tx' : 'text-mut hover:text-ink' }}">
-            Історія змін даних
-        </button>
-        <button wire:click="$set('activeTab', 'systems')"
-            class="pb-3 text-sm font-bold transition-colors {{ $activeTab === 'systems' ? 'border-b-2 border-acc text-acc-tx' : 'text-mut hover:text-ink' }}">
-            Системні логи
-        </button>
+        @if($auditAccess['changes'] ?? false)
+            <button wire:click="$set('activeTab', 'changes')"
+                class="pb-3 text-sm font-bold transition-colors {{ $activeTab === 'changes' ? 'border-b-2 border-acc text-acc-tx' : 'text-mut hover:text-ink' }}">
+                Історія змін даних
+            </button>
+        @endif
+        @if($auditAccess['failover'] ?? false)
+            <button wire:click="$set('activeTab', 'failover')"
+                class="pb-3 text-sm font-bold transition-colors {{ $activeTab === 'failover' ? 'border-b-2 border-acc text-acc-tx' : 'text-mut hover:text-ink' }}">
+                Failover
+            </button>
+        @endif
+        @if($auditAccess['users'] ?? false)
+            <button wire:click="$set('activeTab', 'users')"
+                class="pb-3 text-sm font-bold transition-colors {{ $activeTab === 'users' ? 'border-b-2 border-acc text-acc-tx' : 'text-mut hover:text-ink' }}">
+                Користувачі
+            </button>
+        @endif
+        @if($auditAccess['systems'] ?? false)
+            <button wire:click="$set('activeTab', 'systems')"
+                class="pb-3 text-sm font-bold transition-colors {{ $activeTab === 'systems' ? 'border-b-2 border-acc text-acc-tx' : 'text-mut hover:text-ink' }}">
+                Системні логи
+            </button>
+        @endif
     </div>
 
     {{-- Error messages --}}
@@ -423,7 +501,7 @@
                                             => ['Видалено', 'bg-bad-bg text-bad-tx border border-[#f3e5e2]'],
                                         $log->action === 'audit.restored'
                                             => ['Відновлено', 'bg-acc-bg text-acc-tx border border-acc-bd'],
-                                        in_array($log->action, ['slot.suppressed','messenger.slot_hidden','value.frozen','phone.override_collapsed'])
+                                        in_array($log->action, ['slot.suppressed','slot.hidden','messenger.slot_hidden','value.frozen','phone.override_collapsed'])
                                             => ['Приховано', 'bg-[#f4f5f3] text-mut border border-[#e3e5e1]'],
                                         in_array($log->action, ['slot.renamed','messenger.slot_renamed'])
                                             => ['Перейменовано', 'bg-warn-bg text-warn-tx border border-[#eed8a0]'],
@@ -479,7 +557,7 @@
                                     </td>
                                     <td class="p-3.5 text-sm text-ink border-b border-[#edf0ed]">{!! $renderDiff($log) !!}</td>
                                     <td class="p-3.5 text-right whitespace-nowrap border-b border-[#edf0ed]">
-                                        @if(in_array($log->action, ['value.updated', 'value.geo_changed', 'slot.renamed', 'messenger.slot_renamed', 'value.deleted', 'slot.removed', 'messenger.removed', 'value.created', 'messenger.added', 'messenger.reserve_added', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'number.added', 'number.removed', 'number.status_changed', 'number.edited']))
+                                        @if(in_array($log->action, ['value.updated', 'value.geo_changed', 'slot.renamed', 'slot.hidden', 'slot.shown', 'messenger.slot_renamed', 'value.deleted', 'slot.removed', 'messenger.removed', 'value.created', 'messenger.added', 'messenger.reserve_added', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'number.added', 'number.removed', 'number.status_changed', 'number.edited']))
                                             <button wire:click="restore({{ $log->id }})"
                                                 wire:confirm="Ви впевнені, що хочете відкатати цю зміну назад?"
                                                 class="rounded-md border border-acc bg-acc-bg px-3 py-1.5 text-xs font-bold text-acc-tx hover:bg-[#e6edf2] transition-colors">
@@ -543,12 +621,201 @@
                 </div>
             </div>
         @endif
+    @elseif($activeTab === 'failover')
+        {{-- FAILOVER VIEW --}}
+        <div class="bg-white border border-[#dfe3e0] rounded-lg p-5 shadow-sm">
+            <div class="border-b border-[#edf0ed] pb-4 mb-4">
+                <h2 class="text-base font-bold text-ink">Failover аудит</h2>
+                <span class="text-xs text-mut mt-1 block">Окрема стрічка перемикань телефонних ліній, падінь і відновлень номерів.</span>
+            </div>
+
+            <div class="flex flex-wrap gap-3 items-center mb-5 text-sm text-mut">
+                <input wire:model.live.debounce.250ms="search" type="text" placeholder="Пошук номера або сайта..."
+                    class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 w-64 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+
+                <select wire:model.live="actionFilter" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+                    <option value="">Усі failover-події</option>
+                    @foreach(self::FAILOVER_ACTIONS as $act)
+                        <option value="{{ $act }}">{{ $actionLabels[$act] ?? $act }}</option>
+                    @endforeach
+                </select>
+
+                <select wire:model.live="actorFilter" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+                    <option value="">Усі джерела</option>
+                    <option value="system">Система</option>
+                    <option value="webhook">Вебхук</option>
+                    @foreach(\App\Models\User::all() as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                    @endforeach
+                </select>
+
+                <input wire:model.live="dateFrom" type="date" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+                <span>до</span>
+                <input wire:model.live="dateTo" type="date" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+
+                <button wire:click="resetFilters" class="ml-auto text-sm text-mut hover:text-ink font-semibold">Очистити фільтри ✕</button>
+            </div>
+
+            <div class="overflow-x-auto mt-4">
+                <table class="w-full text-left text-sm border-collapse border border-[#dfe3e0] rounded-lg overflow-hidden">
+                    <thead>
+                        <tr class="bg-[#f6f8f6] border-b border-[#dfe3e0] text-xs uppercase tracking-wider text-mut font-bold">
+                            <th class="p-3.5 w-36">Коли</th>
+                            <th class="p-3.5 w-56">Сайт</th>
+                            <th class="p-3.5 w-40">Слот</th>
+                            <th class="p-3.5 w-44">Подія</th>
+                            <th class="p-3.5">Деталі</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#edf0ed]">
+                        @forelse($logs as $log)
+                            @php
+                                $old = is_array($log->old) ? $log->old : [];
+                                $new = is_array($log->new) ? $log->new : [];
+                                $sites = collect($new['sites'] ?? $old['sites'] ?? []);
+                                if (! app(\App\Admin\AccessControl::class)->canManageAccess(auth()->user())) {
+                                    $sites = $sites->filter(fn($s) => app(\App\Admin\AccessControl::class)->canViewFailover(auth()->user(), $s['id'] ?? null));
+                                }
+                                $siteDomains = $sites->pluck('domain')->filter()->values();
+                                $siteText = $siteDomains->isNotEmpty() ? $siteDomains->implode(', ') : '—';
+                                $siteCount = $siteDomains->count();
+                                $triggerStatus = $new['trigger_status'] ?? $old['trigger_status'] ?? null;
+                                $rowClass = match (true) {
+                                    $log->action === 'failover.switch' && $triggerStatus === 'down' => 'bg-[#fff8f6] hover:bg-[#fff3ef]',
+                                    $log->action === 'failover.switch' && $triggerStatus === 'active' => 'bg-[#f5fbf5] hover:bg-[#eef8ef]',
+                                    $log->action === 'number.down' => 'bg-[#fff8f6] hover:bg-[#fff3ef]',
+                                    $log->action === 'number.recovered' => 'bg-[#f5fbf5] hover:bg-[#eef8ef]',
+                                    default => 'hover:bg-[#fafbfa]',
+                                };
+                                $badgeClass = match (true) {
+                                    $log->action === 'failover.switch' && $triggerStatus === 'down' => 'bg-bad-bg text-bad-tx border border-[#f3e5e2]',
+                                    $log->action === 'failover.switch' && $triggerStatus === 'active' => 'bg-ok-bg text-ok-tx border border-[#cbeed2]',
+                                    $log->action === 'number.down' => 'bg-bad-bg text-bad-tx border border-[#f3e5e2]',
+                                    $log->action === 'number.recovered' => 'bg-ok-bg text-ok-tx border border-[#cbeed2]',
+                                    default => 'bg-warn-bg text-warn-tx border border-[#eed8a0]',
+                                };
+                            @endphp
+                            <tr class="{{ $rowClass }} transition-colors">
+                                <td class="p-3.5 text-mut whitespace-nowrap text-xs border-b border-[#edf0ed]">{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
+                                <td class="p-3.5 border-b border-[#edf0ed]">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <span class="font-semibold text-ink text-xs">{{ $siteText }}</span>
+                                        @if($siteCount > 1)
+                                            <span class="rounded bg-acc-bg px-1.5 py-0.5 text-[10px] font-bold text-acc-tx">{{ $siteCount }} сайтів</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="p-3.5 border-b border-[#edf0ed]">
+                                    <div class="flex flex-col gap-0.5">
+                                        <span class="font-mono text-xs font-bold text-ink">{{ $new['slot_key'] ?? $old['slot_key'] ?? ('#'.($log->subject_id ?? '—')) }}</span>
+                                        <span class="text-[10px] text-mut">slot #{{ $new['slot_id'] ?? $old['slot_id'] ?? ($log->subject_id ?? '—') }}</span>
+                                    </div>
+                                </td>
+                                <td class="p-3.5 border-b border-[#edf0ed]">
+                                    <span class="inline-block rounded-md px-2 py-0.5 text-xs font-semibold {{ $badgeClass }}">
+                                        {{ $actionLabels[$log->action] ?? $log->action }}
+                                    </span>
+                                </td>
+                                <td class="p-3.5 text-sm text-ink border-b border-[#edf0ed]">{!! $renderFailoverDetails($log) !!}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="p-8 text-center text-mut text-sm">Failover-подій поки немає</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-5">
+                {{ $logs->links() }}
+            </div>
+        </div>
+    @elseif($activeTab === 'users')
+        {{-- USER LOGS VIEW --}}
+        <div class="bg-white border border-[#dfe3e0] rounded-lg p-5 shadow-sm">
+            <div class="border-b border-[#edf0ed] pb-4 mb-4">
+                <h2 class="text-base font-bold text-ink">Користувачі і доступи</h2>
+                <span class="text-xs text-mut mt-1 block">Входи, виходи, невдалі спроби входу, зміни користувачів, паролі та відкликання сесій.</span>
+            </div>
+
+            <div class="flex flex-wrap gap-3 items-center mb-5 text-sm text-mut">
+                <input wire:model.live.debounce.250ms="search" type="text" placeholder="Пошук користувача або IP..."
+                    class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 w-64 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+
+                <select wire:model.live="actionFilter" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+                    <option value="">Усі події користувачів</option>
+                    @foreach(self::USER_ACTIONS as $act)
+                        <option value="{{ $act }}">{{ $actionLabels[$act] ?? $act }}</option>
+                    @endforeach
+                </select>
+
+                <select wire:model.live="actorFilter" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+                    <option value="">Усі актори</option>
+                    <option value="system">Система</option>
+                    @foreach(\App\Models\User::all() as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                    @endforeach
+                </select>
+
+                <input wire:model.live="dateFrom" type="date" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+                <span>до</span>
+                <input wire:model.live="dateTo" type="date" class="border border-[#dfe3e0] rounded-lg px-3.5 py-2 text-sm text-ink focus:outline-none focus:border-acc bg-white">
+
+                <button wire:click="resetFilters" class="ml-auto text-sm text-mut hover:text-ink font-semibold">Очистити фільтри ✕</button>
+            </div>
+
+            <div class="overflow-x-auto mt-4">
+                <table class="w-full text-left text-sm border-collapse border border-[#dfe3e0] rounded-lg overflow-hidden">
+                    <thead>
+                        <tr class="bg-[#f6f8f6] border-b border-[#dfe3e0] text-xs uppercase tracking-wider text-mut font-bold">
+                            <th class="p-3.5 w-36">Час</th>
+                            <th class="p-3.5 w-44">Подія</th>
+                            <th class="p-3.5 w-44">Актор</th>
+                            <th class="p-3.5">Подробиці</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#edf0ed]">
+                        @forelse($logs as $log)
+                            <tr class="hover:bg-[#fafbfa] transition-colors">
+                                <td class="p-3.5 text-mut whitespace-nowrap text-xs border-b border-[#edf0ed]">{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
+                                <td class="p-3.5 border-b border-[#edf0ed]">
+                                    <span class="inline-block rounded-md px-2 py-0.5 text-xs font-semibold
+                                        {{ str_contains($log->action, 'login_failed') || str_contains($log->action, 'deleted') || str_contains($log->action, 'deactivated') ? 'bg-bad-bg text-bad-tx' : '' }}
+                                        {{ (str_contains($log->action, 'login') && !str_contains($log->action, 'failed')) || str_contains($log->action, 'created') || str_contains($log->action, 'activated') ? 'bg-ok-bg text-ok-tx' : '' }}
+                                        {{ str_contains($log->action, 'password') || str_contains($log->action, 'sessions') || str_contains($log->action, 'updated') ? 'bg-warn-bg text-warn-tx' : '' }}
+                                    ">
+                                        {{ $actionLabels[$log->action] ?? $log->action }}
+                                    </span>
+                                </td>
+                                <td class="p-3.5 text-ink truncate max-w-[170px] border-b border-[#edf0ed]" title="{{ $log->actor_type === 'user' ? (\App\Models\User::find($log->actor_id)?->email ?? 'Користувач') : ucfirst($log->actor_type) }}">
+                                    @if($log->actor_type === 'user')
+                                        {{ \App\Models\User::find($log->actor_id)?->name ?? 'Користувач' }}
+                                    @else
+                                        <span class="text-mut font-semibold text-xs">{{ ucfirst($log->actor_type) }}</span>
+                                    @endif
+                                </td>
+                                <td class="p-3.5 text-sm text-ink border-b border-[#edf0ed]">{!! $renderSystemDetails($log) !!}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="p-8 text-center text-mut text-sm">Подій користувачів немає</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-5">
+                {{ $logs->links() }}
+            </div>
+        </div>
     @else
         {{-- SYSTEM LOGS VIEW --}}
         <div class="bg-white border border-[#dfe3e0] rounded-lg p-5 shadow-sm">
             <div class="border-b border-[#edf0ed] pb-4 mb-4">
-                <h2 class="text-base font-bold text-ink">Системні логи та авторизація</h2>
-                <span class="text-xs text-mut mt-1 block">Сесії користувачів, failover перемикання ліній, вебхуки, логи конфігурації сайтів/груп</span>
+                <h2 class="text-base font-bold text-ink">Системні логи</h2>
+                <span class="text-xs text-mut mt-1 block">Сайти, групи, токени, вебхуки та інші службові події без failover і користувацької стрічки.</span>
             </div>
 
             {{-- Filters --}}

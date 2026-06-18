@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Livewire\SlotPanel;
+use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\Site;
 use App\Models\User;
@@ -80,11 +81,21 @@ class SlotPanelTest extends TestCase
 
         $this->assertSame('hidden', $slot->dataValue->fresh()->status);
         $this->assertTrue(DataValue::where('id', $slot->dataValue->id)->where('status', 'hidden')->exists());
+        $this->assertTrue(
+            AuditLog::where('action', 'slot.hidden')
+                ->where('subject_id', $slot->dataValue->id)
+                ->exists()
+        );
 
         Livewire::test(SlotPanel::class)
             ->call('open', $slot->dataValue->id)
             ->call('showSlot');
 
         $this->assertSame('active', $slot->dataValue->fresh()->status);
+        $this->assertTrue(
+            AuditLog::where('action', 'slot.shown')
+                ->where('subject_id', $slot->dataValue->id)
+                ->exists()
+        );
     }
 }

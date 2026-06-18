@@ -29,23 +29,6 @@ class SitePayloadCompilerTest extends TestCase
         return null;
     }
 
-    public function test_site_override_wins_over_group_value(): void
-    {
-        $group = SiteGroup::factory()->create();
-        $site = Site::factory()->for($group, 'group')->create();
-        DataValue::factory()->forGroup($group)->create([
-            'key' => 'address_main', 'content' => ['value' => 'Групова адреса'],
-        ]);
-        DataValue::factory()->forSite($site)->create([
-            'key' => 'address_main', 'content' => ['value' => 'Власна адреса'],
-        ]);
-
-        $payload = app(SitePayloadCompiler::class)->compile($site);
-
-        $this->assertSame('Власна адреса', $this->itemByKey($payload, 'address_main')['value']);
-        $this->assertCount(1, $payload['values']);
-    }
-
     public function test_phone_slot_compiles_to_active_number_with_geo(): void
     {
         $site = Site::factory()->create();
@@ -63,6 +46,8 @@ class SitePayloadCompilerTest extends TestCase
         $this->assertSame('ok', $item['state']);
         $this->assertSame($entries[0]->phoneNumber->e164, $item['value']);
     }
+
+
 
     public function test_exhausted_hidden_slot_marked_hidden(): void
     {

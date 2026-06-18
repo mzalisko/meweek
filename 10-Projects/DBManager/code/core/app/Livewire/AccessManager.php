@@ -32,6 +32,10 @@ class AccessManager extends Component
 
     public bool $isActive = true;
 
+    public bool $canViewUserLogs = false;
+
+    public bool $canViewSystemLogs = false;
+
     public array $groupPermissions = [];
 
     public array $sitePermissions = [];
@@ -62,13 +66,23 @@ class AccessManager extends Component
         $this->selectedUserId = null;
         $this->name = '';
         $this->email = '';
-        $this->password = '';
+        $this->password = $this->generatePlainPassword();
         $this->visiblePassword = null;
         $this->role = AccessControl::ROLE_VIEWER;
         $this->isActive = true;
+        $this->canViewUserLogs = false;
+        $this->canViewSystemLogs = false;
         $this->groupPermissions = $this->emptyGroupPermissions();
         $this->sitePermissions = $this->emptySitePermissions();
         $this->resetValidation();
+    }
+
+    public function generatePassword(): void
+    {
+        $this->authorizeAccessManagement();
+
+        $this->password = $this->generatePlainPassword();
+        $this->resetValidation('password');
     }
 
     public function closePanel(): void
@@ -106,11 +120,13 @@ class AccessManager extends Component
             'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', Rule::in(AccessControl::ROLES)],
             'isActive' => ['boolean'],
+            'canViewUserLogs' => ['boolean'],
+            'canViewSystemLogs' => ['boolean'],
         ]);
 
         $plainPassword = $validated['password'];
         if (! $this->selectedUserId && $plainPassword === '') {
-            $plainPassword = Str::password(12);
+            $plainPassword = $this->generatePlainPassword();
         }
 
         $payload = [
@@ -118,6 +134,8 @@ class AccessManager extends Component
             'email' => $validated['email'],
             'role' => $validated['role'],
             'is_active' => $validated['isActive'],
+            'can_view_user_logs' => $validated['role'] === AccessControl::ROLE_SUPERADMIN ? false : (bool) $validated['canViewUserLogs'],
+            'can_view_system_logs' => $validated['role'] === AccessControl::ROLE_SUPERADMIN ? false : (bool) $validated['canViewSystemLogs'],
         ];
 
         if ($plainPassword !== '') {
@@ -128,7 +146,12 @@ class AccessManager extends Component
             ? User::findOrFail($this->selectedUserId)
             : new User();
 
-        $old = $user->exists ? $user->only(['name', 'email', 'role', 'is_active']) : null;
+        if ($this->blocksLastActiveSuperAdmin($user, $validated['role'], (bool) $validated['isActive'])) {
+            return;
+        }
+
+        $auditFields = ['name', 'email', 'role', 'is_active', 'can_view_user_logs', 'can_view_system_logs'];
+        $old = $user->exists ? $user->only($auditFields) : null;
         $user->fill($payload)->save();
 
         $this->selectedUserId = $user->id;
@@ -141,23 +164,24 @@ class AccessManager extends Component
             'subject_type' => 'User',
             'subject_id' => $user->id,
             'old' => $old,
-            'new' => $user->fresh()->only(['name', 'email', 'role', 'is_active']),
+            'new' => $user->fresh()->only($auditFields),
         ]);
 
         $this->password = '';
         $this->visiblePassword = $plainPassword !== '' ? $plainPassword : null;
-        $this->panelOpen = true;
-        $this->dispatch('toast', message: 'Користувача збережено');
+        $this->panelOpen = false;
+        $this->dispatch('toast', message: 'Користувача збережено' . ($plainPassword !== '' ? '. Тимчасовий пароль: ' . $plainPassword : ''));
     }
 
     public function resetPassword(int $userId): void
     {
         $this->authorizeAccessManagement();
 
-        $plainPassword = Str::password(12);
+        $plainPassword = $this->generatePlainPassword();
         $user = User::findOrFail($userId);
         $user->update(['password' => Hash::make($plainPassword)]);
-        $this->logoutUser($userId, logAction: false);
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
 
         AuditLog::create([
             'actor_type' => 'user',
@@ -171,14 +195,16 @@ class AccessManager extends Component
         $this->selectedUserId = $user->id;
         $this->panelOpen = true;
         $this->visiblePassword = $plainPassword;
-        $this->dispatch('toast', message: 'Пароль скинуто, активні сесії завершено');
+        $this->dispatch('toast', message: 'Тимчасовий пароль створено, активні сесії завершено');
     }
 
     public function logoutUser(int $userId, bool $logAction = true): void
     {
         $this->authorizeAccessManagement();
 
-        DB::table('sessions')->where('user_id', $userId)->delete();
+        $user = User::findOrFail($userId);
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
 
         if ($logAction) {
             AuditLog::create([
@@ -186,7 +212,7 @@ class AccessManager extends Component
                 'actor_id' => auth()->id(),
                 'action' => 'user.sessions_revoked',
                 'subject_type' => 'User',
-                'subject_id' => $userId,
+                'subject_id' => $user->id,
                 'new' => ['sessions_revoked' => true],
             ]);
         }
@@ -205,6 +231,12 @@ class AccessManager extends Component
         }
 
         $user = User::findOrFail($userId);
+        if ($user->role === AccessControl::ROLE_SUPERADMIN && $user->is_active && $this->activeSuperadminCount() <= 1) {
+            $this->addError('selectedUserId', 'Потрібен щонайменше один активний супер-адмін.');
+
+            return;
+        }
+
         $old = (bool) $user->is_active;
         $user->update(['is_active' => ! $old]);
 
@@ -262,6 +294,12 @@ class AccessManager extends Component
         }
 
         $user = User::findOrFail($userId);
+        if ($user->role === AccessControl::ROLE_SUPERADMIN && $user->is_active && $this->activeSuperadminCount() <= 1) {
+            $this->addError('selectedUserId', 'Потрібен щонайменше один активний супер-адмін.');
+
+            return;
+        }
+
         $old = $user->only(['name', 'email', 'role', 'is_active']);
 
         DB::table('sessions')->where('user_id', $user->id)->delete();
@@ -307,9 +345,9 @@ class AccessManager extends Component
             'onlineUsers' => $onlineUsers,
             'onlineUserIds' => $onlineUsers->pluck('id')->map(fn ($id) => (int) $id)->all(),
             'roles' => [
-                AccessControl::ROLE_SUPERADMIN => 'Суперадмін',
+                AccessControl::ROLE_SUPERADMIN => 'Адмін',
                 AccessControl::ROLE_MANAGER => 'Менеджер',
-                AccessControl::ROLE_VIEWER => 'В’ювер',
+                AccessControl::ROLE_VIEWER => 'Перегляд',
             ],
         ])->layout('components.layouts.admin');
     }
@@ -335,6 +373,8 @@ class AccessManager extends Component
         $this->visiblePassword = null;
         $this->role = $user->role;
         $this->isActive = (bool) $user->is_active;
+        $this->canViewUserLogs = (bool) $user->can_view_user_logs;
+        $this->canViewSystemLogs = (bool) $user->can_view_system_logs;
 
         foreach ($user->siteGroupAccess as $access) {
             $this->groupPermissions[$access->site_group_id] = $this->permissionArray($access);
@@ -349,13 +389,6 @@ class AccessManager extends Component
 
     private function syncPermissions(User $user): void
     {
-        if ($user->role === AccessControl::ROLE_SUPERADMIN) {
-            $user->siteAccess()->delete();
-            $user->siteGroupAccess()->delete();
-
-            return;
-        }
-
         foreach ($this->groupPermissions as $groupId => $permissions) {
             $permissions = $this->normalizedPermissions($permissions);
             if (! $this->hasAnyPermission($permissions)) {
@@ -381,6 +414,38 @@ class AccessManager extends Component
                 $permissions,
             );
         }
+    }
+
+    private function blocksLastActiveSuperAdmin(User $user, string $nextRole, bool $nextActive): bool
+    {
+        if ($user->role !== AccessControl::ROLE_SUPERADMIN) {
+            return false;
+        }
+
+        if ($nextRole === AccessControl::ROLE_SUPERADMIN && $nextActive) {
+            return false;
+        }
+
+        if ($this->activeSuperadminCount() > 1) {
+            return false;
+        }
+
+        $this->addError('selectedUserId', 'Потрібен щонайменше один активний супер-адмін.');
+
+        return true;
+    }
+
+    private function activeSuperadminCount(): int
+    {
+        return User::query()
+            ->where('role', AccessControl::ROLE_SUPERADMIN)
+            ->where('is_active', true)
+            ->count();
+    }
+
+    private function generatePlainPassword(): string
+    {
+        return Str::password(14);
     }
 
     private function onlineUsers(): Collection
@@ -466,6 +531,8 @@ class AccessManager extends Component
             'can_edit' => false,
             'can_delete' => false,
             'can_publish' => false,
+            'can_view_history' => false,
+            'can_view_failover' => false,
         ];
     }
 
@@ -476,6 +543,8 @@ class AccessManager extends Component
             'can_edit' => (bool) $access->can_edit,
             'can_delete' => (bool) $access->can_delete,
             'can_publish' => (bool) $access->can_publish,
+            'can_view_history' => (bool) ($access->can_view_history ?? false),
+            'can_view_failover' => (bool) ($access->can_view_failover ?? false),
         ];
     }
 
@@ -484,28 +553,33 @@ class AccessManager extends Component
         $canPublish = (bool) ($permissions['can_publish'] ?? false);
         $canDelete = (bool) ($permissions['can_delete'] ?? false);
         $canEdit = (bool) ($permissions['can_edit'] ?? false) || $canPublish;
+        $canViewHistory = (bool) ($permissions['can_view_history'] ?? false);
+        $canViewFailover = (bool) ($permissions['can_view_failover'] ?? false);
 
         return [
-            'can_view' => (bool) ($permissions['can_view'] ?? false) || $canEdit || $canDelete,
+            'can_view' => (bool) ($permissions['can_view'] ?? false) || $canEdit || $canDelete || $canViewHistory || $canViewFailover,
             'can_edit' => $canEdit,
             'can_delete' => $canDelete,
             'can_publish' => $canPublish,
+            'can_view_history' => $canViewHistory,
+            'can_view_failover' => $canViewFailover,
         ];
     }
 
     private function hasAnyPermission(array $permissions): bool
     {
-        return $permissions['can_view'] || $permissions['can_edit'] || $permissions['can_delete'] || $permissions['can_publish'];
+        return $permissions['can_view'] || $permissions['can_edit'] || $permissions['can_delete'] || $permissions['can_publish'] || $permissions['can_view_history'] || $permissions['can_view_failover'];
     }
 
     private function permissionsForLevel(string $level): array
     {
         return match ($level) {
-            'view' => ['can_view' => true, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false],
-            'edit' => ['can_view' => true, 'can_edit' => true, 'can_delete' => false, 'can_publish' => false],
-            'delete' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => false],
-            'publish' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => true],
+            'view' => ['can_view' => true, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false],
+            'edit' => ['can_view' => true, 'can_edit' => true, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false],
+            'delete' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false],
+            'publish' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => true, 'can_view_history' => false, 'can_view_failover' => false],
             default => $this->blankPermissions(),
         };
     }
 }
+

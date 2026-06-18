@@ -23,8 +23,8 @@ class DemoDataSeederTest extends TestCase
 
         $this->assertSame(['domen.ro', 'domen.ua', 'old.test'], Site::orderBy('domain')->pluck('domain')->all());
         $this->assertSame(2, SiteGroup::count());
-        $this->assertSame(4, DataValue::whereHas('type', fn ($q) => $q->where('code', 'phone'))->count());
-        $this->assertSame(2, DataValue::whereHas('type', fn ($q) => $q->where('code', 'messenger'))->count());
+        $this->assertSame(6, DataValue::whereHas('type', fn ($q) => $q->where('code', 'phone'))->count());
+        $this->assertSame(4, DataValue::whereHas('type', fn ($q) => $q->where('code', 'messenger'))->count());
 
         $siteRo = Site::where('domain', 'domen.ro')->sole();
         $siteUa = Site::where('domain', 'domen.ua')->sole();
@@ -56,7 +56,7 @@ class DemoDataSeederTest extends TestCase
 
         $this->assertSame('+74951234567', $ruOnRo['value']);
         $this->assertSame('+74957654321', $ruOnUa['value']);
-        $this->assertSame('group', $ruOnRo['scope']);
+        $this->assertSame('site', $ruOnRo['scope']);
         $this->assertSame('site', $ruOnUa['scope']);
         $this->assertSame(['WORLD', 'RU', 'BY'], $ruOnRo['geo']);
         $this->assertSame(['WORLD', 'RU', 'BY'], $ruOnUa['geo']);
@@ -73,7 +73,7 @@ class DemoDataSeederTest extends TestCase
         $this->seed(DemoDataSeeder::class);
 
         $this->assertSame(['domen.ro', 'domen.ua'], Site::orderBy('domain')->pluck('domain')->all());
-        $this->assertSame(4, DataValue::whereHas('type', fn ($q) => $q->where('code', 'phone'))->count());
-        $this->assertSame(2, DataValue::whereHas('type', fn ($q) => $q->where('code', 'messenger'))->count());
+        $this->assertSame(6, DataValue::whereHas('type', fn ($q) => $q->where('code', 'phone'))->count());
+        $this->assertSame(4, DataValue::whereHas('type', fn ($q) => $q->where('code', 'messenger'))->count());
     }
 }

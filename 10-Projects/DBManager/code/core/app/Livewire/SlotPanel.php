@@ -4,8 +4,6 @@ namespace App\Livewire;
 
 use App\Admin\AccessControl;
 use App\Admin\PhoneNumberAssignment;
-use App\Admin\PhoneSlotInheritance;
-use App\Livewire\Concerns\HandlesScopeDecision;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
@@ -23,8 +21,6 @@ use Livewire\Component;
 
 class SlotPanel extends Component
 {
-    use HandlesScopeDecision;
-
     public bool $open = false;
 
     public string $mode = 'settings';
@@ -108,9 +104,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('renameSlot', [], $value)) {
-            return;
-        }
+
 
         [$groupId, $siteIds] = $this->chainScope($value);
 
@@ -181,9 +175,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('addNumber', [], $value)) {
-            return;
-        }
+
 
         $slot = $value->phoneSlot;
         $next = $slot->entries()->count()
@@ -282,9 +274,7 @@ class SlotPanel extends Component
         }
 
         $old = $entry->phoneNumber->e164;
-        if ($old !== $e164 && $this->deferForScope('saveNumber', [], $value)) {
-            return;
-        }
+
 
         $entry = app(PhoneNumberAssignment::class)->assign($entry, $e164);
         app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
@@ -306,13 +296,7 @@ class SlotPanel extends Component
             ],
         ]);
 
-        $collapsedSite = app(PhoneSlotInheritance::class)->collapseOverrideIfMatchesSource($entry);
-        if ($collapsedSite) {
-            $publication = app(SitePayloadCompiler::class)->publish($collapsedSite);
-            app(BridgePublisher::class)->push($publication);
-        } else {
-            $this->publishSlotSites($slot->fresh());
-        }
+        $this->publishSlotSites($slot->fresh());
         $this->cancelEdit();
         $this->closeAndRefresh('Номер збережено → опубліковано');
     }
@@ -335,9 +319,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('setNumberStatus', [$entryId, $status], $value)) {
-            return;
-        }
+
 
         $engine = app(FailoverEngine::class);
         $status === 'active'
@@ -379,9 +361,7 @@ class SlotPanel extends Component
             return; // Already at top — nothing to do
         }
 
-        if ($this->deferForScope('moveUp', [$entryId], $value)) {
-            return;
-        }
+
 
         $this->swapEntryPriorities($current, $neighbour);
 
@@ -430,9 +410,7 @@ class SlotPanel extends Component
             return; // Already at bottom — nothing to do
         }
 
-        if ($this->deferForScope('moveDown', [$entryId], $value)) {
-            return;
-        }
+
 
         $this->swapEntryPriorities($current, $neighbour);
 
@@ -474,9 +452,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('removeNumber', [$entryId], $value)) {
-            return;
-        }
+
 
         $e164 = $entry->phoneNumber->e164 ?? null;
 
@@ -520,9 +496,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('pin', [$entryId], $value)) {
-            return;
-        }
+
 
         app(FailoverEngine::class)->pin($slot, $entry, 'user');
         $this->publishSlotSites($slot->fresh());
@@ -545,9 +519,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('unpin', [], $value)) {
-            return;
-        }
+
 
         app(FailoverEngine::class)->unpin($value->phoneSlot, 'user');
         $this->publishSlotSites($value->phoneSlot->fresh());
@@ -579,9 +551,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('setReturnMode', [$mode], $value)) {
-            return;
-        }
+
 
         $slot->update(['return_mode' => $mode]);
         app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
@@ -612,9 +582,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('setExhaustionPolicy', [$policy], $value)) {
-            return;
-        }
+
 
         $value->phoneSlot->update(['exhaustion_policy' => $policy]);
         $this->dispatch('slot-updated');
@@ -661,9 +629,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if ($this->deferForScope('setSlotVisibility', [$status], $value)) {
-            return;
-        }
+
 
         $value->update(['status' => $status]);
         $value->refresh()->load('phoneSlot.entries.phoneNumber', 'geoTags', 'type');
@@ -716,9 +682,7 @@ class SlotPanel extends Component
             return;
         }
 
-        if (($geoChanged || $emergencyChanged) && $this->deferForScope('persistSettings', [$notify], $value)) {
-            return;
-        }
+
 
         $changed = false;
 
@@ -815,40 +779,23 @@ class SlotPanel extends Component
      */
     private function chainScope(DataValue $value): array
     {
-        if ($value->scope_type === 'group') {
-            $groupId = (int) $value->scope_id;
-        } else {
-            $site = Site::withTrashed()->find($value->scope_id);
-            $groupId = $site?->site_group_id ? (int) $site->site_group_id : null;
-        }
-
-        $siteIds = $groupId
-            ? Site::withTrashed()->where('site_group_id', $groupId)->pluck('id')
-            : collect($value->scope_type === 'site' ? [(int) $value->scope_id] : []);
-
-        return [$groupId, $siteIds];
+        return [null, collect([(int) $value->scope_id])];
     }
 
     /**
-     * Усі DataValue із цим ключем у межах ланцюга (значення групи + перекриття сайтів).
+     * Усі DataValue із цим ключем у межах ланцюга (лише сам сайт).
      *
      * @param  \Illuminate\Support\Collection<int,int>  $siteIds
      */
     private function chainQuery(string $key, ?int $groupId, $siteIds)
     {
-        return DataValue::where('key', $key)->where(function ($q) use ($groupId, $siteIds) {
-            if ($groupId) {
-                $q->orWhere(fn ($g) => $g->where('scope_type', 'group')->where('scope_id', $groupId));
-            }
-            if ($siteIds->isNotEmpty()) {
-                $q->orWhere(fn ($s) => $s->where('scope_type', 'site')->whereIn('scope_id', $siteIds));
-            }
-        });
+        return DataValue::where('key', $key)
+            ->where('scope_type', 'site')
+            ->whereIn('scope_id', $siteIds);
     }
 
     /**
-     * Перенаправити месенджери, прив'язані до старого ключа телефону, на новий ключ,
-     * щоб прив'язки (linked_slot) не «осиротіли» після перейменування.
+     * Перенаправити месенджери, прив'язані до старого ключа телефону, на новий ключ.
      *
      * @param  \Illuminate\Support\Collection<int,int>  $siteIds
      */
@@ -860,14 +807,8 @@ class SlotPanel extends Component
         }
 
         DataValue::where('value_type_id', $messengerTypeId)
-            ->where(function ($q) use ($groupId, $siteIds) {
-                if ($groupId) {
-                    $q->orWhere(fn ($g) => $g->where('scope_type', 'group')->where('scope_id', $groupId));
-                }
-                if ($siteIds->isNotEmpty()) {
-                    $q->orWhere(fn ($s) => $s->where('scope_type', 'site')->whereIn('scope_id', $siteIds));
-                }
-            })
+            ->where('scope_type', 'site')
+            ->whereIn('scope_id', $siteIds)
             ->get()
             ->each(function (DataValue $messenger) use ($oldKey, $newKey) {
                 $content = $messenger->content ?? [];

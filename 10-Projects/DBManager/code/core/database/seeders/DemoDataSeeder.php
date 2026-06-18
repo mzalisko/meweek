@@ -47,7 +47,7 @@ class DemoDataSeeder extends Seeder
             $this->wipeDemoData();
 
             $group = SiteGroup::factory()->create(['name' => self::DEMO_GROUP]);
-            Site::factory()->for($group, 'group')->create([
+            $siteRo = Site::factory()->for($group, 'group')->create([
                 'name' => 'Domen RO',
                 'domain' => 'domen.ro',
                 'country_hint' => 'RO',
@@ -63,41 +63,45 @@ class DemoDataSeeder extends Seeder
             $ru    = GeoTag::where('code', 'RU')->sole();
             $by    = GeoTag::where('code', 'BY')->sole();
 
-            // Однаковий RO для всієї групи: WORLD, основний + 1 резерв.
-            $this->slot(
-                key: 'phone_ro_1',
-                scopeType: 'group',
-                scopeId: $group->id,
-                geoTags: [$world->id],
-                numbers: [
-                    ['+40211222333', 'RO основний'],
-                    ['+40211444555', 'RO резерв'],
-                ],
-            );
+            // phone_ro_1 — основний номер RO для обох сайтів (тепер локально на кожному сайті)
+            foreach ([$siteRo, $siteUa] as $site) {
+                $this->slot(
+                    key: 'phone_ro_1',
+                    scopeType: 'site',
+                    scopeId: $site->id,
+                    geoTags: [$world->id],
+                    numbers: [
+                        ['+40211222333', 'RO основний'],
+                        ['+40211222444', 'RO резерв'],
+                    ],
+                );
+            }
 
-            // Однаковий UA для всієї групи: WORLD + UA, без RU.
-            $this->slot(
-                key: 'phone_ua_1',
-                scopeType: 'group',
-                scopeId: $group->id,
-                geoTags: [$world->id, $ua->id],
-                numbers: [
-                    ['+380441112233', 'UA основний'],
-                ],
-            );
+            // phone_ua_1 — номер для України: WORLD + UA (тепер локально на кожному сайті)
+            foreach ([$siteRo, $siteUa] as $site) {
+                $this->slot(
+                    key: 'phone_ua_1',
+                    scopeType: 'site',
+                    scopeId: $site->id,
+                    geoTags: [$world->id, $ua->id],
+                    numbers: [
+                        ['+380441112233', 'UA основний'],
+                    ],
+                );
+            }
 
-            // Груповий RU діє на сайтах без власного override: WORLD + RU + BY, без UA.
+            // phone_ru_1 — локальний номер для RU/BY на domen.ro
             $this->slot(
                 key: 'phone_ru_1',
-                scopeType: 'group',
-                scopeId: $group->id,
+                scopeType: 'site',
+                scopeId: $siteRo->id,
                 geoTags: [$world->id, $ru->id, $by->id],
                 numbers: [
-                    ['+74951234567', 'RU груповий'],
+                    ['+74951234567', 'RU для domen.ro'],
                 ],
             );
 
-            // На другому сайті RU відрізняється, але RO і UA лишаються груповими.
+            // phone_ru_1 — site-override на domen.ua: інший номер, та сама гео.
             $this->slot(
                 key: 'phone_ru_1',
                 scopeType: 'site',
@@ -110,33 +114,39 @@ class DemoDataSeeder extends Seeder
 
             $messengerType = ValueType::where('code', 'messenger')->sole();
 
-            DataValue::create([
-                'key' => 'tg_brand',
-                'value_type_id' => $messengerType->id,
-                'scope_type' => 'group',
-                'scope_id' => $group->id,
-                'content' => [
-                    'value' => 'Написати в Telegram',
-                    'network' => 'telegram',
-                    'url' => 'https://t.me/brand',
-                    'linked_slot' => 'phone_ro_1',
-                ],
-                'status' => 'active',
-            ])->geoTags()->sync([$world->id, $ua->id]);
+            foreach ([$siteRo, $siteUa] as $site) {
+                // tg_brand — локальний месенджер, прив'язаний до phone_ro_1
+                DataValue::create([
+                    'key' => 'tg_brand',
+                    'value_type_id' => $messengerType->id,
+                    'scope_type' => 'site',
+                    'scope_id' => $site->id,
+                    'content' => [
+                        'value' => 'Написати в Telegram',
+                        'network' => 'telegram',
+                        'url' => 'https://t.me/brand',
+                        'linked_slot' => 'phone_ro_1',
+                        'exhaustion_policy' => 'hide',
+                    ],
+                    'status' => 'active',
+                ])->geoTags()->sync([$world->id]);
 
-            DataValue::create([
-                'key' => 'viber_ro_1',
-                'value_type_id' => $messengerType->id,
-                'scope_type' => 'group',
-                'scope_id' => $group->id,
-                'content' => [
-                    'value' => 'Viber підтримка',
-                    'network' => 'viber',
-                    'messenger_slot' => 'tg_brand',
-                    'exhaustion_policy' => 'hide',
-                ],
-                'status' => 'active',
-            ])->geoTags()->sync([$world->id]);
+                // viber_ro_1 — резерв месенджера tg_brand
+                DataValue::create([
+                    'key' => 'viber_ro_1',
+                    'value_type_id' => $messengerType->id,
+                    'scope_type' => 'site',
+                    'scope_id' => $site->id,
+                    'content' => [
+                        'value' => 'Viber підтримка',
+                        'network' => 'viber',
+                        'url' => 'viber://chat?number=%2B40211222333',
+                        'messenger_slot' => 'tg_brand',
+                        'exhaustion_policy' => 'hide',
+                    ],
+                    'status' => 'active',
+                ])->geoTags()->sync([$world->id]);
+            }
         });
 
         $this->command?->info('DemoDataSeeder: створено Brand A + domen.ro/domen.ua; RO/UA групові, RU перекритий на domen.ua.');
@@ -148,6 +158,16 @@ class DemoDataSeeder extends Seeder
      */
     private function slot(string $key, string $scopeType, int $scopeId, array $geoTags, array $numbers): DataValue
     {
+        $existing = DataValue::query()
+            ->where('key', $key)
+            ->where('scope_type', $scopeType)
+            ->where('scope_id', $scopeId)
+            ->first();
+
+        if ($existing) {
+            $existing->forceDelete();
+        }
+
         $value = DataValue::factory()->ofType('phone')->create([
             'key'        => $key,
             'scope_type' => $scopeType,

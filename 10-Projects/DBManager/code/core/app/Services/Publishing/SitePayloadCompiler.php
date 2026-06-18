@@ -6,6 +6,7 @@ use App\Models\DataValue;
 use App\Models\Publication;
 use App\Models\Site;
 use App\Services\Failover\SlotResolver;
+use App\Admin\SiteHierarchy;
 use Illuminate\Support\Collection;
 
 class SitePayloadCompiler
@@ -39,26 +40,24 @@ class SitePayloadCompiler
 
         return [
             'site' => $site->domain,
-            'version' => 0, // фінальне значення ставить publish()
+            'version' => 0,
             'generated_at' => now()->toIso8601String(),
             'values' => $items,
         ];
     }
 
-    /** @return Collection<string, DataValue> ключ → значення; сайт перекриває групу */
+    /** @return Collection<string, DataValue> */
     private function effectiveValues(Site $site): Collection
     {
         $with = ['type', 'geoTags', 'phoneSlot.entries.phoneNumber'];
 
-        $group = $site->site_group_id
-            ? DataValue::with($with)->where('status', 'active')
-                ->where('scope_type', 'group')->where('scope_id', $site->site_group_id)->get()
-            : collect();
-
-        $own = DataValue::with($with)->where('status', 'active')
-            ->where('scope_type', 'site')->where('scope_id', $site->id)->get();
-
-        return $group->toBase()->keyBy('key')->merge($own->toBase()->keyBy('key'));
+        return DataValue::with($with)
+            ->where('status', 'active')
+            ->where('scope_type', 'site')
+            ->where('scope_id', $site->id)
+            ->get()
+            ->keyBy('key')
+            ->toBase();
     }
 
     private function buildItem(DataValue $value, Collection $all): ?array

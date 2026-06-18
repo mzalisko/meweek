@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -30,8 +31,21 @@ class LoginForm extends Form
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only(['email', 'password']), $this->remember)) {
+        $credentials = $this->only(['email', 'password']) + ['is_active' => true];
+
+        if (! Auth::attempt($credentials, $this->remember)) {
+            $inactiveUser = User::query()
+                ->where('email', $this->email)
+                ->where('is_active', false)
+                ->first();
+
             RateLimiter::hit($this->throttleKey());
+
+            if ($inactiveUser) {
+                throw ValidationException::withMessages([
+                    'form.email' => 'Цей обліковий запис вимкнено.',
+                ]);
+            }
 
             throw ValidationException::withMessages([
                 'form.email' => trans('auth.failed'),

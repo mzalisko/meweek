@@ -16,25 +16,6 @@ class ValueEditorTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_create_group_value(): void
-    {
-        $this->actingAs(User::factory()->create());
-        $group = SiteGroup::factory()->create();
-        $site = Site::factory()->for($group, 'group')->create();
-
-        Livewire::test(ValueEditor::class)
-            ->call('createFor', $site->id)
-            ->set('type', 'messenger')->set('key', 'tg_brand')->set('value', 'https://t.me/brand')->set('network', 'telegram')->set('scope', 'group')
-            ->call('save');
-
-        $dv = DataValue::where('key', 'tg_brand')->first();
-        $this->assertNotNull($dv);
-        $this->assertSame('group', $dv->scope_type);
-        $this->assertSame($group->id, $dv->scope_id);
-        $this->assertSame('https://t.me/brand', $dv->content['value']);
-        $this->assertTrue(AuditLog::where('action', 'value.created')->exists());
-    }
-
     public function test_create_site_value(): void
     {
         $this->actingAs(User::factory()->create());
@@ -42,7 +23,7 @@ class ValueEditorTest extends TestCase
 
         Livewire::test(ValueEditor::class)
             ->call('createFor', $site->id)
-            ->set('type', 'messenger')->set('key', 'tg_site')->set('value', 'https://t.me/site')->set('network', 'telegram')->set('scope', 'site')
+            ->set('type', 'messenger')->set('key', 'tg_site')->set('value', 'https://t.me/site')->set('network', 'telegram')
             ->call('save');
 
         $dv = DataValue::where('key', 'tg_site')->first();

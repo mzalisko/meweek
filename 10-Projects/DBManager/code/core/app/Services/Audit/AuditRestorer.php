@@ -233,6 +233,16 @@ class AuditRestorer
                     }
                     break;
 
+                case 'slot.hidden':
+                case 'slot.shown':
+                    $dv = DataValue::find($log->subject_id);
+                    if ($dv && is_array($log->old) && isset($log->old['status'])) {
+                        $dv->update(['status' => $log->old['status']]);
+                        self::logRestoreAction($log, $dv);
+                        return true;
+                    }
+                    break;
+
                 case 'number.edited':
                     // subject_type = 'DataValue', subject_id = data_value_id
                     // old = ['e164' => старий, 'scope_type' => ..., 'scope_id' => ...]

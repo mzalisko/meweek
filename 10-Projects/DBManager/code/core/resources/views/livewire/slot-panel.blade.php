@@ -98,6 +98,20 @@
                 @endif
             @else
                 <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Ключ слота</div>
+                    <div class="flex items-center gap-2">
+                        <input type="text"
+                            wire:model="slotKey"
+                            placeholder="phone_ua_1"
+                            class="flex-1 min-w-0 border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
+                        <button wire:click="renameSlot"
+                            class="shrink-0 inline-flex items-center gap-1 border border-acc text-acc-tx rounded-lg px-3 py-1.5 text-[12px] font-semibold hover:bg-acc-bg whitespace-nowrap">@svg('check') перейменувати</button>
+                    </div>
+                    <p class="mt-1 text-[11px] text-mut">Латиниця, цифри, підкреслення. Перейменування оновлює перекриття сайтів і прив'язки месенджерів.</p>
+                    @error('slotKey')<p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="mt-4">
                     <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Гео-мітки</div>
                     <div class="flex flex-wrap gap-1.5">
                         @foreach($allGeoTags as $gt)
@@ -166,15 +180,7 @@
                         @endif
                     </div>
 
-                    <div class="mt-3">
-                        <span class="text-mut block mb-1">Дії слота:</span>
-                        <div class="flex gap-1.5 flex-wrap">
-                            <button wire:click="showSlot"
-                                class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ ($value->status ?? 'active') === 'active' ? 'bg-acc text-white border-acc font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">Показати слот</button>
-                            <button wire:click="hideSlot"
-                                class="rounded-lg px-2.5 py-0.5 text-[11px] border {{ ($value->status ?? 'active') === 'hidden' ? 'bg-bad-tx text-white border-bad-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-bad-tx' }}">Приховати слот</button>
-                        </div>
-                    </div>
+
                 </div>
 
                 <div class="mt-5 flex items-center gap-3">
@@ -186,4 +192,5 @@
     </aside>
     </div>
 @endif
+
 </div>

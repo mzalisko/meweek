@@ -26,7 +26,12 @@ class AccessManagerTest extends TestCase
         $this->actingAs($admin);
 
         $component = Livewire::test(AccessManager::class)
-            ->call('startCreate')
+            ->call('startCreate');
+
+        $generatedPassword = $component->get('password');
+        $this->assertNotEmpty($generatedPassword);
+
+        $component
             ->set('name', 'Менеджер RO')
             ->set('email', 'manager@example.test')
             ->set('role', 'manager')
@@ -40,7 +45,7 @@ class AccessManagerTest extends TestCase
         $plainPassword = $component->get('visiblePassword');
 
         $this->assertSame('manager', $user->role);
-        $this->assertNotEmpty($plainPassword);
+        $this->assertSame($generatedPassword, $plainPassword);
         $this->assertTrue(Hash::check($plainPassword, $user->password));
         $this->assertDatabaseHas('user_site_access', [
             'user_id' => $user->id,
@@ -50,6 +55,25 @@ class AccessManagerTest extends TestCase
             'can_delete' => true,
             'can_publish' => true,
         ]);
+    }
+
+    public function test_superadmin_can_override_generated_password_before_creating_user(): void
+    {
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin);
+
+        $component = Livewire::test(AccessManager::class)
+            ->call('startCreate')
+            ->set('name', 'Власний пароль')
+            ->set('email', 'custom-password@example.test')
+            ->set('password', 'manual-secret')
+            ->call('saveUser');
+
+        $user = User::where('email', 'custom-password@example.test')->sole();
+
+        $this->assertSame('manual-secret', $component->get('visiblePassword'));
+        $this->assertTrue(Hash::check('manual-secret', $user->password));
     }
 
     public function test_user_table_and_side_panel_render_after_actions(): void
@@ -75,7 +99,7 @@ class AccessManagerTest extends TestCase
     public function test_superadmin_resets_password_and_revokes_sessions(): void
     {
         $admin = User::factory()->create();
-        $user = User::factory()->viewer()->create();
+        $user = User::factory()->viewer()->create(['remember_token' => 'old-token']);
 
         DB::table('sessions')->insert([
             'id' => 'session-to-kill',
@@ -96,6 +120,31 @@ class AccessManagerTest extends TestCase
         $this->assertNotEmpty($plainPassword);
         $this->assertTrue(Hash::check($plainPassword, $user->fresh()->password));
         $this->assertDatabaseMissing('sessions', ['id' => 'session-to-kill']);
+        $this->assertNotSame('old-token', $user->fresh()->remember_token);
+    }
+
+    public function test_superadmin_logout_revokes_sessions_and_rotates_remember_token(): void
+    {
+        $admin = User::factory()->create();
+        $user = User::factory()->viewer()->create(['remember_token' => 'old-token']);
+
+        DB::table('sessions')->insert([
+            'id' => 'session-to-revoke',
+            'user_id' => $user->id,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Feature test',
+            'payload' => 'payload',
+            'last_activity' => now()->timestamp,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AccessManager::class)
+            ->call('logoutUser', $user->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseMissing('sessions', ['id' => 'session-to-revoke']);
+        $this->assertNotSame('old-token', $user->fresh()->remember_token);
     }
 
     public function test_group_preset_creates_single_group_rule_for_many_sites(): void
@@ -127,6 +176,53 @@ class AccessManagerTest extends TestCase
         $this->assertDatabaseCount('user_site_access', 0);
     }
 
+    public function test_permission_matrix_has_no_group_preset_buttons(): void
+    {
+        $admin = User::factory()->create();
+        $group = SiteGroup::factory()->create(['name' => 'Бренд']);
+        Site::factory()->for($group, 'group')->create(['domain' => 'live.test']);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AccessManager::class)
+            ->call('startCreate')
+            ->set('role', 'manager')
+            ->assertDontSeeHtml('applyGroupPreset') // групові пресети прибрано
+            ->assertSee('live.test')                // матриця сайтів лишилась
+            ->assertSeeHtml('sitePermissions');     // per-site чекбокси лишились
+    }
+
+    public function test_log_access_matrix_is_persisted(): void
+    {
+        $admin = User::factory()->create();
+        $site = Site::factory()->create(['domain' => 'logs.test']);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AccessManager::class)
+            ->call('startCreate')
+            ->set('name', 'Log Manager')
+            ->set('email', 'logs@example.test')
+            ->set('role', 'manager')
+            ->set('password', 'secret123')
+            ->set('canViewUserLogs', true)
+            ->set('canViewSystemLogs', true)
+            ->set("sitePermissions.{$site->id}.can_view_failover", true)
+            ->call('saveUser')
+            ->assertHasNoErrors();
+
+        $user = User::where('email', 'logs@example.test')->firstOrFail();
+
+        $this->assertTrue((bool) $user->can_view_user_logs);
+        $this->assertTrue((bool) $user->can_view_system_logs);
+        $this->assertDatabaseHas('user_site_access', [
+            'user_id' => $user->id,
+            'site_id' => $site->id,
+            'can_view' => true,
+            'can_view_failover' => true,
+        ]);
+    }
+
     public function test_superadmin_deletes_user_and_revokes_sessions(): void
     {
         $admin = User::factory()->create();
@@ -149,6 +245,24 @@ class AccessManagerTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['id' => $user->id]);
         $this->assertDatabaseMissing('sessions', ['id' => 'deleted-user-session']);
+    }
+
+    public function test_superadmin_cannot_demote_last_active_superadmin(): void
+    {
+        $admin = User::factory()->create(['role' => 'superadmin']);
+        $this->actingAs($admin);
+
+        Livewire::test(AccessManager::class)
+            ->call('toggleUserActive', User::where('email', 'admin@dbmanager.local')->value('id'))
+            ->assertSet('panelOpen', false);
+
+        Livewire::test(AccessManager::class)
+            ->call('selectUser', $admin->id)
+            ->set('role', 'viewer')
+            ->call('saveUser')
+            ->assertHasErrors(['selectedUserId']);
+
+        $this->assertSame('superadmin', $admin->fresh()->role);
     }
 
     public function test_manager_cannot_open_access_manager(): void
