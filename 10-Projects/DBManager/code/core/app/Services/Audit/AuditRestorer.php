@@ -293,7 +293,7 @@ class AuditRestorer
     /**
      * Створює запис в аудиті про факт відновлення.
      */
-    private static function logRestoreAction(AuditLog $originalLog, ?DataValue $dv = null): void
+    private static function logRestoreAction(AuditLog $originalLog, ?DataValue $dv = null, ?User $actor = null): void
     {
         $scopeType = null;
         $scopeId = null;
@@ -335,6 +335,7 @@ class AuditRestorer
 
         AuditLog::create([
             'actor_type' => 'user',
+            'actor_id'   => auth()->id(),
             'action' => 'audit.restored',
             'subject_type' => 'AuditLog',
             'subject_id' => $originalLog->id,

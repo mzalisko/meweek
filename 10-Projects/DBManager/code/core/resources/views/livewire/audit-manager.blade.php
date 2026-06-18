@@ -404,27 +404,73 @@
                         <thead>
                             <tr class="bg-[#f6f8f6] border-b border-[#dfe3e0] text-xs uppercase tracking-wider text-mut font-bold">
                                 <th class="p-3.5 w-36">Час</th>
-                                <th class="p-3.5 w-44">Користувач</th>
-                                <th class="p-3.5 w-40">Дія</th>
+                                <th class="p-3.5 w-36">Користувач</th>
+                                <th class="p-3.5 w-28">Операція</th>
+                                <th class="p-3.5 w-28">Тип</th>
+                                <th class="p-3.5 w-48">Дія</th>
                                 <th class="p-3.5">Різниця значень (Старе ➔ Нове)</th>
                                 <th class="p-3.5 w-24 text-right"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-[#edf0ed]">
                             @forelse($logs as $log)
+                                @php
+                                    // --- Бейдж операції ---
+                                    $opBadge = match(true) {
+                                        in_array($log->action, ['value.created','messenger.added','messenger.reserve_added','number.added','phone.materialized','messenger.materialized'])
+                                            => ['Додано', 'bg-ok-bg text-ok-tx border border-[#cbeed2]'],
+                                        in_array($log->action, ['value.deleted','slot.removed','messenger.removed','number.removed'])
+                                            => ['Видалено', 'bg-bad-bg text-bad-tx border border-[#f3e5e2]'],
+                                        $log->action === 'audit.restored'
+                                            => ['Відновлено', 'bg-acc-bg text-acc-tx border border-acc-bd'],
+                                        in_array($log->action, ['slot.suppressed','messenger.slot_hidden','value.frozen','phone.override_collapsed'])
+                                            => ['Приховано', 'bg-[#f4f5f3] text-mut border border-[#e3e5e1]'],
+                                        in_array($log->action, ['slot.renamed','messenger.slot_renamed'])
+                                            => ['Перейменовано', 'bg-warn-bg text-warn-tx border border-[#eed8a0]'],
+                                        default
+                                            => ['Оновлено', 'bg-warn-bg text-warn-tx border border-[#eed8a0]'],
+                                    };
+
+                                    // --- Тип даних ---
+                                    $dataType = match(true) {
+                                        str_starts_with($log->action, 'number.') || str_starts_with($log->action, 'phone.') || str_starts_with($log->action, 'slot.')
+                                            => ['📞 Телефон', 'text-[#3a7c4f]'],
+                                        str_starts_with($log->action, 'messenger.')
+                                            => ['💬 Месенджер', 'text-[#6b52c8]'],
+                                        $log->action === 'audit.restored'
+                                            => ['🔄 Аудит', 'text-acc-tx'],
+                                        str_starts_with($log->action, 'value.') => (function() use ($log) {
+                                            // Визначаємо тип з серіалізованих даних або поточного DataValue
+                                            $payload = $log->old ?? $log->new ?? [];
+                                            if (!empty($payload['phone_slot'])) return ['📞 Телефон', 'text-[#3a7c4f]'];
+                                            // Спробуємо знайти поточний DataValue
+                                            $dv = \App\Models\DataValue::with('type')->find($log->subject_id);
+                                            if ($dv?->type?->code === 'phone') return ['📞 Телефон', 'text-[#3a7c4f]'];
+                                            if ($dv?->type?->code === 'messenger') return ['💬 Месенджер', 'text-[#6b52c8]'];
+                                            if ($dv?->type?->code === 'price') return ['💰 Ціна', 'text-[#b45309]'];
+                                            return ['📝 Текст', 'text-[#555]'];
+                                        })(),
+                                        default => ['—', 'text-mut'],
+                                    };
+                                @endphp
                                 <tr class="hover:bg-[#fafbfa] transition-colors">
                                     <td class="p-3.5 text-mut whitespace-nowrap text-xs border-b border-[#edf0ed]">{{ $log->created_at->format('d.m.Y H:i:s') }}</td>
-                                    <td class="p-3.5 text-ink truncate max-w-[170px] border-b border-[#edf0ed]" title="{{ $log->actor_id ? \App\Models\User::find($log->actor_id)?->email : 'Система' }}">
+                                    <td class="p-3.5 text-ink truncate max-w-[140px] border-b border-[#edf0ed]" title="{{ $log->actor_id ? \App\Models\User::find($log->actor_id)?->email : 'Система' }}">
                                         {{ $log->actor_id ? \App\Models\User::find($log->actor_id)?->name : 'Система' }}
                                     </td>
+                                    {{-- Операція (Додано/Оновлено/Видалено...) --}}
+                                    <td class="p-3.5 border-b border-[#edf0ed] whitespace-nowrap">
+                                        <span class="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold {{ $opBadge[1] }}">
+                                            {{ $opBadge[0] }}
+                                        </span>
+                                    </td>
+                                    {{-- Тип даних --}}
+                                    <td class="p-3.5 border-b border-[#edf0ed] whitespace-nowrap">
+                                        <span class="text-xs font-semibold {{ $dataType[1] }}">{{ $dataType[0] }}</span>
+                                    </td>
+                                    {{-- Назва дії --}}
                                     <td class="p-3.5 border-b border-[#edf0ed]">
-                                        <span class="inline-block rounded-md px-2 py-0.5 text-xs font-semibold
-                                            {{ str_contains($log->action, 'create') || str_contains($log->action, 'add') ? 'bg-ok-bg text-ok-tx' : '' }}
-                                            {{ str_contains($log->action, 'delete') || str_contains($log->action, 'remove') ? 'bg-bad-bg text-bad-tx' : '' }}
-                                            {{ str_contains($log->action, 'update') || str_contains($log->action, 'change') || str_contains($log->action, 'rename') ? 'bg-warn-bg text-warn-tx' : '' }}
-                                            {{ str_contains($log->action, 'restore') ? 'bg-acc-bg text-acc-tx' : '' }}
-                                            {{ !str_contains($log->action, 'create') && !str_contains($log->action, 'delete') && !str_contains($log->action, 'remove') && !str_contains($log->action, 'update') && !str_contains($log->action, 'change') && !str_contains($log->action, 'rename') && !str_contains($log->action, 'restore') ? 'bg-[#f4f5f3] text-mut' : '' }}
-                                        ">
+                                        <span class="text-xs text-mut">
                                             {{ $actionLabels[$log->action] ?? $log->action }}
                                         </span>
                                     </td>
@@ -441,7 +487,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="p-8 text-center text-mut text-sm">Записи змін відсутні</td>
+                                    <td colspan="7" class="p-8 text-center text-mut text-sm">Записи змін відсутні</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -276,35 +276,39 @@
                                             $isInactive = $numberStatus !== 'active';
                                             $isPinned = $number['is_pinned'] ?? false;
                                         @endphp
-                                        <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}">
-                                            <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
-                                                {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
-                                            </span>
-                                            @if($isEditingNumber)
-                                                <div x-data="{ initial: '{{ addslashes($number['e164']) }}' }"
-                                                     @click.outside="
-                                                        const inp = $el.querySelector('input');
-                                                        if (inp && inp.value.trim() === initial) {
-                                                            $wire.cancelInlinePhoneEdit();
-                                                        }
-                                                     "
-                                                     class="contents"
-                                                >
+                                        @if($isEditingNumber)
+                                            <span
+                                                x-data="{ initial: '{{ addslashes($number['e164']) }}' }"
+                                                @click.outside="
+                                                    const inp = $el.querySelector('input');
+                                                    if (inp && inp.value.trim() === initial) {
+                                                        $wire.cancelInlinePhoneEdit();
+                                                    }
+                                                "
+                                                class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
+                                            >
+                                                <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
+                                                    {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
+                                                </span>
                                                 <input
                                                     wire:model.defer="editingPhoneNumber"
                                                     wire:keydown.enter="saveInlinePhoneNumber"
                                                     wire:keydown.escape="cancelInlinePhoneEdit"
                                                     type="text"
-                                                    class="w-44 max-w-full border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
+                                                    class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
                                                     aria-label="Редагувати номер"
                                                 >
-                                                <span class="ml-auto shrink-0 flex items-center gap-1">
+                                                <span class="shrink-0 flex items-center gap-1">
                                                     <button wire:click.stop="saveInlinePhoneNumber" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
                                                     <button wire:click.stop="cancelInlinePhoneEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
                                                     <button wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
                                                 </span>
-                                                </div>
-                                            @else
+                                            </span>
+                                        @else
+                                            <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}">
+                                                <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
+                                                    {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
+                                                </span>
                                                 <span class="min-w-0 truncate text-ink">{{ $number['e164'] }}</span>
                                                 <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
                                                     @if($isInactive)
@@ -325,7 +329,8 @@
                                                     <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('link')</span>
                                                     <button wire:click.stop="startInlinePhoneEdit({{ $number['entry_id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
                                                 </span>
-                                            @endif
+                                            </span>
+                                        @endif
                                         </span>
                                         @if($isEditingNumber)
                                             @error('editingPhoneNumber')
