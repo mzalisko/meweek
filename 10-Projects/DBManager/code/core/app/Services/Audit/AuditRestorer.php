@@ -36,13 +36,12 @@ class AuditRestorer
 
         if ($dv->phoneSlot) {
             $data['phone_slot'] = [
-                'return_mode' => $dv->phoneSlot->return_mode,
+                'return_mode'       => $dv->phoneSlot->return_mode,
                 'exhaustion_policy' => $dv->phoneSlot->exhaustion_policy,
-                'entries' => $dv->phoneSlot->entries->map(fn ($e) => [
+                'entries'           => $dv->phoneSlot->entries->map(fn ($e) => [
                     'priority' => (int) $e->priority,
-                    'e164' => $e->phoneNumber->e164,
-                    'status' => $e->phoneNumber->status ?? 'active',
-                    'is_pinned' => (bool) ($e->phoneNumber->is_pinned ?? false),
+                    'e164'     => $e->phoneNumber->e164,
+                    'status'   => $e->phoneNumber->status ?? 'active',
                 ])->all(),
             ];
         }
@@ -90,16 +89,13 @@ class AuditRestorer
                 foreach ($data['phone_slot']['entries'] as $eData) {
                     $pn = PhoneNumber::firstOrCreate(
                         ['e164' => $eData['e164']],
-                        [
-                            'status' => $eData['status'] ?? 'active',
-                            'is_pinned' => $eData['is_pinned'] ?? false,
-                        ]
+                        ['status' => $eData['status'] ?? 'active']
                     );
 
                     NumberEntry::create([
-                        'phone_slot_id' => $ps->id,
+                        'phone_slot_id'   => $ps->id,
                         'phone_number_id' => $pn->id,
-                        'priority' => $eData['priority'],
+                        'priority'        => $eData['priority'],
                     ]);
                 }
             }
@@ -252,7 +248,7 @@ class AuditRestorer
                         if ($entry) {
                             $oldPn = PhoneNumber::firstOrCreate(
                                 ['e164' => $oldE164],
-                                ['status' => 'active', 'is_pinned' => false]
+                                ['status' => 'active']
                             );
                             $entry->update(['phone_number_id' => $oldPn->id]);
                             self::logRestoreAction($log, $dv);
@@ -387,8 +383,16 @@ class AuditRestorer
 
         // Оновлюємо та пушимо на DataBridge
         $sites->each(function ($site) {
-            $publication = app(SitePayloadCompiler::class)->publish($site);
-            app(BridgePublisher::class)->push($publication);
+            try {
+                $publication = app(SitePayloadCompiler::class)->publish($site);
+                app(BridgePublisher::class)->push($publication);
+            } catch (\Throwable $e) {
+                // Публікація не критична — відновлення вже збережено в БД
+                \Illuminate\Support\Facades\Log::warning('publishChanges failed after restore', [
+                    'site_id' => $site->id,
+                    'error'   => $e->getMessage(),
+                ]);
+            }
         });
     }
 }
