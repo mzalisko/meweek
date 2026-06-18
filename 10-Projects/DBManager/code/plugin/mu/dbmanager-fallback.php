@@ -34,10 +34,13 @@ add_action('init', function (): void {
     }
 
     // Аварійний фолбек активний лише коли плагін видалено — гео-детект потребує класів
-    // плагіна, яких уже немає, тож показуємо значення зі скоупом «Світ» (свідома деградація).
+    // плагіна, яких уже немає, тож показуємо значення зі скоупом «Світ» (свідома деградація)
+    // або використовуємо збережену країну симуляції.
     add_shortcode($shortcode, function ($atts) {
         $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
+        $simulated = get_option('dbm_simulated_country');
+        $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
 
-        return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => 'WORLD']);
+        return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
     });
 });

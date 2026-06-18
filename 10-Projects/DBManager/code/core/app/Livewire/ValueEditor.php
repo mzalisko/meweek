@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Admin\AffectedSites;
 use App\Admin\AccessControl;
+use App\Livewire\Concerns\UsesEditLock;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
@@ -17,12 +18,15 @@ use Livewire\Component;
 
 class ValueEditor extends Component
 {
+    use UsesEditLock;
+
     public bool $open = false;
 
     #[On('close-editor-panel')]
     public function closePanel(): void
     {
         $this->open = false;
+        $this->releaseEditLock();
     }
 
     public ?int $siteId = null;
@@ -79,6 +83,7 @@ class ValueEditor extends Component
             return;
         }
 
+        $this->releaseEditLock();
         $this->siteId = $siteId;
         $this->valueId = null;
         $this->type = 'phone';
@@ -117,10 +122,16 @@ class ValueEditor extends Component
         $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
         $this->open    = true;
+
+        $this->acquireEditLock($this->editLockKey('data-value', $dv->id), $dv->key);
     }
 
     public function save(): void
     {
+        if (! $this->ensureEditLock()) {
+            return;
+        }
+
         if (! $this->canSaveCurrentTarget()) {
             return;
         }
@@ -273,12 +284,17 @@ class ValueEditor extends Component
         }
 
         $this->open = false;
+        $this->releaseEditLock();
         $this->dispatch('value-saved');
         $this->publishAffected($dv);
     }
 
     public function delete(): void
     {
+        if (! $this->ensureEditLock()) {
+            return;
+        }
+
         $dv = DataValue::findOrFail($this->valueId);
         if (! $this->canDeleteValue($dv)) {
             return;
@@ -299,6 +315,7 @@ class ValueEditor extends Component
 
         $this->valueId = null;
         $this->open    = false;
+        $this->releaseEditLock();
         $this->dispatch('value-saved');
 
         $published = 0;

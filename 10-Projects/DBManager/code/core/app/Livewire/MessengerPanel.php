@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Admin\AffectedSites;
 use App\Admin\AccessControl;
+use App\Livewire\Concerns\UsesEditLock;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
@@ -16,6 +17,8 @@ use Livewire\Component;
 
 class MessengerPanel extends Component
 {
+    use UsesEditLock;
+
     public bool $open = false;
 
     public ?int $dataValueId = null;
@@ -56,6 +59,7 @@ class MessengerPanel extends Component
         $this->geoTagIds = $primary->geoTags->pluck('id')->all();
         $this->resetValidation();
         $this->open = true;
+        $this->acquireEditLock($this->editLockKey('data-value', $primary->id), $this->messengerGroupKey($primary));
     }
 
     public function close(): void
@@ -63,6 +67,7 @@ class MessengerPanel extends Component
         $this->open = false;
         $this->newValue = '';
         $this->resetValidation();
+        $this->releaseEditLock();
     }
 
     /**
@@ -413,7 +418,8 @@ class MessengerPanel extends Component
         $access = app(AccessControl::class);
 
         return $access->canEditValue(auth()->user(), $value)
-            && $access->canPublishValue(auth()->user(), $value);
+            && $access->canPublishValue(auth()->user(), $value)
+            && $this->ensureEditLock();
     }
 
     private function messengerGroupKey(DataValue $value): string

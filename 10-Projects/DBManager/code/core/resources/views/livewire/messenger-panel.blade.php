@@ -1,7 +1,7 @@
 <div>
 @if($open && $value)
     <div class="fixed inset-0 z-40" wire:click="close">
-    <aside wire:click.stop class="fixed right-0 top-0 bottom-0 w-[420px] max-w-[calc(100vw-24px)] bg-white border-l border-[#dfe3e0] shadow-[-18px_0_40px_rgba(28,34,30,0.12)] overflow-y-auto text-[13px]">
+    <aside wire:click.stop wire:poll.15s="refreshEditLock" class="fixed right-0 top-0 bottom-0 w-[420px] max-w-[calc(100vw-24px)] bg-white border-l border-[#dfe3e0] shadow-[-18px_0_40px_rgba(28,34,30,0.12)] overflow-y-auto text-[13px]">
         <div class="p-4">
             <div class="flex justify-between items-start gap-3">
                 <div class="min-w-0">
@@ -13,6 +13,9 @@
                 <button wire:click="close" class="text-mut hover:text-ink shrink-0" aria-label="Закрити">@svg('x')</button>
             </div>
 
+            @include('livewire.partials.edit-lock-alert')
+
+            @if(!$editLockBlocked)
             @if($allHidden)
                 <div class="mt-4 rounded-[10px] border border-bad-tx/30 bg-bad-bg px-3 py-2 text-[12px]">
                     <div class="flex items-center gap-2 text-bad-tx font-medium">@svg('eye-off') Слот месенджера приховано</div>
@@ -102,6 +105,7 @@
                 <button wire:click="close" class="border border-[#dfe3e0] text-mut rounded-lg px-3 py-1.5 hover:border-acc hover:text-acc-tx">Закрити</button>
                 <span class="text-[11px] text-mut">зберігається автоматично</span>
             </div>
+            @endif
         </div>
     </aside>
     </div>

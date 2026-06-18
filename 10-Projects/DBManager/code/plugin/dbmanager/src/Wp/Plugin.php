@@ -93,6 +93,12 @@ class Plugin
             ['CF-IPCountry' => $_SERVER['HTTP_CF_IPCOUNTRY'] ?? ''],
             (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? ($_SERVER['REMOTE_ADDR'] ?? ''))
         );
+
+        $simulated = get_option('dbm_simulated_country');
+        if (! empty($simulated) && $simulated !== 'disabled') {
+            $country = strtoupper($simulated);
+        }
+
         // Доступно для прямих викликів dbm_get('key') у шаблонах (без явної країни) — #2 рев'ю.
         $GLOBALS['dbm_country'] = $country;
 
@@ -101,6 +107,19 @@ class Plugin
 
             return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
         });
+
+        // Застосовуємо шорткоди до стандартних полів WordPress
+        add_filter('the_title', 'do_shortcode');
+        add_filter('the_excerpt', 'do_shortcode');
+        add_filter('widget_text', 'do_shortcode');
+
+        // Застосовуємо шорткоди до полів ACF перед їх виведенням
+        add_filter('acf/format_value', function ($value) {
+            if (is_string($value)) {
+                return do_shortcode($value);
+            }
+            return $value;
+        }, 10, 1);
     }
 
     public function registerRest(): void

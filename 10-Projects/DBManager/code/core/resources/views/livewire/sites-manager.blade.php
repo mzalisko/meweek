@@ -14,7 +14,24 @@
     </div>
 </x-slot>
 
-<div class="relative h-full w-full p-4">
+@php
+    $siteSectionKeys = $groups->pluck('id')->map(fn ($id) => 'group-'.$id)->values();
+    if ($ungroupedSites->isNotEmpty()) {
+        $siteSectionKeys->push('ungrouped');
+    }
+@endphp
+
+<div
+    class="relative h-full w-full p-4"
+    x-data="{
+        collapsed: {},
+        sectionKeys: {{ json_encode($siteSectionKeys->all()) }},
+        isOpen(key) { return this.collapsed[key] !== true },
+        toggle(key) { this.collapsed[key] = this.isOpen(key) },
+        expandAll() { this.sectionKeys.forEach(key => this.collapsed[key] = false) },
+        collapseAll() { this.sectionKeys.forEach(key => this.collapsed[key] = true) },
+    }"
+>
     <div class="mb-3 flex items-center justify-between gap-3">
         <div>
             <h1 class="text-[18px] font-semibold text-acc-tx">Сайти і групи</h1>
@@ -38,28 +55,47 @@
         @endif
     </div>
 
-    <div class="mb-3 flex items-center gap-2 rounded-lg bg-[#eef1ee] px-3 py-2 w-[360px] max-w-full focus-within:bg-white">
-        <span class="text-mut shrink-0">@svg('search')</span>
-        <input wire:model.live.debounce.250ms="siteSearch" type="text" placeholder="Пошук групи або домену"
-            class="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder-mut border-0 shadow-none focus:ring-0 focus:outline-none">
-        @if($siteSearch !== '')
-            <button type="button" wire:click="$set('siteSearch', '')" class="text-mut hover:text-ink" aria-label="Очистити пошук">@svg('x')</button>
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex w-[360px] max-w-full items-center gap-2 rounded-lg bg-[#eef1ee] px-3 py-2 focus-within:bg-white">
+            <span class="text-mut shrink-0">@svg('search')</span>
+            <input wire:model.live.debounce.250ms="siteSearch" type="text" placeholder="Пошук групи або домену"
+                class="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder-mut border-0 shadow-none focus:ring-0 focus:outline-none">
+            @if($siteSearch !== '')
+                <button type="button" wire:click="$set('siteSearch', '')" class="text-mut hover:text-ink" aria-label="Очистити пошук">@svg('x')</button>
+            @endif
+        </div>
+
+        @if($siteSectionKeys->isNotEmpty())
+            <div class="flex shrink-0 items-center gap-1.5">
+                <button type="button" @click="expandAll()"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe3e0] text-mut hover:border-acc hover:text-acc-tx"
+                    title="Розгорнути всі" aria-label="Розгорнути всі">
+                    @svg('chevron-down')
+                </button>
+                <button type="button" @click="collapseAll()"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe3e0] text-mut hover:border-acc hover:text-acc-tx"
+                    title="Згорнути всі" aria-label="Згорнути всі">
+                    @svg('chevron-up')
+                </button>
+            </div>
         @endif
     </div>
 
     <div class="space-y-4">
         @forelse($groups as $group)
-            <div wire:key="group-{{ $group->id }}" x-data="{ open: true }" @class([
+            <div wire:key="group-{{ $group->id }}" @class([
                 'rounded-lg border bg-white',
                 'border-[#dfe3e0]' => ! $group->trashed(),
                 'border-dashed border-[#cdb9b4]' => $group->trashed(),
             ])>
                 <div class="flex items-center justify-between gap-2 border-b border-[#edf0ed] px-3 py-2">
                     <div class="flex items-center gap-2 min-w-0">
-                        <button type="button" @click="open = ! open" :aria-expanded="open"
+                        <button type="button"
+                            @click="toggle('group-{{ $group->id }}')"
+                            :aria-expanded="(isOpen('group-{{ $group->id }}') || {{ $siteSearch !== '' ? 'true' : 'false' }}).toString()"
                             aria-label="Згорнути або розгорнути групу"
                             class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-mut hover:bg-acc-bg hover:text-acc-tx">
-                            <span class="inline-flex transition-transform duration-150" :class="open ? '' : '-rotate-90'">@svg('chevron-down')</span>
+                            <span class="inline-flex transition-transform duration-150" :class="isOpen('group-{{ $group->id }}') || {{ $siteSearch !== '' ? 'true' : 'false' }} ? '' : '-rotate-90'">@svg('chevron-down')</span>
                         </button>
                         <span class="font-semibold text-ink truncate">{{ $group->name }}</span>
                         @if($group->trashed())
@@ -94,7 +130,7 @@
                     @endif
                 </div>
 
-                <div x-show="open || {{ $siteSearch !== '' ? 'true' : 'false' }}">
+                <div x-show="isOpen('group-{{ $group->id }}') || {{ $siteSearch !== '' ? 'true' : 'false' }}">
                     @forelse($group->sites as $site)
                         @include('livewire.partials.site-row', ['site' => $site, 'depth' => 0, 'canManageSites' => $canManageSites])
                         @foreach($site->children as $child)
@@ -113,8 +149,17 @@
 
         @if($ungroupedSites->isNotEmpty())
             <div class="rounded-lg border border-[#dfe3e0] bg-white">
-                <div class="border-b border-[#edf0ed] px-3 py-2 font-semibold text-ink">Без групи</div>
-                <div>
+                <button type="button"
+                    @click="toggle('ungrouped')"
+                    :aria-expanded="(isOpen('ungrouped') || {{ $siteSearch !== '' ? 'true' : 'false' }}).toString()"
+                    class="flex w-full items-center gap-2 border-b border-[#edf0ed] px-3 py-2 text-left font-semibold text-ink hover:bg-[#eef1ee]">
+                    <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-mut">
+                        <span class="inline-flex transition-transform duration-150" :class="isOpen('ungrouped') || {{ $siteSearch !== '' ? 'true' : 'false' }} ? '' : '-rotate-90'">@svg('chevron-down')</span>
+                    </span>
+                    <span>Без групи</span>
+                    <span class="text-[11px] font-normal text-mut">{{ $ungroupedSites->count() }} сайт(ів)</span>
+                </button>
+                <div x-show="isOpen('ungrouped') || {{ $siteSearch !== '' ? 'true' : 'false' }}">
                     @foreach($ungroupedSites as $site)
                         @include('livewire.partials.site-row', ['site' => $site, 'depth' => 0, 'canManageSites' => $canManageSites])
                         @foreach($site->children as $child)

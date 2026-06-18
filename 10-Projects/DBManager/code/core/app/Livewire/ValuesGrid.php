@@ -10,6 +10,7 @@ use App\Admin\SiteGridReader;
 use App\Admin\SiteHierarchy;
 use App\Admin\ValueScope;
 use App\Livewire\Concerns\HandlesScopeDecision;
+use App\Livewire\Concerns\UsesEditLock;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\NumberEntry;
@@ -27,6 +28,7 @@ use Livewire\Component;
 class ValuesGrid extends Component
 {
     use HandlesScopeDecision;
+    use UsesEditLock;
 
     public ?int $site = null;
 
@@ -132,6 +134,8 @@ class ValuesGrid extends Component
 
     public function selectBreadcrumbGroup(mixed $groupId = null): void
     {
+        $this->cancelInlineEditing();
+
         $groupId = $groupId ? (int) $groupId : null;
         $accessibleGroupIds = app(AccessControl::class)
             ->accessibleSites(auth()->user())
@@ -150,6 +154,8 @@ class ValuesGrid extends Component
 
     public function selectBreadcrumbSite(mixed $siteId = null): void
     {
+        $this->cancelInlineEditing();
+
         $siteId = $siteId ? (int) $siteId : null;
         $site = $siteId ? Site::find($siteId) : null;
 
@@ -274,6 +280,8 @@ class ValuesGrid extends Component
 
     public function openSlot(int $dataValueId): void
     {
+        $this->cancelInlineEditing();
+
         $value = $this->materializeDataValueForCurrentSite(
             DataValue::with(['type', 'geoTags', 'phoneSlot.entries.phoneNumber'])->find($dataValueId),
         );
@@ -288,6 +296,8 @@ class ValuesGrid extends Component
 
     public function openMessengerSlot(int $dataValueId): void
     {
+        $this->cancelInlineEditing();
+
         $value = $this->materializeDataValueForCurrentSite(
             DataValue::with(['type', 'geoTags'])->find($dataValueId),
         );
@@ -313,6 +323,8 @@ class ValuesGrid extends Component
 
     public function editValue(int $dataValueId): void
     {
+        $this->cancelInlineEditing();
+
         $value = $this->materializeDataValueForCurrentSite(DataValue::with(['type', 'geoTags'])->find($dataValueId));
         if (! $this->canChangeValue($value)) {
             return;
@@ -324,6 +336,8 @@ class ValuesGrid extends Component
 
     public function addValue(): void
     {
+        $this->cancelInlineEditing();
+
         if (! $this->ensureCanEditCurrentSite()) {
             return;
         }
@@ -340,6 +354,10 @@ class ValuesGrid extends Component
             return;
         }
 
+        if (! $this->acquireEditLock($this->editLockKey('number-entry', $entry->id), $entry->slot?->dataValue?->key . ' / ' . ($entry->phoneNumber?->e164 ?? 'номер'))) {
+            return;
+        }
+
         $this->editingPhoneEntryId = $entry->id;
         $this->editingPhoneNumber = $entry->phoneNumber->e164 ?? '';
     }
@@ -348,6 +366,7 @@ class ValuesGrid extends Component
     {
         $this->editingPhoneEntryId = null;
         $this->editingPhoneNumber = '';
+        $this->releaseEditLock();
     }
 
     public function startInlineMessengerEdit(int $dataValueId): void
@@ -359,6 +378,10 @@ class ValuesGrid extends Component
             return;
         }
 
+        if (! $this->acquireEditLock($this->editLockKey('data-value', $messenger->id), $messenger->key)) {
+            return;
+        }
+
         $this->editingMessengerId = $messenger->id;
         $this->editingMessengerValue = (string) ($messenger->content['value'] ?? ($messenger->content['url'] ?? ''));
     }
@@ -367,6 +390,16 @@ class ValuesGrid extends Component
     {
         $this->editingMessengerId = null;
         $this->editingMessengerValue = '';
+        $this->releaseEditLock();
+    }
+
+    private function cancelInlineEditing(): void
+    {
+        $this->editingPhoneEntryId = null;
+        $this->editingPhoneNumber = '';
+        $this->editingMessengerId = null;
+        $this->editingMessengerValue = '';
+        $this->releaseEditLock();
     }
 
     public function linkMessengerToPhone(int $dataValueId, string $phoneKey): void
@@ -456,6 +489,10 @@ class ValuesGrid extends Component
     public function saveInlineMessengerValue(): void
     {
         if ($this->editingMessengerId === null) {
+            return;
+        }
+
+        if (! $this->ensureEditLock()) {
             return;
         }
 
@@ -923,6 +960,10 @@ class ValuesGrid extends Component
         }
 
         if ($this->editingPhoneEntryId === null) {
+            return;
+        }
+
+        if (! $this->ensureEditLock()) {
             return;
         }
 

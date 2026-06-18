@@ -27,14 +27,16 @@
             <div class="min-w-0">{{ $breadcrumb ?? '' }}</div>
         </div>
         <div class="flex gap-5 items-center text-mut shrink-0">
-            <span class="hidden lg:inline-flex items-center gap-1.5">@svg('search') пошук ⌘K</span>
             <span class="relative inline-flex items-center gap-1">
                 @svg('bell')<span class="bg-[#a85c52] text-white rounded-full text-[10px] leading-none px-1.5 py-0.5">{{ $incidents ?? 0 }}</span>
             </span>
             <span class="inline-flex items-center gap-1.5 whitespace-nowrap">@svg('user') {{ auth()->user()?->name }}</span>
-            <form method="POST" action="{{ route('logout') }}">
+            <form method="POST" action="{{ route('logout') }}" onsubmit="return confirm('Вийти з DataBridge Core?')">
                 @csrf
-                <button class="underline hover:text-ink">вихід</button>
+                <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2 py-1 text-mut transition-colors hover:border-[#dfe3e0] hover:bg-[#f6f8f6] hover:text-ink" title="Вийти" aria-label="Вийти">
+                    @svg('log-out')
+                    <span>Вийти</span>
+                </button>
             </form>
         </div>
     </header>

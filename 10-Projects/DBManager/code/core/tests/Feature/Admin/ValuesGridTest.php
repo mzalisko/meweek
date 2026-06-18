@@ -30,6 +30,28 @@ class ValuesGridTest extends TestCase
             ->assertSee('1200');
     }
 
+    public function test_sections_render_in_stable_operational_order(): void
+    {
+        $site = Site::factory()->create();
+
+        DataValue::factory()->forSite($site)->ofType('price')->create([
+            'key' => 'price_basic',
+            'content' => ['prices' => [['label' => 'UA', 'value' => '1200', 'geo' => ['UA']]]],
+        ]);
+        DataValue::factory()->forSite($site)->ofType('messenger')->create([
+            'key' => 'telegram',
+            'content' => ['value' => 'https://t.me/example', 'network' => 'telegram'],
+        ]);
+        DataValue::factory()->forSite($site)->ofType('phone')->create([
+            'key' => 'phone_main',
+            'content' => [],
+        ]);
+
+        $this->get(route('admin.site', ['site' => $site->id]))
+            ->assertOk()
+            ->assertSeeInOrder(['Телефони', 'Месенджери', 'Ціни']);
+    }
+
     public function test_defaults_to_first_site_when_none_given(): void
     {
         $site = Site::factory()->create(['domain' => 'domen.ua']);

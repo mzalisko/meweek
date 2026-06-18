@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Admin\AccessControl;
 use App\Admin\PhoneNumberAssignment;
+use App\Livewire\Concerns\UsesEditLock;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
@@ -21,6 +22,8 @@ use Livewire\Component;
 
 class SlotPanel extends Component
 {
+    use UsesEditLock;
+
     public bool $open = false;
 
     public string $mode = 'settings';
@@ -44,6 +47,7 @@ class SlotPanel extends Component
     {
         $this->open = false;
         $this->cancelEdit();
+        $this->releaseEditLock();
     }
 
     #[On('open-slot')]
@@ -72,6 +76,7 @@ class SlotPanel extends Component
         $this->emergencyNumber  = $value->phoneSlot->emergency_number ?? '';
         $this->slotKey          = $value->key;
         $this->open             = true;
+        $this->acquireEditLock($this->editLockKey('data-value', $value->id), $value->key);
     }
 
     /**
@@ -243,6 +248,7 @@ class SlotPanel extends Component
         $this->open = false;
         $this->cancelEdit();
         $this->mode = 'settings';
+        $this->releaseEditLock();
     }
 
     public function saveNumber(): void
@@ -843,7 +849,8 @@ class SlotPanel extends Component
         $access = app(AccessControl::class);
 
         return $access->canEditValue(auth()->user(), $value)
-            && $access->canPublishValue(auth()->user(), $value);
+            && $access->canPublishValue(auth()->user(), $value)
+            && $this->ensureEditLock();
     }
 
     private function canDeleteCurrentValue(): bool
@@ -857,7 +864,8 @@ class SlotPanel extends Component
             return false;
         }
 
-        return app(AccessControl::class)->canDeleteValue(auth()->user(), $value);
+        return app(AccessControl::class)->canDeleteValue(auth()->user(), $value)
+            && $this->ensureEditLock();
     }
 
     public function render()

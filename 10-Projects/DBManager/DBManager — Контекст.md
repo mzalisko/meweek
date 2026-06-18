@@ -4,17 +4,18 @@ tags: [dbmanager, контекст]
 
 # DBManager — Контекст
 
-**Оновлено:** 2026-06-18
-**Стан:** Реалізовано тип даних ЦІНА з повним циклом: CRUD, грід, аудит, компіляція, render-core гео-пріоритизація, дозвіл `can_view_prices`.
+**Оновлено:** 2026-06-19
+**Стан:** Реалізовано панель геосимуляції в адмінці WP плагіна, автоматичне виконання шорткодів у ACF полях, the_title, the_excerpt та аварійному плагіні. Тести плагіна проходять на 100%.
 
 ## Ключові зміни
-- **Тип ЦІНА:** Повна реалізація — ValueEditor (додавання/видалення цін з гео-мітками), відображення в гріді, аудит-лог змін, SitePayloadCompiler (розгортання слота у кілька payload values за країнами), render-core (пріоритет точної країни → WORLD fallback).
-- **Дозвіл `can_view_prices`:** Міграція на `user_site_access` та `user_site_group_access`, моделі, AccessControl (canViewPrices, canViewGroupPrices), AccessManager (blankPermissions, permissionArray, normalizedPermissions, hasAnyPermission, permissionsForLevel), UI колонка «Ціни» в таблиці дозволів, фільтрація price-рядків у ValuesGrid, блокування збереження цін у ValueEditor.
-- **Локальні дані:** Кожен сайт зберігає та читає власні значення (`scope_type = 'site'`). Групове наслідування вилучено.
-- **Клонування при приєднанні:** Кнопка «Клонувати дані з джерела» у SitesManager.
-- **Брендинг:** DataBridge Core — логотип, назва, колір `#69bf81`.
-- **Тести:** Всі 236 тестів (706 assertions) проходять успішно.
+- **Панель геосимуляції:** Вкладка в адмінці WP-плагіна для вибору країни симуляції. Підміняє автовизначення країни за IP на рівні ядра плагіна та аварійного му-плагіна.
+- **Шорткоди в ACF та WP:** Додано фільтри для виконання шорткодів у полях ACF (`acf/format_value`), `the_title`, `the_excerpt`, `widget_text`.
+- **Тип ЦІНА:** Повна реалізація — ValueEditor, відображення в гріді, аудит-лог змін, SitePayloadCompiler, render-core (пріоритет точної країни → WORLD fallback).
+- **Дозвіл `can_view_prices`:** Міграція на `user_site_access`/`user_site_group_access`, AccessControl, AccessManager, UI колонка «Ціни», фільтрація в ValuesGrid.
+- **Локальні дані:** Кожен сайт зберігає та читає власні значення (`scope_type = 'site'`).
+- **Тести:** Всі 236 тестів Core (706 assertions) та 37 тестів плагіна проходять успішно.
 
 ## Шлях коду та запуск
 - Код: `10-Projects/DBManager/code/`
-- Запуск тестів: `docker exec -i code-core-1 php artisan test`
+- Тести Core: `docker exec -i code-core-1 php artisan test`
+- Тести плагіна: `docker compose run --rm plugin vendor/bin/phpunit`

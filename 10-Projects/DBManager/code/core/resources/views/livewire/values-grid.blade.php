@@ -105,97 +105,37 @@
     </div>
 </x-slot>
 
-<div class="flex gap-0 min-h-0" data-values-grid-root>
+<div @if($editLockResource) wire:poll.15s="refreshEditLock" @endif class="flex gap-0 min-h-0" data-values-grid-root>
 <div class="flex-1 min-w-0 p-3.5">
     {{-- Site context heading (also ensures domain is in the component's wire-snapshot for tests) --}}
     @if($siteModel)
         <div class="text-[11px] text-mut mb-2 hidden" aria-label="site-domain">{{ $siteModel->domain }}</div>
     @endif
 
-    {{-- Add value button --}}
-    @if($canEditCurrentSite)
-        <div class="flex justify-end mb-2">
-            <button wire:click="addValue"
-                class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-acc text-white hover:bg-acc/90 transition-colors">
-                + Додати значення
-            </button>
+    @if($siteModel)
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-[#dfe3e0] pb-3">
+            <div class="flex min-w-0 items-center gap-3">
+                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-acc-bd bg-acc-bg text-acc-tx">
+                    @svg('globe')
+                </span>
+                <div class="min-w-0">
+                    <div class="text-[10px] uppercase tracking-[.08em] text-mut">Поточний сайт</div>
+                    <h1 class="truncate font-mono text-[18px] font-semibold leading-6 text-ink" title="{{ $siteModel->domain }}">{{ $siteModel->domain }}</h1>
+                    @if($siteModel?->group)
+                        <div class="truncate text-[11px] text-mut">Група: {{ $siteModel->group->name }}</div>
+                    @endif
+                </div>
+            </div>
+            @if($canEditCurrentSite)
+                <button wire:click="addValue"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-acc px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-acc/90">
+                    + Додати значення
+                </button>
+            @endif
         </div>
     @endif
 
-    {{-- Filter chips (Task 5: interactive wire:model.live bindings) --}}
-    <div class="flex gap-2 items-center text-mut text-xs mb-3 flex-wrap">
-        {{-- Type filter --}}
-        <label class="border rounded-lg px-2.5 py-1 cursor-pointer flex items-center gap-1
-            {{ $type ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
-            Тип ▾
-            <select wire:model.live="type" class="opacity-0 absolute w-0 h-0 pointer-events-none" aria-label="Фільтр за типом">
-                <option value="">Усі типи</option>
-                <option value="phone">Телефони</option>
-                <option value="messenger">Месенджери</option>
-                <option value="price">Ціни</option>
-                <option value="text">Текст</option>
-            </select>
-        </label>
-        @if($type)
-            <button wire:click="$set('type', null)"
-                class="border border-acc bg-acc-bg text-acc-tx rounded-lg px-2.5 py-1 font-semibold">
-                Тип: {{ $type }} ✕
-            </button>
-        @endif
-
-        {{-- Geo filter --}}
-        <label class="border rounded-lg px-2.5 py-1 cursor-pointer flex items-center gap-1
-            {{ $geo ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
-            Гео ▾
-            <select wire:model.live="geo" class="opacity-0 absolute w-0 h-0 pointer-events-none" aria-label="Фільтр за гео">
-                <option value="">Усі регіони</option>
-                <option value="UA">UA</option>
-                <option value="RU">RU</option>
-                <option value="WORLD">WORLD</option>
-            </select>
-        </label>
-        @if($geo)
-            <button wire:click="$set('geo', null)"
-                class="border border-acc bg-acc-bg text-acc-tx rounded-lg px-2.5 py-1 font-semibold">
-                Гео: {{ $geo }} ✕
-            </button>
-        @endif
-
-        {{-- Status filter --}}
-        <label class="border rounded-lg px-2.5 py-1 cursor-pointer flex items-center gap-1
-            {{ $status ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] bg-white' }}">
-            Статус ▾
-            <select wire:model.live="status" class="opacity-0 absolute w-0 h-0 pointer-events-none" aria-label="Фільтр за статусом">
-                <option value="">Усі статуси</option>
-                <option value="ok">ok</option>
-                <option value="on_reserve">резерв</option>
-                <option value="pinned">закріплено</option>
-                <option value="exhausted">вичерпано</option>
-                <option value="hidden">приховано</option>
-            </select>
-        </label>
-        @if($status)
-            <button wire:click="$set('status', null)"
-                class="border border-acc bg-acc-bg text-acc-tx rounded-lg px-2.5 py-1 font-semibold">
-                Статус: {{ $status }} ✕
-            </button>
-        @endif
-
-        {{-- Search input --}}
-        <div class="ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 w-72 max-w-full bg-[#eef1ee] transition-colors focus-within:bg-white">
-            <span class="text-mut shrink-0">@svg('search')</span>
-            <input
-                wire:model.live.debounce.250ms="search"
-                type="text"
-                placeholder="Пошук за ключем або значенням…"
-                class="bg-transparent outline-none placeholder-mut text-xs flex-1 min-w-0 text-ink border-0 shadow-none focus:ring-0 focus:outline-none"
-                aria-label="Пошук за ключем або значенням"
-            >
-            @if($search)
-                <button type="button" wire:click="$set('search', null)" class="text-mut hover:text-ink shrink-0 leading-none" aria-label="Очистити пошук">✕</button>
-            @endif
-        </div>
-    </div>
+    @include('livewire.partials.edit-lock-alert')
 
     @if(!$siteModel)
         <div class="rounded-lg border border-dashed border-[#dfe3e0] bg-white px-4 py-8 text-center">
@@ -226,37 +166,91 @@
                 'exhausted'  => 'вичерпано',
                 'hidden'     => 'приховано',
             ];
+            $rowsCollection = collect($rows);
+            $typeOrder = ['phone', 'messenger', 'price'];
+            $orderedRows = collect($typeOrder)
+                ->filter(fn ($orderedType) => $rowsCollection->has($orderedType))
+                ->mapWithKeys(fn ($orderedType) => [$orderedType => $rowsCollection->get($orderedType)])
+                ->merge($rowsCollection->except($typeOrder));
+            $sectionTypes = $orderedRows->keys()->values()->all();
         @endphp
 
-        @foreach($rows as $type => $items)
-            <div class="mt-3 border border-[#dfe3e0] bg-white rounded-lg">
-                <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_68px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] rounded-t-lg text-[10px] uppercase tracking-wide text-mut">
-                    <div class="flex gap-1.5 items-center">
-                        @svg($typeLabels[$type][1] ?? 'tag')
-                        <span>{{ $typeLabels[$type][0] ?? $type }}</span>
-                        <span class="bg-[#eef1ee] border border-[#c8cec9] rounded-full px-2 py-0.5 text-[10px] leading-none">{{ count($items) }}</span>
-                    </div>
-                    <div>Гео</div>
-                    <div>Стан</div>
-                    <div>Значення / резерви</div>
-                    <div>Область</div>
-                    <div></div>
-                </div>
+        <div
+            x-data="{
+                collapsed: {},
+                sectionTypes: {{ json_encode($sectionTypes) }},
+                isCollapsed(type) { return this.collapsed[type] === true },
+                toggle(type) { this.collapsed[type] = !this.isCollapsed(type) },
+                expandAll() { this.sectionTypes.forEach(type => this.collapsed[type] = false) },
+                collapseAll() { this.sectionTypes.forEach(type => this.collapsed[type] = true) },
+            }"
+            class="space-y-3"
+        >
+            <div class="flex justify-end gap-1.5">
+                <button type="button" @click="expandAll()"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe3e0] text-mut hover:border-acc hover:text-acc-tx"
+                    title="Розгорнути всі" aria-label="Розгорнути всі">
+                    @svg('chevron-down')
+                </button>
+                <button type="button" @click="collapseAll()"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe3e0] text-mut hover:border-acc hover:text-acc-tx"
+                    title="Згорнути всі" aria-label="Згорнути всі">
+                    @svg('chevron-up')
+                </button>
+            </div>
 
-                @foreach($items as $r)
+            @foreach($orderedRows as $type => $items)
+                <div class="border border-[#dfe3e0] bg-white rounded-lg">
+                    <button type="button"
+                        @click="toggle('{{ $type }}')"
+                        :aria-expanded="(!isCollapsed('{{ $type }}')).toString()"
+                        class="grid w-full grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(320px,2fr)_68px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-[#dfe3e0] rounded-t-lg text-left text-[10px] uppercase tracking-wide text-mut hover:bg-[#eef1ee] transition-colors"
+                        :class="isCollapsed('{{ $type }}') ? 'rounded-b-lg border-b-0' : 'border-b'">
+                        <div class="flex gap-1.5 items-center min-w-0">
+                            <span class="inline-flex transition-transform duration-150" :class="isCollapsed('{{ $type }}') ? '-rotate-90' : ''">@svg('chevron-down')</span>
+                            @svg($typeLabels[$type][1] ?? 'tag')
+                            <span class="truncate">{{ $typeLabels[$type][0] ?? $type }}</span>
+                            <span class="bg-[#eef1ee] border border-[#c8cec9] rounded-full px-2 py-0.5 text-[10px] leading-none">{{ count($items) }}</span>
+                        </div>
+                        <div>Гео</div>
+                        <div>Стан</div>
+                        <div>Значення / резерви</div>
+                        <div></div>
+                    </button>
+
+                    <div x-show="!isCollapsed('{{ $type }}')">
+                    @foreach($items as $r)
                     @php
                         $st = $stateMap[$r['state']] ?? 'ok';
                     @endphp
-                    <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_68px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
+                    <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(320px,2fr)_68px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
                         {{-- Key --}}
                         <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate inline-block w-fit mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
 
                         {{-- Geo --}}
-                        <span class="min-w-0 flex flex-wrap gap-1 text-mut text-[11px] pt-1" title="{{ implode(', ', $r['geo']) }}">
-                            @foreach($r['geo'] as $geo)
-                                <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none">{{ $geo }}</span>
-                            @endforeach
-                        </span>
+                        @if($type === 'price' && !empty($r['prices']))
+                            <span class="min-w-0 flex flex-col gap-1 text-mut text-[11px]">
+                                @foreach($r['prices'] as $price)
+                                    @php
+                                        $priceGeo = $price['geo'] ?? ['WORLD'];
+                                        if (empty($priceGeo)) {
+                                            $priceGeo = ['WORLD'];
+                                        }
+                                    @endphp
+                                    <span class="flex min-h-[28px] min-w-0 flex-wrap items-center gap-1 px-2 py-1" title="{{ implode(', ', $priceGeo) }}">
+                                        @foreach($priceGeo as $geo)
+                                            <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none">{{ $geo }}</span>
+                                        @endforeach
+                                    </span>
+                                @endforeach
+                            </span>
+                        @else
+                            <span class="min-w-0 flex flex-wrap gap-1 text-mut text-[11px] pt-1" title="{{ implode(', ', $r['geo']) }}">
+                                @foreach($r['geo'] as $geo)
+                                    <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none">{{ $geo }}</span>
+                                @endforeach
+                            </span>
+                        @endif
 
                         {{-- Status badge --}}
                         <span class="min-w-0">
@@ -462,16 +456,11 @@
                                     @elseif($type === 'price' && !empty($r['prices']))
                                         <span class="flex flex-col gap-1 min-w-0">
                                             @foreach($r['prices'] as $index => $price)
-                                                <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 bg-[#f7f8f7]">
+                                                <span class="flex min-h-[28px] items-start gap-2 min-w-0 rounded-md px-2 py-1 bg-[#f7f8f7]">
                                                     <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide text-mut font-medium">
                                                         {{ $price['label'] ?: ('Ціна ' . ($index + 1)) }}
                                                     </span>
                                                     <span class="min-w-0 truncate text-ink font-semibold">{{ $price['value'] }}</span>
-                                                    <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
-                                                        @foreach($price['geo'] ?? [] as $g)
-                                                            <span class="inline-flex rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut font-semibold leading-none">{{ $g }}</span>
-                                                        @endforeach
-                                                    </span>
                                                 </span>
                                             @endforeach
                                         </span>
@@ -568,18 +557,6 @@
                             @endif
                         </span>
 
-                        {{-- Scope badge --}}
-                        <span class="min-w-0 pt-1">
-                            @php($source = $r['source'] ?? ($r['scope'] === 'site' ? 'current_site' : 'group'))
-                            @if($source === 'current_site')
-                                <span class="inline-block bg-[#eef1ee] border border-dashed border-[#aeb6b0] rounded-md px-2 py-0.5 text-[11px] text-[#5a625d] whitespace-nowrap">цього сайту</span>
-                            @elseif($source === 'parent_site')
-                                <span class="inline-block bg-acc-bg border border-acc-bd rounded-md px-2 py-0.5 text-[11px] text-acc-tx whitespace-nowrap">сайт-джерело</span>
-                            @else
-                                <span class="inline-block rounded-md bg-[#f4f5f3] px-2 py-0.5 text-[11px] text-mut whitespace-nowrap">група</span>
-                            @endif
-                        </span>
-
                         {{-- Details --}}
                         <span class="inline-flex items-center justify-end gap-1.5 pt-1">
                             @if(isset($r['id']))
@@ -603,9 +580,11 @@
                             @endif
                         </span>
                     </div>
-                @endforeach
-            </div>
-        @endforeach
+                    @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </div>
     @endif
 </div>
 <livewire:slot-panel />

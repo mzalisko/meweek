@@ -1,14 +1,17 @@
 <div>
 @if($open)
-<aside class="fixed top-0 right-0 bottom-0 z-40 w-[420px] bg-white border-l border-[#e3e5e1] shadow-xl overflow-y-auto text-[13px]">
+<aside wire:poll.15s="refreshEditLock" class="fixed top-0 right-0 bottom-0 z-40 w-[420px] bg-white border-l border-[#e3e5e1] shadow-xl overflow-y-auto text-[13px]">
 <div class="p-4">
 
     {{-- Header --}}
     <div class="flex justify-between items-center mb-4">
         <b class="text-acc-tx text-[15px] flex items-center gap-1.5">@svg('edit') {{ $valueId ? 'Редагувати значення' : 'Додати значення' }}</b>
-        <button wire:click="$set('open', false)" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
+        <button wire:click="closePanel" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
     </div>
 
+    @include('livewire.partials.edit-lock-alert')
+
+    @if(!$editLockBlocked)
     {{-- Type --}}
     <div class="mb-3">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Тип</label>
@@ -81,10 +84,12 @@
                         <span class="block text-mut text-[10px] uppercase mb-1">Гео-видимість</span>
                         <div class="flex flex-wrap gap-1.5">
                             @foreach($allGeoTags as $gt)
-                                <label class="flex items-center gap-1 cursor-pointer border rounded-md px-1.5 py-0.5 text-[10px] transition-colors
-                                    {{ in_array($gt->code, $prices[$index]['geo'] ?? []) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut' }}">
-                                    <input type="checkbox" wire:model="prices.{{ $index }}.geo" value="{{ $gt->code }}" class="sr-only">
-                                    {{ $gt->code }}
+                                <label class="cursor-pointer" wire:key="price-{{ $index }}-geo-{{ $gt->code }}">
+                                    <input type="checkbox" wire:model="prices.{{ $index }}.geo" value="{{ $gt->code }}" class="peer sr-only">
+                                    <span class="inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[10px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-acc/30 peer-checked:border-acc peer-checked:bg-acc-bg peer-checked:text-acc-tx peer-checked:font-semibold
+                                        {{ in_array($gt->code, $prices[$index]['geo'] ?? []) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
+                                        {{ $gt->code }}
+                                    </span>
                                 </label>
                             @endforeach
                         </div>
@@ -135,10 +140,11 @@
         <span></span>
         @endif
         <div class="flex gap-2">
-            <button wire:click="$set('open', false)" type="button" class="px-4 py-1.5 rounded-lg border border-[#dfe3e0] text-mut hover:bg-[#f5f5f3]">Скасувати</button>
+            <button wire:click="closePanel" type="button" class="px-4 py-1.5 rounded-lg border border-[#dfe3e0] text-mut hover:bg-[#f5f5f3]">Скасувати</button>
             <button wire:click="save" type="button" class="px-4 py-1.5 rounded-lg bg-acc text-white font-semibold hover:opacity-90">Зберегти</button>
         </div>
     </div>
+    @endif
 
 </div>
 </aside>

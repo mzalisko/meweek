@@ -267,9 +267,9 @@ class SitesManagerTest extends TestCase
         Site::factory()->for($group, 'group')->create(['domain' => 'live.test']);
 
         Livewire::test(SitesManager::class)
-            ->assertSeeHtml('x-data="{ open: true }"') // обгортка-акордеон
-            ->assertSeeHtml('@click="open = ! open"')   // кнопка-перемикач
-            ->assertSeeHtml('x-show="open')             // тіло групи згортається
+            ->assertSeeHtml('sectionKeys') // обгортка-акордеон
+            ->assertSeeHtml("@click=\"toggle('group-{$group->id}')\"")   // кнопка-перемикач
+            ->assertSeeHtml("x-show=\"isOpen('group-{$group->id}')")             // тіло групи згортається
             ->assertSee('live.test');                   // сайт лишається в DOM
     }
 }
