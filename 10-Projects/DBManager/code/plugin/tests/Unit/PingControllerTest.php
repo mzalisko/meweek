@@ -4,33 +4,31 @@ namespace DBM\Tests\Unit;
 
 use DBM\Rest\PingController;
 use DBM\Sync\PayloadVerifier;
+use DBM\Tests\Support\InMemoryCacheStore;
 use PHPUnit\Framework\TestCase;
 
 class PingControllerTest extends TestCase
 {
-    public function test_valid_ping_triggers_sync(): void
+    public function test_valid_payload_updates_cache(): void
     {
-        $body = json_encode(['domain' => 'd.ua', 'version' => 6]);
-        $sig = hash_hmac('sha256', $body, 'ping-secret');
-        $synced = false;
+        $payload = ['version' => 6, 'values' => []];
+        $body = json_encode($payload);
+        $sig = hash_hmac('sha256', $body, 'signing-secret');
+        $cache = new InMemoryCacheStore();
 
-        $controller = new PingController(new PayloadVerifier(), 'ping-secret', function () use (&$synced) {
-            $synced = true;
-        });
+        $controller = new PingController(new PayloadVerifier(), $cache, 'signing-secret');
         $status = $controller->handle($body, $sig);
 
-        $this->assertSame(202, $status);
-        $this->assertTrue($synced);
+        $this->assertSame(200, $status);
+        $this->assertSame(6, $cache->version());
     }
 
-    public function test_invalid_signature_is_rejected_without_sync(): void
+    public function test_invalid_signature_is_rejected_without_cache_update(): void
     {
-        $synced = false;
-        $controller = new PingController(new PayloadVerifier(), 'ping-secret', function () use (&$synced) {
-            $synced = true;
-        });
+        $cache = new InMemoryCacheStore();
+        $controller = new PingController(new PayloadVerifier(), $cache, 'signing-secret');
 
-        $this->assertSame(401, $controller->handle('{"domain":"d.ua","version":6}', 'wrong'));
-        $this->assertFalse($synced);
+        $this->assertSame(401, $controller->handle('{"version":6,"values":[]}', 'wrong'));
+        $this->assertSame(0, $cache->version());
     }
 }

@@ -2,6 +2,7 @@
 
 namespace DBM\Wp;
 
+use DBM\Cache\WpOptionCacheStore;
 use DBM\Config\Settings;
 use DBM\Rest\PingController;
 use DBM\Sync\PayloadVerifier;
@@ -9,8 +10,7 @@ use DBM\Sync\PayloadVerifier;
 class RestController
 {
     public function __construct(
-        private Settings $settings,
-        private \Closure $syncCallback
+        private Settings $settings
     ) {}
 
     public function register(): void
@@ -20,7 +20,11 @@ class RestController
 
     public function registerRoutes(): void
     {
-        $controller = new PingController(new PayloadVerifier(), $this->settings->pingSecret, $this->syncCallback);
+        $controller = new PingController(
+            new PayloadVerifier(),
+            new WpOptionCacheStore(),
+            $this->settings->signingSecret
+        );
 
         register_rest_route('dbm/v1', '/ping', [
             'methods' => 'POST',

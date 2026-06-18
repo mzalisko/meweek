@@ -12,14 +12,18 @@ class SettingsTest extends TestCase
         $s = Settings::fromArray([]);
         $this->assertSame('dbm', $s->shortcode);
         $this->assertSame('', $s->cssClass);
-        $this->assertSame('', $s->bridgeUrl);
+        $this->assertSame('', $s->signingSecret);
     }
 
     public function test_from_array_reads_values(): void
     {
-        $s = Settings::fromArray(['bridge_url' => 'https://b', 'site_token' => 't',
-            'shortcode' => 'phone', 'css_class' => 'c']);
-        $this->assertSame('https://b', $s->bridgeUrl);
+        $s = Settings::fromArray([
+            'signing_secret' => 'secret-token',
+            'shortcode' => 'phone',
+            'css_class' => 'c'
+        ]);
+        $this->assertSame('secret-token', $s->signingSecret);
         $this->assertSame('phone', $s->shortcode);
+        $this->assertSame('c', $s->cssClass);
     }
 }

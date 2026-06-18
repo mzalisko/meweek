@@ -2,26 +2,31 @@
 
 namespace DBM\Rest;
 
+use DBM\Cache\CacheStore;
 use DBM\Sync\PayloadVerifier;
 
 class PingController
 {
-    /** @param callable $onValid викликається при валідному пінгу (запускає синхронізацію) */
     public function __construct(
         private PayloadVerifier $verifier,
-        private string $pingSecret,
-        private $onValid,
+        private CacheStore $cache,
+        private string $signingSecret,
     ) {}
 
-    /** Повертає HTTP-статус: 202 прийнято, 401 битий підпис. */
+    /** Повертає HTTP-статус: 200 успішно оновлено, 400 пошкоджений payload, 401 невірний підпис. */
     public function handle(string $rawBody, string $signature): int
     {
-        if (! $this->verifier->verify($rawBody, $signature, $this->pingSecret)) {
+        if (! $this->verifier->verify($rawBody, $signature, $this->signingSecret)) {
             return 401;
         }
 
-        ($this->onValid)();
+        $payload = json_decode($rawBody, true);
+        if (! is_array($payload) || ! isset($payload['version'])) {
+            return 400;
+        }
 
-        return 202;
+        $this->cache->put($payload);
+
+        return 200;
     }
 }

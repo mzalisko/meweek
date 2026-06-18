@@ -72,10 +72,7 @@ class AdminPages
             $val = esc_attr((string) ($o[$key] ?? ''));
             echo '<p><label>' . esc_html($label) . '<br><input type="text" name="dbm_settings[' . $key . ']" value="' . $val . '" size="60"></label></p>';
         };
-        $field('bridge_url', 'URL DataBridge');
-        $field('site_token', 'Токен сайта');
-        $field('signing_secret', 'Секрет подписи данных');
-        $field('ping_secret', 'Секрет пинга');
+        $field('signing_secret', 'Токен / Секрет подписи данных');
         $field('shortcode', 'Название шорткода (нейтральное)');
         $field('css_class', 'CSS-класс вывода');
         submit_button();
