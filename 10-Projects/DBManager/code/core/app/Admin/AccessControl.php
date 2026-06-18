@@ -80,6 +80,31 @@ class AccessControl
         return $this->canForGroup($user, $group, 'can_view_failover');
     }
 
+    public function canViewPrices(?User $user, Site|int|null $site = null): bool
+    {
+        if (! $this->isActiveKnownRole($user)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        if ($site !== null) {
+            return $this->canForSite($user, $site, 'can_view_prices');
+        }
+
+        $hasSitePrices = $user->siteAccess()->where('can_view_prices', true)->exists();
+        $hasGroupPrices = $user->siteGroupAccess()->where('can_view_prices', true)->exists();
+
+        return $hasSitePrices || $hasGroupPrices;
+    }
+
+    public function canViewGroupPrices(?User $user, SiteGroup|int|null $group): bool
+    {
+        return $this->canForGroup($user, $group, 'can_view_prices');
+    }
+
     public function canViewUserLogs(?User $user): bool
     {
         if (! $this->isActiveKnownRole($user)) {

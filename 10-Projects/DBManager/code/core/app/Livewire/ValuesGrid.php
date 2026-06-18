@@ -1140,6 +1140,12 @@ class ValuesGrid extends Component
         }
 
         $rows = $siteModel ? app(SiteGridReader::class)->forSite($siteModel) : [];
+
+        // Приховати цінові слоти, якщо користувач не має дозволу can_view_prices
+        if (! app(AccessControl::class)->canViewPrices(auth()->user(), $siteModel)) {
+            unset($rows['price']);
+        }
+
         $phoneKeys = collect($rows['phone'] ?? [])->pluck('key')->values()->all();
         $rows = $this->applyFilters($rows);
 

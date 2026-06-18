@@ -125,6 +125,11 @@ class ValueEditor extends Component
             return;
         }
 
+        // Для цін потрібен окремий дозвіл can_view_prices
+        if ($this->type === 'price' && ! app(AccessControl::class)->canViewPrices(auth()->user(), $this->siteId)) {
+            return;
+        }
+
         $rules = [
             'key'   => ['required', 'regex:/^[a-z0-9_]+$/'],
             'type'  => ['required', $this->valueId ? 'in:text,price,messenger,address,social,phone' : 'in:phone,messenger,price'],

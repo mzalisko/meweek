@@ -216,7 +216,7 @@
                 </section>
 
                 @php
-                    $permissionGridStyle = 'min-width: 780px; grid-template-columns: minmax(190px, 1fr) repeat(6, 80px);';
+                    $permissionGridStyle = 'min-width: 860px; grid-template-columns: minmax(190px, 1fr) repeat(7, 80px);';
                 @endphp
 
                 <section class="mt-4 rounded-lg border border-[#dfe3e0]">
@@ -284,7 +284,7 @@
                     <div class="max-h-[520px] overflow-y-auto p-3 space-y-3">
                         @foreach($groups as $group)
                             @php
-                                $gp = $groupPermissions[$group->id] ?? ['can_view' => false, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false];
+                                $gp = $groupPermissions[$group->id] ?? ['can_view' => false, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false, 'can_view_prices' => false];
                                 $groupLevel = $gp['can_publish'] ? 'publish' : ($gp['can_delete'] ? 'delete' : ($gp['can_edit'] ? 'edit' : ($gp['can_view'] ? 'view' : 'none')));
                                 $groupLevelLabels = ['none' => 'немає', 'view' => 'перегляд', 'edit' => 'редагування', 'delete' => 'видалення', 'publish' => 'повний'];
                             @endphp
@@ -307,6 +307,7 @@
                                     <div class="text-center whitespace-nowrap">Публ.</div>
                                     <div class="text-center whitespace-nowrap">Історія</div>
                                     <div class="text-center whitespace-nowrap">Failover</div>
+                                    <div class="text-center whitespace-nowrap">Ціни</div>
                                 </div>
 
                                 {{-- Рядок для налаштування всієї групи --}}
@@ -315,7 +316,7 @@
                                         <div class="font-bold text-acc-tx truncate">Уся група: {{ $group->name }}</div>
                                         <div class="text-[10px] text-mut truncate">Налаштування для всієї групи</div>
                                     </div>
-                                    @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover'] as $permission)
+                                    @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover', 'can_view_prices'] as $permission)
                                         <label class="flex justify-center">
                                             <input wire:model="groupPermissions.{{ $group->id }}.{{ $permission }}" type="checkbox" @disabled($role === 'superadmin') class="h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
                                         </label>
@@ -328,7 +329,7 @@
                                             <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }}</div>
                                             <div class="text-[10px] text-mut truncate">{{ $site->name }}</div>
                                         </div>
-                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover'] as $permission)
+                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover', 'can_view_prices'] as $permission)
                                             <label class="flex justify-center">
                                                 <input wire:model="sitePermissions.{{ $site->id }}.{{ $permission }}" type="checkbox" @disabled($role === 'superadmin') class="h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
                                             </label>
@@ -349,6 +350,7 @@
                                     <div class="text-center whitespace-nowrap">Публ.</div>
                                     <div class="text-center whitespace-nowrap">Історія</div>
                                     <div class="text-center whitespace-nowrap">Failover</div>
+                                    <div class="text-center whitespace-nowrap">Ціни</div>
                                 </div>
                                 @foreach($ungroupedSites as $site)
                                     <div class="grid gap-2 items-center border-t border-[#edf0ed] px-3 py-2" style="{{ $permissionGridStyle }}">
@@ -356,7 +358,7 @@
                                             <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }}</div>
                                             <div class="text-[10px] text-mut truncate">{{ $site->name }}</div>
                                         </div>
-                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover'] as $permission)
+                                        @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover', 'can_view_prices'] as $permission)
                                             <label class="flex justify-center">
                                                 <input wire:model="sitePermissions.{{ $site->id }}.{{ $permission }}" type="checkbox" @disabled($role === 'superadmin') class="h-4 w-4 rounded border-[#c8cec9] text-acc accent-acc focus:ring-acc focus:ring-offset-0 disabled:opacity-40">
                                             </label>

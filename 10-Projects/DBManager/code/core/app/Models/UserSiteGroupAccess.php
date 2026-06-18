@@ -18,6 +18,7 @@ class UserSiteGroupAccess extends Model
         'can_publish' => 'boolean',
         'can_view_history' => 'boolean',
         'can_view_failover' => 'boolean',
+        'can_view_prices' => 'boolean',
     ];
 
     public function user(): BelongsTo

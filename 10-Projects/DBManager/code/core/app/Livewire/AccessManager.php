@@ -533,6 +533,7 @@ class AccessManager extends Component
             'can_publish' => false,
             'can_view_history' => false,
             'can_view_failover' => false,
+            'can_view_prices' => false,
         ];
     }
 
@@ -545,6 +546,7 @@ class AccessManager extends Component
             'can_publish' => (bool) $access->can_publish,
             'can_view_history' => (bool) ($access->can_view_history ?? false),
             'can_view_failover' => (bool) ($access->can_view_failover ?? false),
+            'can_view_prices' => (bool) ($access->can_view_prices ?? false),
         ];
     }
 
@@ -555,29 +557,31 @@ class AccessManager extends Component
         $canEdit = (bool) ($permissions['can_edit'] ?? false) || $canPublish;
         $canViewHistory = (bool) ($permissions['can_view_history'] ?? false);
         $canViewFailover = (bool) ($permissions['can_view_failover'] ?? false);
+        $canViewPrices = (bool) ($permissions['can_view_prices'] ?? false);
 
         return [
-            'can_view' => (bool) ($permissions['can_view'] ?? false) || $canEdit || $canDelete || $canViewHistory || $canViewFailover,
+            'can_view' => (bool) ($permissions['can_view'] ?? false) || $canEdit || $canDelete || $canViewHistory || $canViewFailover || $canViewPrices,
             'can_edit' => $canEdit,
             'can_delete' => $canDelete,
             'can_publish' => $canPublish,
             'can_view_history' => $canViewHistory,
             'can_view_failover' => $canViewFailover,
+            'can_view_prices' => $canViewPrices,
         ];
     }
 
     private function hasAnyPermission(array $permissions): bool
     {
-        return $permissions['can_view'] || $permissions['can_edit'] || $permissions['can_delete'] || $permissions['can_publish'] || $permissions['can_view_history'] || $permissions['can_view_failover'];
+        return $permissions['can_view'] || $permissions['can_edit'] || $permissions['can_delete'] || $permissions['can_publish'] || $permissions['can_view_history'] || $permissions['can_view_failover'] || $permissions['can_view_prices'];
     }
 
     private function permissionsForLevel(string $level): array
     {
         return match ($level) {
-            'view' => ['can_view' => true, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false],
-            'edit' => ['can_view' => true, 'can_edit' => true, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false],
-            'delete' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false],
-            'publish' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => true, 'can_view_history' => false, 'can_view_failover' => false],
+            'view' => ['can_view' => true, 'can_edit' => false, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false, 'can_view_prices' => false],
+            'edit' => ['can_view' => true, 'can_edit' => true, 'can_delete' => false, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false, 'can_view_prices' => false],
+            'delete' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => false, 'can_view_history' => false, 'can_view_failover' => false, 'can_view_prices' => false],
+            'publish' => ['can_view' => true, 'can_edit' => true, 'can_delete' => true, 'can_publish' => true, 'can_view_history' => false, 'can_view_failover' => false, 'can_view_prices' => false],
             default => $this->blankPermissions(),
         };
     }
