@@ -331,7 +331,6 @@
                                                 </span>
                                             </span>
                                         @endif
-                                        </span>
                                         @if($isEditingNumber)
                                             @error('editingPhoneNumber')
                                                 <span class="ml-[5.5rem] text-[11px] text-bad-tx">{{ $message }}</span>

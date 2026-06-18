@@ -434,23 +434,21 @@
                                     // --- Тип даних ---
                                     $dataType = match(true) {
                                         str_starts_with($log->action, 'number.') || str_starts_with($log->action, 'phone.') || str_starts_with($log->action, 'slot.')
-                                            => ['📞 Телефон', 'text-[#3a7c4f]'],
+                                            => ['phone', 'Телефон', 'text-[#3a7c4f]'],
                                         str_starts_with($log->action, 'messenger.')
-                                            => ['💬 Месенджер', 'text-[#6b52c8]'],
+                                            => ['msg', 'Месенджер', 'text-[#6b52c8]'],
                                         $log->action === 'audit.restored'
-                                            => ['🔄 Аудит', 'text-acc-tx'],
+                                            => ['refresh', 'Аудит', 'text-acc-tx'],
                                         str_starts_with($log->action, 'value.') => (function() use ($log) {
-                                            // Визначаємо тип з серіалізованих даних або поточного DataValue
                                             $payload = $log->old ?? $log->new ?? [];
-                                            if (!empty($payload['phone_slot'])) return ['📞 Телефон', 'text-[#3a7c4f]'];
-                                            // Спробуємо знайти поточний DataValue
+                                            if (!empty($payload['phone_slot'])) return ['phone', 'Телефон', 'text-[#3a7c4f]'];
                                             $dv = \App\Models\DataValue::with('type')->find($log->subject_id);
-                                            if ($dv?->type?->code === 'phone') return ['📞 Телефон', 'text-[#3a7c4f]'];
-                                            if ($dv?->type?->code === 'messenger') return ['💬 Месенджер', 'text-[#6b52c8]'];
-                                            if ($dv?->type?->code === 'price') return ['💰 Ціна', 'text-[#b45309]'];
-                                            return ['📝 Текст', 'text-[#555]'];
+                                            if ($dv?->type?->code === 'phone')     return ['phone',   'Телефон',   'text-[#3a7c4f]'];
+                                            if ($dv?->type?->code === 'messenger') return ['msg',     'Месенджер', 'text-[#6b52c8]'];
+                                            if ($dv?->type?->code === 'price')     return ['dollar',  'Ціна',      'text-[#b45309]'];
+                                            return ['text', 'Текст', 'text-[#555]'];
                                         })(),
-                                        default => ['—', 'text-mut'],
+                                        default => [null, '—', 'text-mut'],
                                     };
                                 @endphp
                                 <tr class="hover:bg-[#fafbfa] transition-colors">
@@ -466,7 +464,12 @@
                                     </td>
                                     {{-- Тип даних --}}
                                     <td class="p-3.5 border-b border-[#edf0ed] whitespace-nowrap">
-                                        <span class="text-xs font-semibold {{ $dataType[1] }}">{{ $dataType[0] }}</span>
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $dataType[2] }}">
+                                            @if($dataType[0])
+                                                @svg($dataType[0], '14')
+                                            @endif
+                                            {{ $dataType[1] }}
+                                        </span>
                                     </td>
                                     {{-- Назва дії --}}
                                     <td class="p-3.5 border-b border-[#edf0ed]">
