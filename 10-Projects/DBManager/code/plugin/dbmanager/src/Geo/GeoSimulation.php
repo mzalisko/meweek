@@ -29,7 +29,7 @@ class GeoSimulation
     /** @return string[] */
     public function getAvailableCountries(array $cache): array
     {
-        $countries = ['WORLD'];
+        $countries = ['WORLD', 'UA', 'RO', 'RU', 'BY', 'KZ', 'PL'];
         foreach ($cache['values'] ?? [] as $v) {
             if (! empty($v['geos']) && is_array($v['geos'])) {
                 foreach ($v['geos'] as $g) {
