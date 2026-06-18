@@ -1116,8 +1116,40 @@ class ValuesGrid extends Component
         $filtered = [];
         foreach ($rows as $type => $items) {
             $kept = array_filter($items, function (array $row) use ($search, $geo, $status): bool {
-                if ($search !== null && !str_contains(mb_strtolower($row['key']), $search)) {
-                    return false;
+                if ($search !== null) {
+                    $haystack = mb_strtolower($row['key']);
+
+                    // Текст/ціна: content['value']
+                    if (isset($row['value']) && $row['value'] !== null) {
+                        $haystack .= ' ' . mb_strtolower((string) $row['value']);
+                    }
+
+                    // URL
+                    if (!empty($row['url'])) {
+                        $haystack .= ' ' . mb_strtolower($row['url']);
+                    }
+
+                    // Номери телефонів (e164)
+                    if (!empty($row['numbers'])) {
+                        foreach ($row['numbers'] as $num) {
+                            if (!empty($num['e164'])) {
+                                $haystack .= ' ' . mb_strtolower($num['e164']);
+                            }
+                        }
+                    }
+
+                    // Месенджери (value)
+                    if (!empty($row['messengers'])) {
+                        foreach ($row['messengers'] as $msg) {
+                            if (!empty($msg['value'])) {
+                                $haystack .= ' ' . mb_strtolower($msg['value']);
+                            }
+                        }
+                    }
+
+                    if (!str_contains($haystack, $search)) {
+                        return false;
+                    }
                 }
                 if ($geo !== null && !in_array($geo, $row['geo'], true)) {
                     return false;

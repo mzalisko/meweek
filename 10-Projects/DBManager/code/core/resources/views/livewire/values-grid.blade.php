@@ -181,15 +181,15 @@
             </button>
         @endif
 
-        {{-- Search input — просторе поле без бордера й оутлайна (навіть у фокусі) --}}
+        {{-- Search input --}}
         <div class="ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 w-72 max-w-full bg-[#eef1ee] transition-colors focus-within:bg-white">
             <span class="text-mut shrink-0">@svg('search')</span>
             <input
                 wire:model.live.debounce.250ms="search"
                 type="text"
-                placeholder="Пошук за ключем…"
+                placeholder="Пошук за ключем або значенням…"
                 class="bg-transparent outline-none placeholder-mut text-xs flex-1 min-w-0 text-ink border-0 shadow-none focus:ring-0 focus:outline-none"
-                aria-label="Пошук за ключем"
+                aria-label="Пошук за ключем або значенням"
             >
             @if($search)
                 <button type="button" wire:click="$set('search', null)" class="text-mut hover:text-ink shrink-0 leading-none" aria-label="Очистити пошук">✕</button>
