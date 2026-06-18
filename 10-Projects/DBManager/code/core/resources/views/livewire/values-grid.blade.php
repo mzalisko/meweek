@@ -1,32 +1,97 @@
 <x-slot name="breadcrumb">
-    <span class="text-mut text-xs">›</span>
-    <span class="text-mut text-xs">Усі сайти</span>
-    @if($siteModel?->group)
-        <span class="text-mut text-xs">›</span>
-        <span class="text-mut text-xs">{{ $siteModel->group->name }}</span>
-    @endif
-    <span class="text-mut text-xs">›</span>
-    {{-- Site context switcher --}}
-    <select
-        wire:model.live="site"
-        class="text-xs font-semibold bg-transparent border-none outline-none cursor-pointer text-ink hover:text-acc-tx transition-colors"
-        aria-label="Обрати сайт"
-    >
-        @foreach($groups as $group)
-            <optgroup label="{{ $group->name }}">
-                @foreach($group->sites->sortBy('domain') as $s)
-                    <option value="{{ $s->id }}">{{ $s->domain }}</option>
+    @php
+        $currentGroupId = $selectedGroup?->id ?? $group ?? $siteModel?->group?->id;
+        $currentGroupName = null;
+        if ($currentGroupId) {
+            $currentGroupName = $groups->firstWhere('id', $currentGroupId)?->name;
+        }
+    @endphp
+
+    <div class="flex items-center gap-3 ml-2 flex-wrap">
+        <span class="text-mut text-sm select-none">/</span>
+        
+        <!-- Кастомний селект ГРУПИ -->
+        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+            <button data-site-group-select @click="open = !open" 
+                class="flex items-center gap-2 bg-[#f4f5f3] hover:bg-[#ebede9] px-3 py-1.5 rounded-lg border border-[#e3e5e1] text-xs font-bold text-ink transition-colors outline-none focus:outline-none select-none">
+                <span class="text-mut text-[10px] font-bold uppercase tracking-wider">Група</span>
+                <span class="text-acc-tx font-bold">{{ $currentGroupName ?? 'Оберіть групу' }}</span>
+                <svg class="w-3.5 h-3.5 text-mut transition-transform duration-200 shrink-0" :class="open ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            
+            <div x-show="open" 
+                 x-transition:enter="transition ease-out duration-100"
+                 x-transition:enter-start="transform opacity-0 scale-95"
+                 x-transition:enter-end="transform opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-75"
+                 x-transition:leave-start="transform opacity-100 scale-100"
+                 x-transition:leave-end="transform opacity-0 scale-95"
+                 x-cloak
+                 class="absolute left-0 mt-1.5 z-40 bg-white border border-[#dfe3e0] rounded-lg shadow-lg py-1.5 min-w-[210px] max-h-[300px] overflow-y-auto">
+                <a href="{{ route('admin.site') }}"
+                   class="flex items-center justify-between px-3.5 py-2 text-xs text-mut hover:bg-[#eef1ee] hover:text-acc-tx transition-colors {{ !$currentGroupId ? 'bg-[#eef1ee] text-acc-tx font-semibold' : '' }}">
+                    <span>Оберіть групу</span>
+                    @if(!$currentGroupId)
+                        <svg class="w-3.5 h-3.5 text-acc-tx" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    @endif
+                </a>
+                @foreach($groups as $groupOption)
+                    <a href="{{ route('admin.site', ['group' => $groupOption->id]) }}" data-group-id="{{ $groupOption->id }}"
+                       class="flex items-center justify-between px-3.5 py-2 text-xs text-ink hover:bg-[#eef1ee] hover:text-acc-tx transition-colors {{ (int) $currentGroupId === (int) $groupOption->id ? 'bg-[#eef1ee] text-acc-tx font-semibold' : '' }}">
+                        <span>{{ $groupOption->name }}</span>
+                        @if((int) $currentGroupId === (int) $groupOption->id)
+                            <svg class="w-3.5 h-3.5 text-acc-tx" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        @endif
+                    </a>
                 @endforeach
-            </optgroup>
-        @endforeach
-        @if($ungroupedSites->isNotEmpty())
-            <optgroup label="Без групи">
-                @foreach($ungroupedSites->sortBy('domain') as $s)
-                    <option value="{{ $s->id }}">{{ $s->domain }}</option>
-                @endforeach
-            </optgroup>
-        @endif
-    </select>
+            </div>
+        </div>
+
+        <span class="text-mut text-sm select-none">/</span>
+
+        <!-- Кастомний селект САЙТУ -->
+        <div class="relative {{ !$currentGroupId ? 'opacity-50 pointer-events-none' : '' }}" x-data="{ open: false }" @click.outside="open = false">
+            <button data-site-select @click="open = !open" @disabled(!$currentGroupId)
+                class="flex items-center gap-2 bg-[#f4f5f3] hover:bg-[#ebede9] px-3 py-1.5 rounded-lg border border-[#e3e5e1] text-xs font-bold text-ink transition-colors outline-none focus:outline-none disabled:cursor-not-allowed select-none">
+                <span class="text-mut text-[10px] font-bold uppercase tracking-wider">Сайт</span>
+                <span class="text-ink font-mono font-medium">{{ $siteModel?->domain ?? 'Оберіть сайт' }}</span>
+                <svg class="w-3.5 h-3.5 text-mut transition-transform duration-200 shrink-0" :class="open ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            
+            @if($currentGroupId)
+                <div x-show="open" 
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     x-cloak
+                     class="absolute left-0 mt-1.5 z-40 bg-white border border-[#dfe3e0] rounded-lg shadow-lg py-1.5 min-w-[210px] max-h-[300px] overflow-y-auto">
+                    <a href="{{ route('admin.site', ['group' => $currentGroupId]) }}"
+                       class="flex items-center justify-between px-3.5 py-2 text-xs text-mut hover:bg-[#eef1ee] hover:text-acc-tx transition-colors {{ !$siteModel ? 'bg-[#eef1ee] text-acc-tx font-semibold' : '' }}">
+                        <span>Оберіть сайт</span>
+                        @if(!$siteModel)
+                            <svg class="w-3.5 h-3.5 text-acc-tx" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        @endif
+                    </a>
+                    @foreach($selectedGroupSites->sortBy('domain') as $s)
+                        <a href="{{ route('admin.site', ['group' => $s->site_group_id, 'site' => $s->id]) }}"
+                           class="flex items-center justify-between px-3.5 py-2 text-xs text-ink hover:bg-[#eef1ee] hover:text-acc-tx font-mono transition-colors {{ (int) $siteModel?->id === (int) $s->id ? 'bg-[#eef1ee] text-acc-tx font-semibold' : '' }}">
+                            <span>{{ $s->domain }}</span>
+                            @if((int) $siteModel?->id === (int) $s->id)
+                                <svg class="w-3.5 h-3.5 text-acc-tx" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            @endif
+                        </a>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    </div>
 </x-slot>
 
 <x-slot name="context">
@@ -40,7 +105,7 @@
     </div>
 </x-slot>
 
-<div class="flex gap-0 min-h-0">
+<div class="flex gap-0 min-h-0" data-values-grid-root>
 <div class="flex-1 min-w-0 p-3.5">
     {{-- Site context heading (also ensures domain is in the component's wire-snapshot for tests) --}}
     @if($siteModel)
@@ -116,14 +181,14 @@
             </button>
         @endif
 
-        {{-- Search input — просторе поле, бордер лише у фокусі --}}
-        <div class="ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 w-72 max-w-full bg-[#eef1ee] border border-transparent transition-colors focus-within:bg-white focus-within:border-acc">
+        {{-- Search input — просторе поле без бордера й оутлайна (навіть у фокусі) --}}
+        <div class="ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 w-72 max-w-full bg-[#eef1ee] transition-colors focus-within:bg-white">
             <span class="text-mut shrink-0">@svg('search')</span>
             <input
                 wire:model.live.debounce.250ms="search"
                 type="text"
                 placeholder="Пошук за ключем…"
-                class="bg-transparent outline-none placeholder-mut text-xs flex-1 min-w-0 text-ink"
+                class="bg-transparent outline-none placeholder-mut text-xs flex-1 min-w-0 text-ink border-0 shadow-none focus:ring-0 focus:outline-none"
                 aria-label="Пошук за ключем"
             >
             @if($search)
@@ -132,7 +197,12 @@
         </div>
     </div>
 
-    @if(empty($rows))
+    @if(!$siteModel)
+        <div class="rounded-lg border border-dashed border-[#dfe3e0] bg-white px-4 py-8 text-center">
+            <div class="text-sm font-semibold text-ink">Оберіть сайт</div>
+            <div class="mt-1 text-xs text-mut">Стартовий екран сайту відкривається після вибору домену у верхньому списку.</div>
+        </div>
+    @elseif(empty($rows))
         <div class="text-mut text-sm py-8 text-center">Значення відсутні</div>
     @else
         @php
@@ -160,8 +230,7 @@
 
         @foreach($rows as $type => $items)
             <div class="mt-3 border border-[#dfe3e0] bg-white rounded-lg">
-                <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] rounded-t-lg text-[10px] uppercase tracking-wide text-mut">
-                    <div></div>
+                <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-b border-[#dfe3e0] rounded-t-lg text-[10px] uppercase tracking-wide text-mut">
                     <div class="flex gap-1.5 items-center">
                         @svg($typeLabels[$type][1] ?? 'tag')
                         <span>{{ $typeLabels[$type][0] ?? $type }}</span>
@@ -178,15 +247,9 @@
                     @php
                         $st = $stateMap[$r['state']] ?? 'ok';
                     @endphp
-                    <div class="grid grid-cols-[32px_minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
-                        {{-- Row checkbox --}}
-                        <input type="checkbox"
-                            wire:click.stop="toggleSelect({{ $r['id'] }})"
-                            @checked(in_array($r['id'], $selected))
-                            class="cursor-pointer accent-acc">
-
+                    <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(280px,1.8fr)_92px_42px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
                         {{-- Key --}}
-                        <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate block mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
+                        <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate inline-block w-fit mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
 
                         {{-- Geo --}}
                         <span class="min-w-0 flex flex-wrap gap-1 text-mut text-[11px] pt-1" title="{{ implode(', ', $r['geo']) }}">
@@ -218,6 +281,15 @@
                                                 {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
                                             </span>
                                             @if($isEditingNumber)
+                                                <div x-data="{ initial: '{{ addslashes($number['e164']) }}' }"
+                                                     @click.outside="
+                                                        const inp = $el.querySelector('input');
+                                                        if (inp && inp.value.trim() === initial) {
+                                                            $wire.cancelInlinePhoneEdit();
+                                                        }
+                                                     "
+                                                     class="contents"
+                                                >
                                                 <input
                                                     wire:model.defer="editingPhoneNumber"
                                                     wire:keydown.enter="saveInlinePhoneNumber"
@@ -231,6 +303,7 @@
                                                     <button wire:click.stop="cancelInlinePhoneEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
                                                     <button wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
                                                 </span>
+                                                </div>
                                             @else
                                                 <span class="min-w-0 truncate text-ink">{{ $number['e164'] }}</span>
                                                 <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
@@ -291,9 +364,17 @@
                                             $isInactiveMessenger = !($r['enabled'] ?? true);
                                         @endphp
                                         <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveMessenger ? 'opacity-70' : '' }}">
-                                            <span class="w-12 shrink-0 text-[10px] uppercase tracking-wide {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">#1</span>
-                                            <span class="w-20 shrink-0 text-[11px] {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ ucfirst($r['network'] ?? 'msg') }}</span>
+                                            <span class="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">#1 {{ $r['network'] ?? 'msg' }}</span>
                                             @if($isEditingMessenger)
+                                                <div x-data="{ initial: '{{ addslashes($r['value'] ?? '') }}' }"
+                                                     @click.outside="
+                                                        const inp = $el.querySelector('input');
+                                                        if (inp && inp.value.trim() === initial) {
+                                                            $wire.cancelInlineMessengerEdit();
+                                                        }
+                                                     "
+                                                     class="contents"
+                                                >
                                                 <input
                                                     wire:model.defer="editingMessengerValue"
                                                     wire:keydown.enter="saveInlineMessengerValue"
@@ -302,6 +383,7 @@
                                                     class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
                                                     aria-label="Редагувати месенджер"
                                                 >
+                                                </div>
                                             @else
                                                 @if($r['value'] !== null)
                                                     <span class="min-w-0 truncate text-ink">{{ $r['value'] }}</span>
@@ -370,7 +452,7 @@
                                         </span>
                                         @if($isEditingMessenger)
                                             @error('editingMessengerValue')
-                                                <span class="ml-[8rem] text-[11px] text-bad-tx">{{ $message }}</span>
+                                                <span class="ml-[6.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
                                             @enderror
                                         @endif
                                     @else
@@ -390,8 +472,7 @@
                                                     $isInactiveReserve = $reserve['state'] === 'hidden';
                                                 @endphp
                                                 <div class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($reserve['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveReserve ? 'opacity-70' : '' }}">
-                                                    <span class="w-12 shrink-0 text-[10px] uppercase tracking-wide {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ $reserve['label'] }}</span>
-                                                    <span class="w-20 shrink-0 text-[11px] {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ ucfirst($reserve['network']) }}</span>
+                                                    <span class="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ $reserve['label'] }} {{ $reserve['network'] }}</span>
                                                     @if($isEditingReserve)
                                                         <input
                                                             wire:model.defer="editingMessengerValue"
@@ -469,21 +550,29 @@
 
                         {{-- Scope badge --}}
                         <span class="min-w-0 pt-1">
-                            @if($r['scope'] === 'site')
-                                <span class="inline-block bg-[#eef1ee] border border-dashed border-[#aeb6b0] rounded-md px-2 py-0.5 text-[11px] text-[#5a625d] whitespace-nowrap">цього сайта</span>
+                            @php($source = $r['source'] ?? ($r['scope'] === 'site' ? 'current_site' : 'group'))
+                            @if($source === 'current_site')
+                                <span class="inline-block bg-[#eef1ee] border border-dashed border-[#aeb6b0] rounded-md px-2 py-0.5 text-[11px] text-[#5a625d] whitespace-nowrap">цього сайту</span>
+                            @elseif($source === 'parent_site')
+                                <span class="inline-block bg-acc-bg border border-acc-bd rounded-md px-2 py-0.5 text-[11px] text-acc-tx whitespace-nowrap">сайт-джерело</span>
                             @else
-                                <span class="text-mut text-xs">Група</span>
+                                <span class="inline-block rounded-md bg-[#f4f5f3] px-2 py-0.5 text-[11px] text-mut whitespace-nowrap">група</span>
                             @endif
                         </span>
 
                         {{-- Details --}}
-                        <span class="text-right pt-1">
+                        <span class="inline-flex items-center justify-end gap-1.5 pt-1">
                             @if($type === 'phone' && isset($r['id']))
                                 <button wire:click="openSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування слота" aria-label="Налаштування слота">@svg('edit')</button>
                             @elseif($type === 'messenger' && isset($r['id']))
                                 <button wire:click="openMessengerSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування месенджера" aria-label="Налаштування месенджера">@svg('edit')</button>
                             @elseif($type !== 'phone' && isset($r['id']))
                                 <button wire:click="editValue({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Редагувати значення" aria-label="Редагувати значення">@svg('edit')</button>
+                            @endif
+                            @if(isset($r['id']))
+                                <button wire:click="removeSlotFromSite({{ $r['id'] }})"
+                                    wire:confirm="Прибрати цей слот з цього сайту? Якщо він спільний — лишиться на джерелі (групі чи сайті-джерелі)."
+                                    class="text-mut hover:text-bad-tx" title="Прибрати з цього сайту" aria-label="Прибрати з цього сайту">@svg('trash')</button>
                             @endif
                         </span>
                     </div>
@@ -495,4 +584,91 @@
 <livewire:slot-panel />
 <livewire:messenger-panel />
 <livewire:value-editor />
+@if(request()->routeIs('admin.values') && $bulkReplaceOpen)
+    <div class="fixed inset-0 z-40 bg-[rgba(20,26,22,0.28)]" wire:click="closeBulkReplace"></div>
+    <aside class="fixed right-0 top-0 bottom-0 z-50 w-[520px] max-w-[calc(100vw-24px)] overflow-y-auto border-l border-[#dfe3e0] bg-white text-[13px] shadow-[-18px_0_40px_rgba(28,34,30,0.12)]" wire:click.stop>
+        <div class="flex items-center justify-between border-b border-[#edf0ed] px-4 py-3">
+            <h2 class="text-[15px] font-semibold text-acc-tx">Масова заміна</h2>
+            <button type="button" wire:click="closeBulkReplace" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
+        </div>
+        <div class="space-y-4 px-4 py-4">
+            <div class="grid grid-cols-1 gap-3">
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Знайти</label>
+                    <input wire:model.live="bulkFind" type="text" class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Замінити на</label>
+                    <input wire:model.live="bulkReplace" type="text" class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Область</label>
+                    <select wire:model.live="bulkScope" class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                        <option value="current_site">Поточний сайт</option>
+                        <option value="selected">Вибрані сайти</option>
+                        <option value="group">Уся група</option>
+                        <option value="tree">Сайт і сателіти</option>
+                        <option value="all">Усі доступні сайти</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[12px] text-mut">
+                <div>Збігів у прев’ю: <span class="font-semibold text-ink">{{ count($bulkPreview) }}</span></div>
+                @if($bulkReport)
+                    <div class="mt-1">Змінено: {{ $bulkReport['values'] }} значень, {{ $bulkReport['changes'] }} замін.</div>
+                @endif
+            </div>
+
+            <div class="max-h-[52vh] space-y-1 overflow-y-auto rounded-lg border border-[#dfe3e0]">
+                @forelse($bulkPreview as $row)
+                    <div class="flex items-center justify-between gap-2 border-b border-[#edf0ed] px-3 py-2 last:border-b-0 text-[12px]">
+                        <div class="min-w-0">
+                            <div class="truncate font-semibold text-ink">{{ $row['key'] }}</div>
+                            <div class="truncate text-mut">{{ $row['site'] }} · {{ $row['type'] }}</div>
+                        </div>
+                        <span class="shrink-0 rounded-md bg-[#eef1ee] px-2 py-0.5 text-[11px] text-mut">{{ $row['hits'] }} збіг(и)</span>
+                    </div>
+                @empty
+                    <div class="px-3 py-4 text-center text-mut">Поки немає збігів.</div>
+                @endforelse
+            </div>
+
+            <div class="flex gap-2 pt-1">
+                <button type="button" wire:click="applyBulkReplace" class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                    Застосувати
+                </button>
+                <button type="button" wire:click="closeBulkReplace" class="rounded-lg border border-[#dfe3e0] px-3 py-2 text-xs font-semibold text-mut hover:border-acc hover:text-acc-tx">
+                    Скасувати
+                </button>
+            </div>
+        </div>
+    </aside>
+@endif
+
+@if($showScopeDialog)
+    <div class="fixed inset-0 z-[60] bg-[rgba(20,26,22,0.32)]" wire:click="cancelScopeDecision"></div>
+    <aside class="fixed right-0 top-0 bottom-0 z-[70] w-[420px] max-w-[calc(100vw-24px)] overflow-y-auto border-l border-[#dfe3e0] bg-white text-[13px] shadow-[-18px_0_40px_rgba(28,34,30,0.12)]" wire:click.stop>
+        <div class="flex items-center justify-between border-b border-[#edf0ed] px-4 py-3">
+            <h2 class="text-[15px] font-semibold text-acc-tx">Область зміни</h2>
+            <button type="button" wire:click="cancelScopeDecision" class="text-mut hover:text-ink" aria-label="Закрити">@svg('x')</button>
+        </div>
+        <div class="space-y-3 px-4 py-4">
+            <p class="text-[12px] leading-5 text-mut">
+                Це значення наслідують дочірні сайти. Оберіть, чи змінити тільки поточний сайт, чи також ті сайти, які зараз наслідують це значення.
+            </p>
+            <button type="button" wire:click="confirmScopeOnlyThisSite" class="flex w-full items-center justify-between rounded-lg border border-acc bg-acc-bg px-3 py-2 text-left text-[13px] font-semibold text-acc-tx hover:bg-[#e6edf2]">
+                <span>Лише цей сайт</span>
+                @svg('chevron-right')
+            </button>
+            <button type="button" wire:click="confirmScopeCascade" class="flex w-full items-center justify-between rounded-lg border border-[#dfe3e0] px-3 py-2 text-left text-[13px] font-semibold text-ink hover:border-acc hover:text-acc-tx">
+                <span>Цей сайт + ті, що наслідують</span>
+                @svg('chevron-right')
+            </button>
+            <button type="button" wire:click="cancelScopeDecision" class="rounded-lg border border-[#dfe3e0] px-3 py-1.5 text-xs font-semibold text-mut hover:border-acc hover:text-acc-tx">
+                Скасувати
+            </button>
+        </div>
+    </aside>
+@endif
 </div>

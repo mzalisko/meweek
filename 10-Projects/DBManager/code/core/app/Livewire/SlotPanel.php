@@ -3,12 +3,17 @@
 namespace App\Livewire;
 
 use App\Admin\AccessControl;
+use App\Admin\PhoneNumberAssignment;
+use App\Admin\PhoneSlotInheritance;
+use App\Livewire\Concerns\HandlesScopeDecision;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;
 use App\Models\NumberEntry;
 use App\Models\PhoneNumber;
 use App\Models\PhoneSlot;
+use App\Models\Site;
+use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Failover\SlotResolver;
 use App\Services\Publishing\BridgePublisher;
@@ -18,6 +23,8 @@ use Livewire\Component;
 
 class SlotPanel extends Component
 {
+    use HandlesScopeDecision;
+
     public bool $open = false;
 
     public string $mode = 'settings';
@@ -33,6 +40,8 @@ class SlotPanel extends Component
     public array $geoTagIds = [];
 
     public string $emergencyNumber = '';
+
+    public string $slotKey = '';
 
     #[On('close-slot-panel')]
     public function closePanel(): void
@@ -65,7 +74,78 @@ class SlotPanel extends Component
         $this->editE164         = '';
         $this->geoTagIds        = $value->geoTags->pluck('id')->toArray();
         $this->emergencyNumber  = $value->phoneSlot->emergency_number ?? '';
+        $this->slotKey          = $value->key;
         $this->open             = true;
+    }
+
+    /**
+     * Перейменувати слот (ключ DataValue). Щоб нічого не зламати, перейменування
+     * каскадне в межах однієї групи: разом із цим значенням оновлюються його
+     * сайт-перекриття з тим самим ключем і прив'язки месенджерів (linked_slot).
+     */
+    public function renameSlot(): void
+    {
+        if (! $this->canChangeCurrentValue() || ! $this->dataValueId) {
+            return;
+        }
+
+        $newKey = trim($this->slotKey);
+        $this->resetErrorBag('slotKey');
+
+        if (! preg_match('/^[a-z0-9_]+$/', $newKey)) {
+            $this->addError('slotKey', 'Ключ: лише малі латинські літери, цифри та підкреслення.');
+
+            return;
+        }
+
+        $value = DataValue::find($this->dataValueId);
+        if (! $value) {
+            return;
+        }
+
+        $oldKey = $value->key;
+        if ($newKey === $oldKey) {
+            return;
+        }
+
+        if ($this->deferForScope('renameSlot', [], $value)) {
+            return;
+        }
+
+        [$groupId, $siteIds] = $this->chainScope($value);
+
+        if ($this->chainQuery($newKey, $groupId, $siteIds)->exists()) {
+            $this->addError('slotKey', 'Слот із таким ключем уже існує в цій області.');
+
+            return;
+        }
+
+        \DB::transaction(function () use ($oldKey, $newKey, $groupId, $siteIds) {
+            $this->chainQuery($oldKey, $groupId, $siteIds)
+                ->get()
+                ->each(fn (DataValue $dv) => $dv->update(['key' => $newKey]));
+
+            $this->relinkMessengers($oldKey, $newKey, $groupId, $siteIds);
+        });
+
+        AuditLog::create([
+            'actor_type'   => 'user',
+            'action'       => 'slot.renamed',
+            'subject_type' => 'DataValue',
+            'subject_id'   => $value->id,
+            'old'          => ['key' => $oldKey],
+            'new'          => ['key' => $newKey],
+        ]);
+
+        $this->slotKey = $newKey;
+
+        $value->refresh()->loadMissing('phoneSlot');
+        if ($value->phoneSlot) {
+            $this->publishSlotSites($value->phoneSlot);
+        }
+
+        $this->dispatch('slot-updated');
+        $this->dispatch('toast', message: 'Ключ слота змінено → опубліковано');
     }
 
     #[On('open-number-editor')]
@@ -98,6 +178,10 @@ class SlotPanel extends Component
         $value = DataValue::with('phoneSlot.entries')->find($this->dataValueId);
 
         if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        if ($this->deferForScope('addNumber', [], $value)) {
             return;
         }
 
@@ -198,19 +282,37 @@ class SlotPanel extends Component
         }
 
         $old = $entry->phoneNumber->e164;
-        $entry->phoneNumber->update(['e164' => $e164]);
+        if ($old !== $e164 && $this->deferForScope('saveNumber', [], $value)) {
+            return;
+        }
+
+        $entry = app(PhoneNumberAssignment::class)->assign($entry, $e164);
         app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
 
         AuditLog::create([
             'actor_type'   => 'user',
             'action'       => 'number.edited',
-            'subject_type' => 'phone_slot',
-            'subject_id'   => $slot->id,
-            'old'          => ['e164' => $old],
-            'new'          => ['e164' => $e164],
+            'subject_type' => 'DataValue',
+            'subject_id'   => $value->id,
+            'old'          => [
+                'e164'       => $old,
+                'scope_type' => $value->scope_type,
+                'scope_id'   => $value->scope_id,
+            ],
+            'new'          => [
+                'e164'       => $e164,
+                'scope_type' => $value->scope_type,
+                'scope_id'   => $value->scope_id,
+            ],
         ]);
 
-        $this->publishSlotSites($slot->fresh());
+        $collapsedSite = app(PhoneSlotInheritance::class)->collapseOverrideIfMatchesSource($entry);
+        if ($collapsedSite) {
+            $publication = app(SitePayloadCompiler::class)->publish($collapsedSite);
+            app(BridgePublisher::class)->push($publication);
+        } else {
+            $this->publishSlotSites($slot->fresh());
+        }
         $this->cancelEdit();
         $this->closeAndRefresh('Номер збережено → опубліковано');
     }
@@ -230,6 +332,10 @@ class SlotPanel extends Component
         $entry = $value?->phoneSlot?->entries->firstWhere('id', $entryId);
 
         if (! $entry) {
+            return;
+        }
+
+        if ($this->deferForScope('setNumberStatus', [$entryId, $status], $value)) {
             return;
         }
 
@@ -271,6 +377,10 @@ class SlotPanel extends Component
 
         if ($index === 0 || ! $neighbour) {
             return; // Already at top — nothing to do
+        }
+
+        if ($this->deferForScope('moveUp', [$entryId], $value)) {
+            return;
         }
 
         $this->swapEntryPriorities($current, $neighbour);
@@ -320,6 +430,10 @@ class SlotPanel extends Component
             return; // Already at bottom — nothing to do
         }
 
+        if ($this->deferForScope('moveDown', [$entryId], $value)) {
+            return;
+        }
+
         $this->swapEntryPriorities($current, $neighbour);
 
         app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
@@ -357,6 +471,10 @@ class SlotPanel extends Component
 
         if (! $entry) {
             // Entry does not belong to this slot — reject silently
+            return;
+        }
+
+        if ($this->deferForScope('removeNumber', [$entryId], $value)) {
             return;
         }
 
@@ -402,6 +520,10 @@ class SlotPanel extends Component
             return;
         }
 
+        if ($this->deferForScope('pin', [$entryId], $value)) {
+            return;
+        }
+
         app(FailoverEngine::class)->pin($slot, $entry, 'user');
         $this->publishSlotSites($slot->fresh());
         $this->dispatch('slot-updated');
@@ -420,6 +542,10 @@ class SlotPanel extends Component
         $value = DataValue::with('phoneSlot')->find($this->dataValueId);
 
         if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        if ($this->deferForScope('unpin', [], $value)) {
             return;
         }
 
@@ -449,6 +575,14 @@ class SlotPanel extends Component
         }
 
         $slot = $value->phoneSlot;
+        if ($slot->return_mode === $mode) {
+            return;
+        }
+
+        if ($this->deferForScope('setReturnMode', [$mode], $value)) {
+            return;
+        }
+
         $slot->update(['return_mode' => $mode]);
         app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
         $this->dispatch('slot-updated');
@@ -471,6 +605,14 @@ class SlotPanel extends Component
         $value = DataValue::with('phoneSlot')->find($this->dataValueId);
 
         if (! $value || ! $value->phoneSlot) {
+            return;
+        }
+
+        if ($value->phoneSlot->exhaustion_policy === $policy) {
+            return;
+        }
+
+        if ($this->deferForScope('setExhaustionPolicy', [$policy], $value)) {
             return;
         }
 
@@ -519,6 +661,10 @@ class SlotPanel extends Component
             return;
         }
 
+        if ($this->deferForScope('setSlotVisibility', [$status], $value)) {
+            return;
+        }
+
         $value->update(['status' => $status]);
         $value->refresh()->load('phoneSlot.entries.phoneNumber', 'geoTags', 'type');
 
@@ -559,12 +705,25 @@ class SlotPanel extends Component
             return;
         }
 
+        $oldGeoIds = $value->geoTags->pluck('id')->sort()->values()->toArray();
+        $newGeoIds = collect($this->geoTagIds)->map(fn ($id) => (int) $id)->sort()->values()->toArray();
+        $slot = $value->phoneSlot;
+        $newEmergency = $this->emergencyNumber ?: null;
+        $geoChanged = $oldGeoIds !== $newGeoIds;
+        $emergencyChanged = ($slot->emergency_number ?? null) !== $newEmergency;
+
+        if (! $geoChanged && ! $emergencyChanged && ! $notify) {
+            return;
+        }
+
+        if (($geoChanged || $emergencyChanged) && $this->deferForScope('persistSettings', [$notify], $value)) {
+            return;
+        }
+
         $changed = false;
 
         // Sync geo-tags with audit when changed
-        $oldGeoIds = $value->geoTags->pluck('id')->sort()->values()->toArray();
-        $newGeoIds = collect($this->geoTagIds)->map(fn ($id) => (int) $id)->sort()->values()->toArray();
-        if ($oldGeoIds !== $newGeoIds) {
+        if ($geoChanged) {
             $value->geoTags()->sync($this->geoTagIds);
             AuditLog::create([
                 'actor_type'   => 'user',
@@ -577,9 +736,7 @@ class SlotPanel extends Component
             $changed = true;
         }
 
-        $slot = $value->phoneSlot;
-        $newEmergency = $this->emergencyNumber ?: null;
-        if (($slot->emergency_number ?? null) !== $newEmergency) {
+        if ($emergencyChanged) {
             $slot->update(['emergency_number' => $newEmergency]);
             $changed = true;
         }
@@ -648,6 +805,87 @@ class SlotPanel extends Component
         $this->close();
         $this->dispatch('slot-updated');
         $this->dispatch('toast', message: $message);
+    }
+
+    /**
+     * Межі ланцюга ключа: id групи (якщо є) і всі сайти цієї групи. Для сайту без
+     * групи ланцюг — лише сам сайт. Так перейменування не виходить за межі групи.
+     *
+     * @return array{0:?int,1:\Illuminate\Support\Collection<int,int>}
+     */
+    private function chainScope(DataValue $value): array
+    {
+        if ($value->scope_type === 'group') {
+            $groupId = (int) $value->scope_id;
+        } else {
+            $site = Site::withTrashed()->find($value->scope_id);
+            $groupId = $site?->site_group_id ? (int) $site->site_group_id : null;
+        }
+
+        $siteIds = $groupId
+            ? Site::withTrashed()->where('site_group_id', $groupId)->pluck('id')
+            : collect($value->scope_type === 'site' ? [(int) $value->scope_id] : []);
+
+        return [$groupId, $siteIds];
+    }
+
+    /**
+     * Усі DataValue із цим ключем у межах ланцюга (значення групи + перекриття сайтів).
+     *
+     * @param  \Illuminate\Support\Collection<int,int>  $siteIds
+     */
+    private function chainQuery(string $key, ?int $groupId, $siteIds)
+    {
+        return DataValue::where('key', $key)->where(function ($q) use ($groupId, $siteIds) {
+            if ($groupId) {
+                $q->orWhere(fn ($g) => $g->where('scope_type', 'group')->where('scope_id', $groupId));
+            }
+            if ($siteIds->isNotEmpty()) {
+                $q->orWhere(fn ($s) => $s->where('scope_type', 'site')->whereIn('scope_id', $siteIds));
+            }
+        });
+    }
+
+    /**
+     * Перенаправити месенджери, прив'язані до старого ключа телефону, на новий ключ,
+     * щоб прив'язки (linked_slot) не «осиротіли» після перейменування.
+     *
+     * @param  \Illuminate\Support\Collection<int,int>  $siteIds
+     */
+    private function relinkMessengers(string $oldKey, string $newKey, ?int $groupId, $siteIds): void
+    {
+        $messengerTypeId = ValueType::where('code', 'messenger')->value('id');
+        if (! $messengerTypeId) {
+            return;
+        }
+
+        DataValue::where('value_type_id', $messengerTypeId)
+            ->where(function ($q) use ($groupId, $siteIds) {
+                if ($groupId) {
+                    $q->orWhere(fn ($g) => $g->where('scope_type', 'group')->where('scope_id', $groupId));
+                }
+                if ($siteIds->isNotEmpty()) {
+                    $q->orWhere(fn ($s) => $s->where('scope_type', 'site')->whereIn('scope_id', $siteIds));
+                }
+            })
+            ->get()
+            ->each(function (DataValue $messenger) use ($oldKey, $newKey) {
+                $content = $messenger->content ?? [];
+                $linked = $content['linked_slot'] ?? null;
+                $linked = is_array($linked)
+                    ? $linked
+                    : ($linked !== null && $linked !== '' ? [$linked] : []);
+
+                if (! in_array($oldKey, $linked, true)) {
+                    return;
+                }
+
+                $content['linked_slot'] = array_values(array_map(
+                    fn ($k) => $k === $oldKey ? $newKey : $k,
+                    $linked,
+                ));
+                $messenger->update(['content' => $content]);
+            });
     }
 
     private function canChangeCurrentValue(): bool
