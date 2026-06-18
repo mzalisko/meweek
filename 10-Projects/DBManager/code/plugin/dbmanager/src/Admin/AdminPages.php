@@ -6,7 +6,10 @@ use DBM\Config\Settings;
 
 class AdminPages
 {
-    public function __construct(private Settings $settings) {}
+    public function __construct(
+        private Settings $settings,
+        private \DBM\Geo\GeoSimulation $simulation
+    ) {}
 
     public function register(): void
     {
@@ -23,7 +26,7 @@ class AdminPages
             if (isset($_POST['dbm_geosim_nonce']) && wp_verify_nonce($_POST['dbm_geosim_nonce'], 'dbm_geosim_save')) {
                 if (current_user_can('edit_posts')) {
                     $country = sanitize_text_field($_POST['simulated_country'] ?? '');
-                    update_option('dbm_simulated_country', $country);
+                    $this->simulation->setSimulatedCountry($country);
                     wp_redirect(admin_url('admin.php?page=dbm-geosim&settings-updated=true'));
                     exit;
                 }
@@ -81,7 +84,7 @@ class AdminPages
 
     public function renderGeoSim(): void
     {
-        $simulated = get_option('dbm_simulated_country', '');
+        $simulated = $this->simulation->getSimulatedCountry();
 
         $detector = new \DBM\Geo\GeoDetector(
             new \DBM\Geo\MaxMindCountryLookup((string) (get_option('dbm_geodb_path') ?: ''))
@@ -91,23 +94,11 @@ class AdminPages
             (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? ($_SERVER['REMOTE_ADDR'] ?? ''))
         );
 
-        $current_effective = !empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : $real_country;
+        $current_effective = $simulated !== null ? $simulated : $real_country;
 
         $cache = get_option('dbm_cache');
         $cache = is_array($cache) ? $cache : ['values' => []];
-        $countries = ['WORLD'];
-        foreach ($cache['values'] ?? [] as $v) {
-            if (!empty($v['geos']) && is_array($v['geos'])) {
-                foreach ($v['geos'] as $g) {
-                    $countries[] = strtoupper($g);
-                }
-            }
-            if (!empty($v['geo'])) {
-                $countries[] = strtoupper($v['geo']);
-            }
-        }
-        $countries = array_unique($countries);
-        sort($countries);
+        $countries = $this->simulation->getAvailableCountries($cache);
 
         echo '<div class="wrap"><h1>Геосимуляція</h1>';
 
@@ -121,7 +112,7 @@ class AdminPages
         echo '<thead><tr><th colspan="2">Поточний стан локалізації</th></tr></thead>';
         echo '<tbody>';
         echo '<tr><td style="width: 200px;"><strong>Режим симуляції:</strong></td><td>';
-        if (!empty($simulated) && $simulated !== 'disabled') {
+        if ($simulated !== null) {
             echo '<span style="color: #d63638; font-weight: bold;">Увімкнено (Симуляція: ' . esc_html($simulated) . ')</span>';
         } else {
             echo '<span style="color: #67b878; font-weight: bold;">Вимкнено (Працює авто-визначення)</span>';
@@ -136,7 +127,7 @@ class AdminPages
 
         echo '<p><label for="simulated_country"><strong>Оберіть країну для симуляції:</strong></label><br>';
         echo '<select name="simulated_country" id="simulated_country" style="width: 100%; margin-top: 5px; max-width: 400px;">';
-        echo '<option value="disabled" ' . selected($simulated, 'disabled', false) . ' ' . selected($simulated, '', false) . '>— Вимкнути симуляцію (визначати за IP) —</option>';
+        echo '<option value="disabled" ' . selected($simulated, null, false) . '>— Вимкнути симуляцію (визначати за IP) —</option>';
         foreach ($countries as $c) {
             echo '<option value="' . esc_attr($c) . '" ' . selected($simulated, $c, false) . '>' . esc_html($c) . '</option>';
         }
