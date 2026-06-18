@@ -459,6 +459,22 @@
                                                 <span class="ml-[6.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
                                             @enderror
                                         @endif
+                                    @elseif($type === 'price' && !empty($r['prices']))
+                                        <span class="flex flex-col gap-1 min-w-0">
+                                            @foreach($r['prices'] as $index => $price)
+                                                <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 bg-[#f7f8f7]">
+                                                    <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide text-mut font-medium">
+                                                        {{ $price['label'] ?: ('Ціна ' . ($index + 1)) }}
+                                                    </span>
+                                                    <span class="min-w-0 truncate text-ink font-semibold">{{ $price['value'] }}</span>
+                                                    <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                                        @foreach($price['geo'] ?? [] as $g)
+                                                            <span class="inline-flex rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut font-semibold leading-none">{{ $g }}</span>
+                                                        @endforeach
+                                                    </span>
+                                                </span>
+                                            @endforeach
+                                        </span>
                                     @else
                                         <span class="flex items-center gap-2 min-w-0">
                                             @if($r['value'] !== null)

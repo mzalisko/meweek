@@ -30,8 +30,8 @@
         @error('key')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
 
-    {{-- Value (не для телефона — там номери в панелі слота) --}}
-    @if($type !== 'phone')
+    {{-- Value (не для телефона — там номери в панелі слота; не для цін — там список) --}}
+    @if($type !== 'phone' && $type !== 'price')
     <div class="mb-3">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">
             {{ $type === 'messenger' ? 'Значення месенджера' : 'Значення' }}
@@ -39,8 +39,65 @@
         <input wire:model="value" type="text" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc @error('value') border-bad-tx @enderror" />
         @error('value')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
-    @else
+    @elseif($type === 'phone')
     <p class="mb-3 text-[12px] text-mut bg-[#fafbfa] border border-[#e3e5e1] rounded-lg px-3 py-2">Номери додаються в панелі слота після створення.</p>
+    @endif
+
+    {{-- Price List editor --}}
+    @if($type === 'price')
+    <div class="mb-4">
+        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1.5">Список цін у слоті</label>
+        <div class="space-y-3">
+            @foreach($prices as $index => $price)
+                <div class="p-3 bg-[#fafbfa] border border-[#dfe3e0] rounded-lg relative space-y-2.5">
+                    {{-- Remove Button --}}
+                    @if(count($prices) > 1)
+                        <button type="button" wire:click="removePrice({{ $index }})" 
+                            class="absolute top-2 right-2 text-mut hover:text-bad-tx text-xs font-bold" 
+                            title="Видалити ціну" aria-label="Видалити ціну">
+                            &times;
+                        </button>
+                    @endif
+                    
+                    {{-- Label input --}}
+                    <div>
+                        <label class="block text-mut text-[10px] uppercase mb-0.5">Опис / Назва (напр. Україна)</label>
+                        <input type="text" wire:model="prices.{{ $index }}.label" placeholder="Україна" 
+                            class="w-full border border-[#dfe3e0] rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-acc" />
+                    </div>
+
+                    {{-- Value input --}}
+                    <div>
+                        <label class="block text-mut text-[10px] uppercase mb-0.5">Значення / Ціна (напр. 1200)</label>
+                        <input type="text" wire:model="prices.{{ $index }}.value" placeholder="1200" 
+                            class="w-full border border-[#dfe3e0] rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-acc" />
+                        @error("prices.{$index}.value")
+                            <p class="text-bad-tx text-[11px] mt-0.5">Ціна є обов'язковою.</p>
+                        @enderror
+                    </div>
+
+                    {{-- Geo tags checkboxes per price entry --}}
+                    <div>
+                        <span class="block text-mut text-[10px] uppercase mb-1">Гео-видимість</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach($allGeoTags as $gt)
+                                <label class="flex items-center gap-1 cursor-pointer border rounded-md px-1.5 py-0.5 text-[10px] transition-colors
+                                    {{ in_array($gt->code, $prices[$index]['geo'] ?? []) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut' }}">
+                                    <input type="checkbox" wire:model="prices.{{ $index }}.geo" value="{{ $gt->code }}" class="sr-only">
+                                    {{ $gt->code }}
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        
+        <button type="button" wire:click="addPrice" 
+            class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-acc hover:text-acc-tx">
+            + Додати ціну
+        </button>
+    </div>
     @endif
 
     {{-- Messenger-specific fields --}}
@@ -52,8 +109,8 @@
     </div>
     @endif
 
-    {{-- Гео-мітки --}}
-    @if($allGeoTags->isNotEmpty())
+    {{-- Гео-мітки (для цін вони налаштовуються всередині кожної ціни) --}}
+    @if($allGeoTags->isNotEmpty() && $type !== 'price')
     <div class="mb-4">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1.5">Гео-мітки</label>
         <div class="flex flex-wrap gap-1.5">

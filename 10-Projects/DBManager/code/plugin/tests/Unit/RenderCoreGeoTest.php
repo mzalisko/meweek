@@ -44,4 +44,21 @@ class RenderCoreGeoTest extends TestCase
         $this->assertStringContainsString('t.me/brand',
             dbm_render_from_cache($this->payload(), 'tg_brand', []));
     }
+
+    public function test_multi_option_value_prioritizes_country_match(): void
+    {
+        $payload = ['values' => [
+            ['key' => 'ROMANIA', 'state' => 'ok', 'value' => '1200', 'geo' => ['UA']],
+            ['key' => 'ROMANIA', 'state' => 'ok', 'value' => '2000', 'geo' => ['WORLD', 'RU', 'BY']],
+        ]];
+
+        // UA visitor -> 1200
+        $this->assertSame('<span>1200</span>', dbm_render_from_cache($payload, 'ROMANIA', ['country' => 'UA']));
+        
+        // RU visitor -> 2000
+        $this->assertSame('<span>2000</span>', dbm_render_from_cache($payload, 'ROMANIA', ['country' => 'RU']));
+
+        // PL visitor -> fallback WORLD -> 2000
+        $this->assertSame('<span>2000</span>', dbm_render_from_cache($payload, 'ROMANIA', ['country' => 'PL']));
+    }
 }

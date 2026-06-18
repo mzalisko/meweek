@@ -82,6 +82,7 @@
             'status' => 'Стан',
             'key' => 'Ключ',
             'linked_slot' => 'Прив\'язаний телефон',
+            'prices' => 'Список цін',
             'current_messenger_id' => 'Активний месенджер',
             'last_active_value' => 'Останнє значення',
             'last_active_url' => 'Останнє URL',
@@ -106,8 +107,23 @@
                     $newVal = $new[$k] ?? null;
                     if ($oldVal !== $newVal) {
                         $label = $labels[$k] ?? $k;
-                        $oldStr = is_bool($oldVal) ? ($oldVal ? 'так' : 'ні') : (is_array($oldVal) ? implode(', ', $oldVal) : (string)$oldVal);
-                        $newStr = is_bool($newVal) ? ($newVal ? 'так' : 'ні') : (is_array($newVal) ? implode(', ', $newVal) : (string)$newVal);
+                        if ($k === 'prices') {
+                            $formatPrices = function($val) {
+                                if (!is_array($val)) return (string)$val;
+                                $parts = [];
+                                foreach ($val as $p) {
+                                    $lbl = !empty($p['label']) ? $p['label'] : 'Ціна';
+                                    $geo = !empty($p['geo']) ? implode(',', $p['geo']) : 'WORLD';
+                                    $parts[] = $lbl . ': ' . ($p['value'] ?? '') . ' [' . $geo . ']';
+                                }
+                                return implode(' | ', $parts);
+                            };
+                            $oldStr = $formatPrices($oldVal);
+                            $newStr = $formatPrices($newVal);
+                        } else {
+                            $oldStr = is_bool($oldVal) ? ($oldVal ? 'так' : 'ні') : (is_array($oldVal) ? implode(', ', $oldVal) : (string)$oldVal);
+                            $newStr = is_bool($newVal) ? ($newVal ? 'так' : 'ні') : (is_array($newVal) ? implode(', ', $newVal) : (string)$newVal);
+                        }
                         if ($oldStr === '') $oldStr = '—';
                         if ($newStr === '') $newStr = '—';
                         

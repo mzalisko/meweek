@@ -11,16 +11,29 @@ if (! function_exists('dbm_render_from_cache')) {
     function dbm_render_from_cache(array $payload, string $key, array $opts = []): string
     {
         $value = null;
+        $fallback = null;
+        $country = $opts['country'] ?? 'WORLD';
+
         foreach ($payload['values'] ?? [] as $candidate) {
             if (($candidate['key'] ?? null) === $key) {
-                $value = $candidate;
-                break;
+                $geo = $candidate['geo'] ?? [];
+                if (in_array($country, $geo, true)) {
+                    $value = $candidate;
+                    break;
+                }
+                if (empty($geo) || in_array('WORLD', $geo, true)) {
+                    $fallback = $candidate;
+                }
             }
         }
+
+        if ($value === null) {
+            $value = $fallback;
+        }
+
         if ($value === null || in_array($value['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
             return '';
         }
-        $country = $opts['country'] ?? 'WORLD';
         $geo = $value['geo'] ?? [];
         if ($geo !== [] && ! in_array('WORLD', $geo, true) && ! in_array($country, $geo, true)) {
             return ''; // не для цієї країни

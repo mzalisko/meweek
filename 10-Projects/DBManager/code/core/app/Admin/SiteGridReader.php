@@ -89,6 +89,12 @@ class SiteGridReader
             'exhaustion_policy' => null,
         ];
 
+        if ($value->type->code === 'price') {
+            $base['prices'] = $value->content['prices'] ?? [];
+            $base['state'] = ($value->status ?? 'active') === 'hidden' ? 'hidden' : 'ok';
+            return $base;
+        }
+
         $slot = $value->phoneSlot;
         if (! $slot) {
             return $base;

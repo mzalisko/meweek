@@ -43,6 +43,30 @@ class ValueEditor extends Component
 
     public array $geoTagIds = [];
 
+    public array $prices = [];
+
+    public function updatedType(string $newType): void
+    {
+        if ($newType === 'price' && empty($this->prices)) {
+            $this->addPrice();
+        }
+    }
+
+    public function addPrice(): void
+    {
+        $this->prices[] = [
+            'label' => '',
+            'value' => '',
+            'geo' => ['WORLD'],
+        ];
+    }
+
+    public function removePrice(int $index): void
+    {
+        unset($this->prices[$index]);
+        $this->prices = array_values($this->prices);
+    }
+
     #[On('open-value-editor')]
     public function openCreate(int $siteId): void
     {
@@ -64,6 +88,7 @@ class ValueEditor extends Component
         $this->network = null;
         $this->url = null;
         $this->geoTagIds = [];
+        $this->prices = [];
         $this->resetValidation();
         $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
@@ -87,6 +112,7 @@ class ValueEditor extends Component
         $this->network   = $dv->content['network'] ?? null;
         $this->url       = $dv->content['url'] ?? null;
         $this->geoTagIds = $dv->geoTags->pluck('id')->toArray();
+        $this->prices    = $dv->content['prices'] ?? [];
         $this->resetValidation();
         $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
@@ -101,14 +127,18 @@ class ValueEditor extends Component
 
         $rules = [
             'key'   => ['required', 'regex:/^[a-z0-9_]+$/'],
-            'type'  => ['required', $this->valueId ? 'in:text,price,messenger,address,social,phone' : 'in:phone,messenger'],
+            'type'  => ['required', $this->valueId ? 'in:text,price,messenger,address,social,phone' : 'in:phone,messenger,price'],
         ];
 
-        if ($this->type !== 'phone') {
+        if ($this->type !== 'phone' && $this->type !== 'price') {
             $rules['value'] = ['required'];
         }
         if ($this->type === 'messenger') {
             $rules['network'] = ['nullable', 'string', 'max:64'];
+        }
+        if ($this->type === 'price') {
+            $rules['prices'] = ['required', 'array', 'min:1'];
+            $rules['prices.*.value'] = ['required'];
         }
 
         $this->validate($rules);
@@ -121,6 +151,21 @@ class ValueEditor extends Component
             if (! $this->valueId) {
                 $content['exhaustion_policy'] = 'hide';
             }
+        }
+        if ($this->type === 'price') {
+            $content = [
+                'prices' => $this->prices,
+            ];
+
+            // Auto-collect unique geo tag ids from price entries
+            $geoCodes = [];
+            foreach ($this->prices as $p) {
+                foreach ($p['geo'] ?? [] as $code) {
+                    $geoCodes[] = $code;
+                }
+            }
+            $geoCodes = array_unique($geoCodes);
+            $this->geoTagIds = GeoTag::whereIn('code', $geoCodes)->pluck('id')->toArray();
         }
 
         // Resolve value_type_id

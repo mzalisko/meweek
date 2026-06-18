@@ -32,9 +32,16 @@ class SitePayloadCompiler
 
         $items = [];
         foreach ($values as $value) {
-            $item = $this->buildItem($value, $values);
-            if ($item !== null) {
-                $items[] = $item;
+            if ($value->type->code === 'price') {
+                $priceItems = $this->buildPriceItems($value);
+                foreach ($priceItems as $pi) {
+                    $items[] = $pi;
+                }
+            } else {
+                $item = $this->buildItem($value, $values);
+                if ($item !== null) {
+                    $items[] = $item;
+                }
             }
         }
 
@@ -44,6 +51,36 @@ class SitePayloadCompiler
             'generated_at' => now()->toIso8601String(),
             'values' => $items,
         ];
+    }
+
+    private function buildPriceItems(DataValue $value): array
+    {
+        $prices = $value->content['prices'] ?? [];
+        if (empty($prices)) {
+            return [
+                [
+                    'key' => $value->key,
+                    'type' => 'price',
+                    'geo' => ['WORLD'],
+                    'value' => null,
+                    'state' => ($value->status ?? 'active') === 'hidden' ? 'hidden' : 'ok',
+                ]
+            ];
+        }
+
+        $items = [];
+        foreach ($prices as $price) {
+            $items[] = [
+                'key' => $value->key,
+                'type' => 'price',
+                'geo' => $price['geo'] ?? ['WORLD'],
+                'value' => $price['value'],
+                'label' => $price['label'] ?? null,
+                'state' => ($value->status ?? 'active') === 'hidden' ? 'hidden' : 'ok',
+            ];
+        }
+
+        return $items;
     }
 
     /** @return Collection<string, DataValue> */
