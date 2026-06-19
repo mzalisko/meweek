@@ -158,18 +158,45 @@ class AdminPages
     {
         $cache = get_option('dbm_cache');
         $cache = is_array($cache) ? $cache : ['values' => []];
-        $builder = new SnippetBuilder($this->settings->shortcode);
 
         $this->adminStyles();
 
         echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Вставка</span><h1>Коды для сайта</h1><p>Готовые шорткоды для значений и презентационного блока.</p></div></div>';
         echo '<div class="dbm-card dbm-highlight"><div><h2>Презентационный блок</h2><p>Интерактивный блок с телефонами, мессенджерами и ценами из локального кеша.</p></div><code>[dbm_presentation]</code><code>[dbm_block]</code></div>';
-        echo '<div class="dbm-card"><div class="dbm-card-head"><div><h2>Отдельные значения</h2><p>Для телефонов формат <code>tel</code> оставляет чистый номер в href.</p></div></div>';
-        echo '<table class="dbm-table"><thead><tr><th>Ключ</th><th>Шорткод</th><th>tel</th><th>PHP</th></tr></thead><tbody>';
+        echo '<div class="dbm-card"><div class="dbm-card-head"><div><h2>Отдельные значения</h2><p>Для каждого типа данных доступны специализированные шорткоды и PHP-функции.</p></div></div>';
+        echo '<table class="dbm-table"><thead><tr><th>Данные</th><th>Шорткоды для вставки</th><th>PHP вызовы</th></tr></thead><tbody>';
         foreach ($this->orderedValues($cache) as $value) {
-            $snippet = $builder->forKey((string) ($value['key'] ?? ''));
-            echo '<tr><td><div class="dbm-key">' . esc_html($value['key'] ?? '') . '</div>' . $this->typeBadge((string) ($value['type'] ?? '')) . '</td><td><code>' . esc_html($snippet['shortcode']) . '</code></td>';
-            echo '<td><code>' . esc_html($snippet['tel']) . '</code></td><td><code>' . esc_html($snippet['php']) . '</code></td></tr>';
+            $key = (string) ($value['key'] ?? '');
+            $type = (string) ($value['type'] ?? '');
+            
+            echo '<tr>';
+            echo '<td><div class="dbm-key">' . esc_html($key) . '</div>' . $this->typeBadge($type) . '</td>';
+            
+            echo '<td>';
+            if ($type === 'phone') {
+                echo '<div class="dbm-snippet-item"><span>Стандартный:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Ссылка tel:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '" format="tel"]</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Блок с мессенджерами:</span> <code>[dbm_phone_block key="' . esc_html($key) . '"]</code></div>';
+            } elseif ($type === 'price') {
+                echo '<div class="dbm-snippet-item"><span>Универсальная цена:</span> <code>[dbm_price key="' . esc_html($key) . '"]</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Числовое значение:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
+            } else {
+                echo '<div class="dbm-snippet-item"><code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
+            }
+            echo '</td>';
+            
+            echo '<td>';
+            if ($type === 'phone') {
+                echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Блок:</span> <code>dbm_phone_block(\'' . esc_html($key) . '\')</code></div>';
+            } elseif ($type === 'price') {
+                echo '<div class="dbm-snippet-item"><span>Цена с валютой:</span> <code>dbm_price(\'' . esc_html($key) . '\')</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
+            } else {
+                echo '<div class="dbm-snippet-item"><code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
+            }
+            echo '</td>';
+            echo '</tr>';
         }
         echo '</tbody></table></div></div>';
     }
@@ -328,6 +355,10 @@ class AdminPages
 .dbm-field-row code,.dbm-card code{display:inline-flex;max-width:100%;padding:4px 7px;border-radius:6px;background:#f1f4f6;color:#22313f;overflow-wrap:anywhere;white-space:normal}
 .dbm-form textarea,.dbm-form input[type=text],.dbm-select{max-width:620px;border-color:var(--dbm-line);border-radius:8px}
 @media (max-width:782px){.dbm-hero{display:block}.dbm-version,.dbm-status-card{text-align:left;margin-top:12px}.dbm-stats{grid-template-columns:1fr 1fr}.dbm-table{display:block;overflow-x:auto}.dbm-field-row{display:block}.dbm-field-row code,.dbm-field-row strong{display:inline-block;margin-top:5px}}
+.dbm-snippet-item{margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.dbm-snippet-item:last-child{margin-bottom:0}
+.dbm-snippet-item span{color:var(--dbm-muted);font-size:10px;font-weight:700;text-transform:uppercase;min-width:115px;display:inline-block}
+.dbm-snippet-item code{vertical-align:middle}
 </style>
 HTML;
     }

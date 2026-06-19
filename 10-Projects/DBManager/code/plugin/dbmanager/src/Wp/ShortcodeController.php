@@ -1,73 +1,150 @@
 <?php
 
-namespace DBM\Wp;
+namespace DBM\Wp {
 
-use DBM\Config\Settings;
+    use DBM\Config\Settings;
 
-class ShortcodeController
-{
-    public function __construct(
-        private Settings $settings,
-        private string $country
-    ) {}
-
-    public function register(): void
+    class ShortcodeController
     {
-        if (! function_exists('dbm_get')) {
-            require_once dirname(__DIR__, 2) . '/../shared/render-core.php';
+        public function __construct(
+            private Settings $settings,
+            private string $country
+        ) {}
 
-            eval('function dbm_get(string $key, array $opts = []): string {
-                $cache = get_option("dbm_cache"); $cache = is_array($cache) ? $cache : ["values" => []];
-                $st = get_option("dbm_settings");
-                $opts["class"] = $opts["class"] ?? (is_array($st) ? (string)($st["css_class"] ?? "") : "");
-                if (empty($opts["country"])) {
-                    $simulated = get_option("dbm_simulated_country");
-                    $opts["country"] = (!empty($simulated) && $simulated !== "disabled") ? strtoupper($simulated) : ($GLOBALS["dbm_country"] ?? "WORLD");
-                }
-                return dbm_render_from_cache($cache, $key, $opts);
-            }');
-        }
+        public function register(): void
+        {
+            if (! function_exists('dbm_get')) {
+                require_once dirname(__DIR__, 2) . '/../shared/render-core.php';
 
-        $country = $this->country;
-        $GLOBALS['dbm_country'] = $country;
-
-        add_shortcode($this->settings->shortcode, function ($atts) use ($country) {
-            $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
-
-            return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
-        });
-
-        $presentationRenderer = new PresentationBlockRenderer();
-        $presentationShortcode = function ($atts) use ($presentationRenderer, $country) {
-            $atts = shortcode_atts(['title' => ''], $atts);
-            $cache = get_option('dbm_cache');
-            $cache = is_array($cache) ? $cache : ['values' => []];
-
-            return $presentationRenderer->render($cache, [
-                'title' => (string) ($atts['title'] ?? ''),
-                'country' => $country,
-            ]);
-        };
-
-        add_shortcode('dbm_presentation', $presentationShortcode);
-        add_shortcode('dbm_block', $presentationShortcode);
-
-        add_shortcode('dbm_phone_block', function ($atts) use ($country) {
-            $atts = shortcode_atts([
-                'key' => '',
-                'layout' => 'row', // row або column
-                'class' => '',
-            ], $atts);
-
-            $key = (string) $atts['key'];
-            if ($key === '') {
-                return '';
+                eval('function dbm_get(string $key, array $opts = []): string {
+                    $cache = get_option("dbm_cache"); $cache = is_array($cache) ? $cache : ["values" => []];
+                    $st = get_option("dbm_settings");
+                    $opts["class"] = $opts["class"] ?? (is_array($st) ? (string)($st["css_class"] ?? "") : "");
+                    if (empty($opts["country"])) {
+                        $simulated = get_option("dbm_simulated_country");
+                        $opts["country"] = (!empty($simulated) && $simulated !== "disabled") ? strtoupper($simulated) : ($GLOBALS["dbm_country"] ?? "WORLD");
+                    }
+                    return dbm_render_from_cache($cache, $key, $opts);
+                }');
             }
 
+            $country = $this->country;
+            $GLOBALS['dbm_country'] = $country;
+
+            add_shortcode($this->settings->shortcode, function ($atts) use ($country) {
+                $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
+
+                return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
+            });
+
+            $presentationRenderer = new PresentationBlockRenderer();
+            $presentationShortcode = function ($atts) use ($presentationRenderer, $country) {
+                $atts = shortcode_atts(['title' => ''], $atts);
+                $cache = get_option('dbm_cache');
+                $cache = is_array($cache) ? $cache : ['values' => []];
+
+                return $presentationRenderer->render($cache, [
+                    'title' => (string) ($atts['title'] ?? ''),
+                    'country' => $country,
+                ]);
+            };
+
+            add_shortcode('dbm_presentation', $presentationShortcode);
+            add_shortcode('dbm_block', $presentationShortcode);
+
+            add_shortcode('dbm_phone_block', function ($atts) {
+                $atts = shortcode_atts([
+                    'key' => '',
+                    'layout' => 'row', // row або column
+                    'class' => '',
+                ], $atts);
+
+                return dbm_get_phone_block((string) $atts['key'], $atts);
+            });
+
+            add_shortcode('dbm_price', function ($atts) {
+                $atts = shortcode_atts([
+                    'key' => '',
+                    'show_label' => 'yes', // yes або no
+                    'class' => '',
+                    'tag' => 'span', // span, div, strong і т.д.
+                ], $atts);
+
+                return dbm_get_price((string) $atts['key'], $atts);
+            });
+        }
+    }
+}
+
+namespace {
+    if (! function_exists('dbm_get_price')) {
+        function dbm_get_price(string $key, array $opts = []): string
+        {
             $cache = get_option('dbm_cache');
             $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
 
-            // Шукаємо телефон
+            $simulated = get_option('dbm_simulated_country');
+            $country = (! empty($simulated) && $simulated !== 'disabled') ? strtoupper($simulated) : ($GLOBALS['dbm_country'] ?? 'WORLD');
+
+            $chosen = null;
+            $fallback = null;
+            foreach ($values as $candidate) {
+                if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
+                    $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                    if (in_array('!' . $country, $geo, true)) {
+                        continue;
+                    }
+                    if (in_array($country, $geo, true)) {
+                        $chosen = $candidate;
+                        break;
+                    }
+                    if (empty($geo) || in_array('WORLD', $geo, true)) {
+                        $fallback = $candidate;
+                    }
+                }
+            }
+            $price = $chosen ?? $fallback;
+
+            if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
+                return '';
+            }
+
+            $val = trim((string) ($price['value'] ?? ''));
+            if ($val === '') {
+                return '';
+            }
+
+            $label = trim((string) ($price['label'] ?? ''));
+            $showLabel = isset($opts['show_label']) ? in_array(strtolower((string) $opts['show_label']), ['yes', '1', 'true'], true) : true;
+
+            $display = esc_html($val);
+            if ($showLabel && $label !== '') {
+                $display .= ' ' . esc_html($label);
+            }
+
+            $tag = isset($opts['tag']) && in_array(strtolower($opts['tag']), ['span', 'div', 'strong', 'p', 'b'], true) ? strtolower($opts['tag']) : 'span';
+            $class = ! empty($opts['class']) ? ' class="' . esc_attr($opts['class']) . '"' : '';
+
+            return '<' . $tag . $class . '>' . $display . '</' . $tag . '>';
+        }
+    }
+
+    if (! function_exists('dbm_price')) {
+        function dbm_price(string $key, array $opts = []): string
+        {
+            return dbm_get_price($key, $opts);
+        }
+    }
+
+    if (! function_exists('dbm_get_phone_block')) {
+        function dbm_get_phone_block(string $key, array $opts = []): string
+        {
+            $cache = get_option('dbm_cache');
+            $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
+
+            $simulated = get_option('dbm_simulated_country');
+            $country = (! empty($simulated) && $simulated !== 'disabled') ? strtoupper($simulated) : ($GLOBALS['dbm_country'] ?? 'WORLD');
+
             $chosen = null;
             $fallback = null;
             foreach ($values as $candidate) {
@@ -97,7 +174,6 @@ class ShortcodeController
                 return '';
             }
 
-            // Шукаємо месенджери
             $messengers = [];
             foreach ($values as $candidate) {
                 if (($candidate['type'] ?? null) === 'messenger') {
@@ -125,8 +201,8 @@ class ShortcodeController
                 }
             }
 
-            $layout = in_array(strtolower($atts['layout']), ['row', 'column'], true) ? strtolower($atts['layout']) : 'row';
-            $extraCls = $atts['class'] !== '' ? ' ' . esc_attr($atts['class']) : '';
+            $layout = isset($opts['layout']) && in_array(strtolower($opts['layout']), ['row', 'column'], true) ? strtolower($opts['layout']) : 'row';
+            $extraCls = ! empty($opts['class']) ? ' ' . esc_attr($opts['class']) : '';
 
             $phoneIcon = '<svg class="dbm-phone-block__phone-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
             
@@ -180,64 +256,13 @@ class ShortcodeController
             $html .= '</div>';
 
             return $html;
-        });
+        }
+    }
 
-        add_shortcode('dbm_price', function ($atts) use ($country) {
-            $atts = shortcode_atts([
-                'key' => '',
-                'show_label' => 'yes', // yes або no
-                'class' => '',
-                'tag' => 'span', // span, div, strong і т.д.
-            ], $atts);
-
-            $key = (string) $atts['key'];
-            if ($key === '') {
-                return '';
-            }
-
-            $cache = get_option('dbm_cache');
-            $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
-
-            $chosen = null;
-            $fallback = null;
-            foreach ($values as $candidate) {
-                if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
-                    $geo = array_map('strtoupper', $candidate['geo'] ?? []);
-                    if (in_array('!' . $country, $geo, true)) {
-                        continue;
-                    }
-                    if (in_array($country, $geo, true)) {
-                        $chosen = $candidate;
-                        break;
-                    }
-                    if (empty($geo) || in_array('WORLD', $geo, true)) {
-                        $fallback = $candidate;
-                    }
-                }
-            }
-            $price = $chosen ?? $fallback;
-
-            if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
-                return '';
-            }
-
-            $val = trim((string) ($price['value'] ?? ''));
-            if ($val === '') {
-                return '';
-            }
-
-            $label = trim((string) ($price['label'] ?? ''));
-            $showLabel = in_array(strtolower($atts['show_label']), ['yes', '1', 'true'], true);
-
-            $display = esc_html($val);
-            if ($showLabel && $label !== '') {
-                $display .= ' ' . esc_html($label);
-            }
-
-            $tag = in_array(strtolower($atts['tag']), ['span', 'div', 'strong', 'p', 'b'], true) ? strtolower($atts['tag']) : 'span';
-            $class = $atts['class'] !== '' ? ' class="' . esc_attr($atts['class']) . '"' : '';
-
-            return '<' . $tag . $class . '>' . $display . '</' . $tag . '>';
-        });
+    if (! function_exists('dbm_phone_block')) {
+        function dbm_phone_block(string $key, array $opts = []): string
+        {
+            return dbm_get_phone_block($key, $opts);
+        }
     }
 }

@@ -33,34 +33,68 @@ add_action('init', function (): void {
         return dbm_render_from_cache($cache, $key, $opts);
     }
 
-    // Аварийный фолбек активен только когда плагин удален — гео-детект требует классов
-    // плагина, которых уже нет, поэтому показываем значения со скоупом «Мир» (сознательная деградация)
-    // или используем сохраненную страну симуляции.
-    add_shortcode($shortcode, function ($atts) {
-        $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
+    function dbm_get_price(string $key, array $opts = []): string
+    {
+        $cache = get_option('dbm_cache');
+        $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
+
         $simulated = get_option('dbm_simulated_country');
         $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
 
-        return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
-    });
+        $chosen = null;
+        $fallback = null;
+        foreach ($values as $candidate) {
+            if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
+                $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                if (in_array('!' . $country, $geo, true)) {
+                    continue;
+                }
+                if (in_array($country, $geo, true)) {
+                    $chosen = $candidate;
+                    break;
+                }
+                if (empty($geo) || in_array('WORLD', $geo, true)) {
+                    $fallback = $candidate;
+                }
+            }
+        }
+        $price = $chosen ?? $fallback;
 
-    add_shortcode('dbm_phone_block', function ($atts) {
-        $atts = shortcode_atts([
-            'key' => '',
-            'layout' => 'row', // row або column
-            'class' => '',
-        ], $atts);
-
-        $key = (string) $atts['key'];
-        if ($key === '') {
+        if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
             return '';
         }
 
-        $simulated = get_option('dbm_simulated_country');
-        $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
+        $val = trim((string) ($price['value'] ?? ''));
+        if ($val === '') {
+            return '';
+        }
 
+        $label = trim((string) ($price['label'] ?? ''));
+        $showLabel = isset($opts['show_label']) ? in_array(strtolower((string) $opts['show_label']), ['yes', '1', 'true'], true) : true;
+
+        $display = htmlspecialchars($val, ENT_QUOTES);
+        if ($showLabel && $label !== '') {
+            $display .= ' ' . htmlspecialchars($label, ENT_QUOTES);
+        }
+
+        $tag = isset($opts['tag']) && in_array(strtolower($opts['tag']), ['span', 'div', 'strong', 'p', 'b'], true) ? strtolower($opts['tag']) : 'span';
+        $class = ! empty($opts['class']) ? ' class="' . htmlspecialchars($opts['class'], ENT_QUOTES) . '"' : '';
+
+        return '<' . $tag . $class . '>' . $display . '</' . $tag . '>';
+    }
+
+    function dbm_price(string $key, array $opts = []): string
+    {
+        return dbm_get_price($key, $opts);
+    }
+
+    function dbm_get_phone_block(string $key, array $opts = []): string
+    {
         $cache = get_option('dbm_cache');
         $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
+
+        $simulated = get_option('dbm_simulated_country');
+        $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
 
         $chosen = null;
         $fallback = null;
@@ -118,8 +152,8 @@ add_action('init', function (): void {
             }
         }
 
-        $layout = in_array(strtolower($atts['layout']), ['row', 'column'], true) ? strtolower($atts['layout']) : 'row';
-        $extraCls = $atts['class'] !== '' ? ' ' . htmlspecialchars($atts['class'], ENT_QUOTES) : '';
+        $layout = isset($opts['layout']) && in_array(strtolower($opts['layout']), ['row', 'column'], true) ? strtolower($opts['layout']) : 'row';
+        $extraCls = ! empty($opts['class']) ? ' ' . htmlspecialchars($opts['class'], ENT_QUOTES) : '';
 
         $phoneIcon = '<svg class="dbm-phone-block__phone-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
         
@@ -173,6 +207,32 @@ add_action('init', function (): void {
         $html .= '</div>';
 
         return $html;
+    }
+
+    function dbm_phone_block(string $key, array $opts = []): string
+    {
+        return dbm_get_phone_block($key, $opts);
+    }
+
+    // Аварийный фолбек активен только когда плагин удален — гео-детект требует классов
+    // плагина, которых уже нет, поэтому показываем значения со скоупом «Мир» (сознательная деградация)
+    // или используем сохраненную страну симуляции.
+    add_shortcode($shortcode, function ($atts) {
+        $atts = shortcode_atts(['key' => '', 'format' => ''], $atts);
+        $simulated = get_option('dbm_simulated_country');
+        $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
+
+        return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
+    });
+
+    add_shortcode('dbm_phone_block', function ($atts) {
+        $atts = shortcode_atts([
+            'key' => '',
+            'layout' => 'row', // row або column
+            'class' => '',
+        ], $atts);
+
+        return dbm_get_phone_block((string) $atts['key'], $atts);
     });
 
     add_shortcode('dbm_price', function ($atts) {
@@ -183,56 +243,7 @@ add_action('init', function (): void {
             'tag' => 'span', // span, div, strong і т.д.
         ], $atts);
 
-        $key = (string) $atts['key'];
-        if ($key === '') {
-            return '';
-        }
-
-        $simulated = get_option('dbm_simulated_country');
-        $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
-
-        $cache = get_option('dbm_cache');
-        $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
-
-        $chosen = null;
-        $fallback = null;
-        foreach ($values as $candidate) {
-            if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
-                $geo = array_map('strtoupper', $candidate['geo'] ?? []);
-                if (in_array('!' . $country, $geo, true)) {
-                    continue;
-                }
-                if (in_array($country, $geo, true)) {
-                    $chosen = $candidate;
-                    break;
-                }
-                if (empty($geo) || in_array('WORLD', $geo, true)) {
-                    $fallback = $candidate;
-                }
-            }
-        }
-        $price = $chosen ?? $fallback;
-
-        if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
-            return '';
-        }
-
-        $val = trim((string) ($price['value'] ?? ''));
-        if ($val === '') {
-            return '';
-        }
-
-        $label = trim((string) ($price['label'] ?? ''));
-        $showLabel = in_array(strtolower($atts['show_label']), ['yes', '1', 'true'], true);
-
-        $display = htmlspecialchars($val, ENT_QUOTES);
-        if ($showLabel && $label !== '') {
-            $display .= ' ' . htmlspecialchars($label, ENT_QUOTES);
-        }
-
-        $tag = in_array(strtolower($atts['tag']), ['span', 'div', 'strong', 'p', 'b'], true) ? strtolower($atts['tag']) : 'span';
-        $class = $atts['class'] !== '' ? ' class="' . htmlspecialchars($atts['class'], ENT_QUOTES) . '"' : '';
-
-        return '<' . $tag . $class . '>' . $display . '</' . $tag . '>';
+        return dbm_get_price((string) $atts['key'], $atts);
     });
+});
 });

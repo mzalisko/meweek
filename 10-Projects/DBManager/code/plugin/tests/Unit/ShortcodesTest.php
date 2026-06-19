@@ -238,5 +238,41 @@ namespace DBM\Tests\Unit {
             // Must NOT contain WhatsApp messenger link since UA is excluded
             $this->assertStringNotContainsString('href="https://wa.me/123"', $html);
         }
+
+        public function test_global_helper_functions_work_identically(): void
+        {
+            $this->setupCache([
+                [
+                    'key' => 'romania',
+                    'type' => 'price',
+                    'geo' => ['UA'],
+                    'value' => '100',
+                    'label' => 'грн',
+                    'state' => 'ok'
+                ],
+                [
+                    'key' => 'main_phone',
+                    'type' => 'phone',
+                    'geo' => ['WORLD'],
+                    'value' => '+380441234567',
+                    'display_value' => '+380 (44) 123-45-67',
+                    'state' => 'ok'
+                ]
+            ]);
+
+            $settings = new Settings('', 'dbm', '');
+            $controller = new ShortcodeController($settings, 'UA');
+            $controller->register();
+
+            // Test global dbm_price
+            $this->assertTrue(function_exists('dbm_price'));
+            $this->assertSame('<span>100 грн</span>', dbm_price('romania'));
+
+            // Test global dbm_phone_block
+            $this->assertTrue(function_exists('dbm_phone_block'));
+            $htmlBlock = dbm_phone_block('main_phone');
+            $this->assertStringContainsString('href="tel:+380441234567"', $htmlBlock);
+            $this->assertStringContainsString('+380 (44) 123-45-67', $htmlBlock);
+        }
     }
 }
