@@ -265,7 +265,9 @@
                                 @endif
                             </div>
                             <div class="flex min-w-0 flex-wrap gap-[3px] items-center">
-                                @if($row['changed'] && $row['geo'] !== $row['new_geo'])
+                                @if($row['type'] === 'phone_reserve')
+                                    <span class="text-mut">—</span>
+                                @elseif($row['changed'] && $row['geo'] !== $row['new_geo'])
                                     <span class="text-mut line-through flex flex-wrap gap-[2px] opacity-60">
                                         @foreach($row['geo'] as $geo)
                                             <span class="text-[8px]">{{ $geo }}</span>
@@ -318,7 +320,7 @@
                                 @endif
                             </div>
                             <div class="min-w-0 text-ink text-[13px]">
-                                @if(in_array($row['type'], ['phone', 'phone_reserve'], true))
+                                @if($row['type'] === 'phone')
                                     @php
                                         $hasFormatChange = ($row['format'] ?? '') !== ($row['new_format'] ?? '');
                                     @endphp
