@@ -7,10 +7,17 @@ use App\Models\Publication;
 use App\Models\Site;
 use App\Services\Failover\SlotResolver;
 use App\Admin\SiteHierarchy;
+use App\Support\PhoneFormatter;
 use Illuminate\Support\Collection;
 
 class SitePayloadCompiler
 {
+    private const TYPE_ORDER = [
+        'phone' => 0,
+        'messenger' => 1,
+        'price' => 2,
+    ];
+
     public function __construct(private SlotResolver $resolver) {}
 
     public function publish(Site $site): Publication
@@ -93,6 +100,12 @@ class SitePayloadCompiler
             ->where('scope_type', 'site')
             ->where('scope_id', $site->id)
             ->get()
+            ->sortBy(fn (DataValue $value) => sprintf(
+                '%02d_%s_%010d',
+                self::TYPE_ORDER[$value->type?->code] ?? 99,
+                strtolower($value->key),
+                $value->id
+            ))
             ->keyBy('key')
             ->toBase();
     }
@@ -119,10 +132,14 @@ class SitePayloadCompiler
         }
 
         $resolved = $this->resolver->resolve($slot);
+        $raw = $resolved->visible ? $resolved->number : null;
+        $format = trim((string) ($value->content['phone_format'] ?? ''));
 
         return $base + [
             'state' => $resolved->visible ? $resolved->state : 'hidden',
-            'value' => $resolved->visible ? $resolved->number : null,
+            'value' => $raw,
+            'display_value' => PhoneFormatter::format($raw, $format),
+            'phone_format' => $format !== '' ? $format : null,
         ];
     }
 
@@ -130,13 +147,18 @@ class SitePayloadCompiler
     {
         $content = $value->content ?? [];
         $linkedSlotRaw = $content['linked_slot'] ?? null;
-        $linkedSlotStr = is_string($linkedSlotRaw) && $linkedSlotRaw !== '' ? $linkedSlotRaw : null;
+        $linkedSlotStr = null;
+        if (is_array($linkedSlotRaw)) {
+            $linkedSlotStr = count($linkedSlotRaw) > 0 ? (string) $linkedSlotRaw[0] : null;
+        } elseif (is_string($linkedSlotRaw) && $linkedSlotRaw !== '') {
+            $linkedSlotStr = $linkedSlotRaw;
+        }
 
         $network = $content['network'] ?? 'unknown';
         $base += [
             'network' => $network,
             'name' => $content['value'] ?? ($content['name'] ?? $value->key),
-            'linked_slot' => null,
+            'linked_slot' => $linkedSlotStr,
             'messenger_slot' => $content['messenger_slot'] ?? $linkedSlotStr ?? null,
             'pinned' => (bool) ($content['pinned'] ?? false),
             'return_mode' => $content['return_mode'] ?? 'auto',
@@ -149,8 +171,10 @@ class SitePayloadCompiler
         $groupKey = $content['messenger_slot'] ?? $linkedSlotStr ?? $value->key;
         $group = $messengers
             ->filter(fn (DataValue $dv) => ($dv->content['messenger_slot']
-                ?? (is_string($dv->content['linked_slot'] ?? null) && ($dv->content['linked_slot'] ?? '') !== ''
-                    ? $dv->content['linked_slot'] : null)
+                ?? (is_array($dv->content['linked_slot'] ?? null)
+                    ? (($dv->content['linked_slot'] ?? [])[0] ?? null)
+                    : (is_string($dv->content['linked_slot'] ?? null) && ($dv->content['linked_slot'] ?? '') !== ''
+                        ? $dv->content['linked_slot'] : null))
                 ?? $dv->key) === $groupKey)
             ->sortBy(fn (DataValue $dv) => sprintf(
                 '%010d_%010d',

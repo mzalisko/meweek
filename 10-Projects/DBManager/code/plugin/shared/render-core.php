@@ -1,11 +1,11 @@
 <?php
 
-// Спільне ядро рендеру: одне джерело правди для основного плагіна і mu-фолбека.
-// Без жодних викликів WP — лише чисте перетворення кеш-payload у рядок.
+// Совместное ядро рендера: один источник правды для основного плагина и mu-фолбека.
+// Без каких-либо вызовов WP — только чистое преобразование кеш-payload в строку.
 
 if (! function_exists('dbm_render_from_cache')) {
     /**
-     * @param array $payload розпакований кеш (site/version/values)
+     * @param array $payload распакованный кеш (site/version/values)
      * @param array $opts    ['format' => 'tel'|'link'|'', 'class' => string]
      */
     function dbm_render_from_cache(array $payload, string $key, array $opts = []): string
@@ -18,7 +18,7 @@ if (! function_exists('dbm_render_from_cache')) {
             if (($candidate['key'] ?? null) === $key) {
                 $geo = array_map('strtoupper', $candidate['geo'] ?? []);
                 
-                // Якщо є пряме виключення цієї країни (наприклад, !RU)
+                // Если есть прямое исключение этой страны (например, !RU)
                 if (in_array('!' . $country, $geo, true)) {
                     continue;
                 }
@@ -43,11 +43,11 @@ if (! function_exists('dbm_render_from_cache')) {
         
         $geo = array_map('strtoupper', $value['geo'] ?? []);
         if (in_array('!' . $country, $geo, true)) {
-            return ''; // виключено для цієї країни
+            return ''; // исключено для этой страны
         }
         
         if ($geo !== [] && ! in_array('WORLD', $geo, true) && ! in_array($country, $geo, true)) {
-            return ''; // не для цієї країни
+            return ''; // не для этой страны
         }
         $raw = (string) ($value['value'] ?? '');
         $display = (string) ($value['display_value'] ?? $raw);

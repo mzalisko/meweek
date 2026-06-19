@@ -15,10 +15,10 @@ class AdminPages
     {
         add_action('admin_menu', function (): void {
             add_menu_page('DBManager', 'DBManager', 'edit_posts', 'dbm-data', [$this, 'renderData']);
-            add_submenu_page('dbm-data', 'Дані', 'Дані', 'edit_posts', 'dbm-data', [$this, 'renderData']);
+            add_submenu_page('dbm-data', 'Данные', 'Данные', 'edit_posts', 'dbm-data', [$this, 'renderData']);
             add_submenu_page('dbm-data', 'Вставка', 'Вставка', 'edit_posts', 'dbm-insert', [$this, 'renderInsert']);
-            add_submenu_page('dbm-data', 'Геосимуляція', 'Геосимуляція', 'edit_posts', 'dbm-geosim', [$this, 'renderGeoSim']);
-            add_submenu_page('dbm-data', 'Налаштування', 'Налаштування', 'manage_options', 'dbm-settings', [$this, 'renderSettings']);
+            add_submenu_page('dbm-data', 'Геосимуляция', 'Геосимуляция', 'edit_posts', 'dbm-geosim', [$this, 'renderGeoSim']);
+            add_submenu_page('dbm-data', 'Настройки', 'Настройки', 'manage_options', 'dbm-settings', [$this, 'renderSettings']);
         });
 
         add_action('admin_init', function (): void {
@@ -62,7 +62,7 @@ class AdminPages
                 add_settings_error(
                     'dbm_settings',
                     'dbm_connection_invalid',
-                    'Невірний ключ підключення. Створіть новий ключ у DBManager Core і вставте його повністю.',
+                    'Неверный ключ подключения. Создайте новый ключ в DBManager Core и вставьте его полностью.',
                     'error'
                 );
 
@@ -80,7 +80,7 @@ class AdminPages
             add_settings_error(
                 'dbm_settings',
                 'dbm_connection_saved',
-                'Підключення збережено. Плагін слухає підписані оновлення від DataBridge.',
+                'Подключение сохранено. Плагин слушает подписанные обновления от DataBridge.',
                 'updated'
             );
         }
@@ -98,27 +98,60 @@ class AdminPages
         $this->adminStyles();
 
         echo '<div class="wrap dbm-admin">';
-        echo '<div class="dbm-hero"><div><span class="dbm-eyebrow">DBManager</span><h1>Дані сайту</h1><p>Плагін показує кеш, доставлений із центральної CRM. Редагування відбувається тільки у Core.</p></div>';
-        echo '<div class="dbm-version"><span>Версія</span><strong>' . (int) ($cache['version'] ?? 0) . '</strong></div></div>';
+        echo '<div class="dbm-hero"><div><span class="dbm-eyebrow">DBManager</span><h1>Данные сайта</h1><p>Плагин показывает кеш, доставленный из центральной CRM. Редактирование происходит только в Core.</p></div>';
+        echo '<div class="dbm-version"><span>Версия</span><strong>' . (int) ($cache['version'] ?? 0) . '</strong></div></div>';
         echo '<div class="dbm-stats">';
-        echo '<div class="dbm-stat"><span>Сайт</span><strong>' . esc_html((string) ($cache['site'] ?? 'локальний кеш')) . '</strong></div>';
-        echo '<div class="dbm-stat"><span>Номери</span><strong>' . (int) ($counts['phone'] ?? 0) . '</strong></div>';
-        echo '<div class="dbm-stat"><span>Месенджери</span><strong>' . (int) ($counts['messenger'] ?? 0) . '</strong></div>';
-        echo '<div class="dbm-stat"><span>Ціни</span><strong>' . (int) ($counts['price'] ?? 0) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>Сайт</span><strong>' . esc_html((string) ($cache['site'] ?? 'локальный кеш')) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>Номера</span><strong>' . (int) ($counts['phone'] ?? 0) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>Мессенджеры</span><strong>' . (int) ($counts['messenger'] ?? 0) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>Цены</span><strong>' . (int) ($counts['price'] ?? 0) . '</strong></div>';
         echo '</div>';
         echo '<div class="dbm-card">';
-        echo '<div class="dbm-card-head"><div><h2>Поточні значення</h2><p>Порядок відповідає CRM: телефони, месенджери, ціни.</p></div></div>';
-        echo '<table class="dbm-table"><thead><tr><th>Дані</th><th>Гео</th><th>Стан</th><th>Значення</th></tr></thead><tbody>';
+        echo '<div class="dbm-card-head"><div><h2>Текущие значения</h2><p>Порядок соответствует CRM: телефоны, мессенджеры, цены.</p></div>';
+        echo '<div class="dbm-tabs" style="display: flex; gap: 6px; align-self: center;">';
+        echo '<button type="button" class="button button-primary dbm-tab-btn" data-filter="all">Все</button>';
+        echo '<button type="button" class="button button-secondary dbm-tab-btn" data-filter="phone">Номера</button>';
+        echo '<button type="button" class="button button-secondary dbm-tab-btn" data-filter="messenger">Мессенджеры</button>';
+        echo '<button type="button" class="button button-secondary dbm-tab-btn" data-filter="price">Цены</button>';
+        echo '</div>';
+        echo '</div>';
+        echo '<table class="dbm-table"><thead><tr><th>Данные</th><th>Гео</th><th>Статус</th><th>Значение</th></tr></thead><tbody>';
         foreach ($values as $value) {
-            echo '<tr>';
-            echo '<td><div class="dbm-key">' . esc_html((string) ($value['key'] ?? '')) . '</div>' . $this->typeBadge((string) ($value['type'] ?? '')) . '</td>';
+            $type = (string) ($value['type'] ?? '');
+            echo '<tr class="dbm-row" data-type="' . esc_attr($type) . '">';
+            echo '<td><div class="dbm-key">' . esc_html((string) ($value['key'] ?? '')) . '</div>' . $this->typeBadge($type) . '</td>';
             echo '<td>' . $this->geoChips($value['geo'] ?? []) . '</td>';
             echo '<td>' . $this->stateBadge((string) ($value['state'] ?? 'ok')) . '</td>';
-            echo '<td>' . $this->valuePreview($value) . '</td>';
+            echo '<td>' . $this->valuePreview($value, $values) . '</td>';
             echo '</tr>';
         }
         echo '</tbody></table>';
-        echo '</div></div>';
+        echo '</div>';
+        echo '<script>
+        (function() {
+            var tabs = document.querySelectorAll(".dbm-tab-btn");
+            var rows = document.querySelectorAll(".dbm-row");
+            tabs.forEach(function(tab) {
+                tab.addEventListener("click", function() {
+                    var filter = tab.getAttribute("data-filter");
+                    tabs.forEach(function(t) {
+                        t.classList.remove("button-primary");
+                        t.classList.add("button-secondary");
+                    });
+                    tab.classList.remove("button-secondary");
+                    tab.classList.add("button-primary");
+                    rows.forEach(function(row) {
+                        if (filter === "all" || row.getAttribute("data-type") === filter) {
+                            row.style.display = "";
+                        } else {
+                            row.style.display = "none";
+                        }
+                    });
+                });
+            });
+        })();
+        </script>';
+        echo '</div>';
     }
 
     public function renderInsert(): void
@@ -129,9 +162,9 @@ class AdminPages
 
         $this->adminStyles();
 
-        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Вставка</span><h1>Коди для сайту</h1><p>Готові шорткоди для значень і презентаційного блоку.</p></div></div>';
-        echo '<div class="dbm-card dbm-highlight"><div><h2>Презентаційний блок</h2><p>Інтерактивний блок із телефонами, месенджерами й цінами з локального кешу.</p></div><code>[dbm_presentation]</code><code>[dbm_block]</code></div>';
-        echo '<div class="dbm-card"><div class="dbm-card-head"><div><h2>Окремі значення</h2><p>Для телефонів формат <code>tel</code> лишає чистий номер у href.</p></div></div>';
+        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Вставка</span><h1>Коды для сайта</h1><p>Готовые шорткоды для значений и презентационного блока.</p></div></div>';
+        echo '<div class="dbm-card dbm-highlight"><div><h2>Презентационный блок</h2><p>Интерактивный блок с телефонами, мессенджерами и ценами из локального кеша.</p></div><code>[dbm_presentation]</code><code>[dbm_block]</code></div>';
+        echo '<div class="dbm-card"><div class="dbm-card-head"><div><h2>Отдельные значения</h2><p>Для телефонов формат <code>tel</code> оставляет чистый номер в href.</p></div></div>';
         echo '<table class="dbm-table"><thead><tr><th>Ключ</th><th>Шорткод</th><th>tel</th><th>PHP</th></tr></thead><tbody>';
         foreach ($this->orderedValues($cache) as $value) {
             $snippet = $builder->forKey((string) ($value['key'] ?? ''));
@@ -150,17 +183,17 @@ class AdminPages
 
         $this->adminStyles();
 
-        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Налаштування</span><h1>DBManager</h1><p>Підключення плагіна як пасивного слухача DataBridge.</p></div>';
+        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Настройки</span><h1>DBManager</h1><p>Подключение плагина как пассивного слушателя DataBridge.</p></div>';
         echo '<div class="dbm-status-card">' . ($hasConnection ? $this->stateBadge('ok') : $this->stateBadge('pending')) . '</div></div>';
         settings_errors('dbm_settings');
 
         echo '<div class="dbm-card">';
-        echo '<h2>Стан підключення</h2><p class="dbm-muted">';
-        echo $hasConnection ? 'Плагін підключено. Він не робить вихідних запитів до центральної CRM.' : 'Вставте ключ підключення з DBManager Core. Після цього плагін буде слухати підписані оновлення.';
+        echo '<h2>Статус подключения</h2><p class="dbm-muted">';
+        echo $hasConnection ? 'Плагин подключен. Он не делает исходящих запросов к центральной CRM.' : 'Вставьте ключ подключения из DBManager Core. После этого плагин будет слушать подписанные обновления.';
         echo '</p>';
 
         if ($listenerUrl !== '') {
-            echo '<div class="dbm-field-row"><span>Локальний endpoint</span><code>' . esc_html($listenerUrl) . '</code></div>';
+            echo '<div class="dbm-field-row"><span>Локальный endpoint</span><code>' . esc_html($listenerUrl) . '</code></div>';
         }
         if (! empty($options['connection_site'])) {
             echo '<div class="dbm-field-row"><span>Сайт</span><strong>' . esc_html((string) $options['connection_site']) . '</strong></div>';
@@ -168,34 +201,34 @@ class AdminPages
                 echo '<div class="dbm-field-row"><span>Endpoint доставки</span><code>' . esc_html((string) $options['connection_ping_url']) . '</code></div>';
             }
             if (! empty($options['connection_saved_at'])) {
-                echo '<div class="dbm-field-row"><span>Ключ збережено</span><strong>' . esc_html((string) $options['connection_saved_at']) . '</strong></div>';
+                echo '<div class="dbm-field-row"><span>Ключ сохранен</span><strong>' . esc_html((string) $options['connection_saved_at']) . '</strong></div>';
             }
         }
 
         $cache = get_option('dbm_cache');
         if (is_array($cache) && isset($cache['version'])) {
-            echo '<div class="dbm-field-row"><span>Остання версія даних</span><strong>' . (int) $cache['version'] . '</strong></div>';
+            echo '<div class="dbm-field-row"><span>Последняя версия данных</span><strong>' . (int) $cache['version'] . '</strong></div>';
         } elseif ($hasConnection) {
-            echo '<div class="dbm-field-row"><span>Дані</span><strong>ще не отримано</strong></div>';
+            echo '<div class="dbm-field-row"><span>Данные</span><strong>еще не получены</strong></div>';
         }
         echo '</div>';
 
         echo '<form method="post" action="options.php" class="dbm-card dbm-form">';
-        echo '<h2>Параметри</h2>';
+        echo '<h2>Параметры</h2>';
         settings_fields('dbm');
         echo '<table class="form-table" role="presentation"><tbody>';
-        echo '<tr><th scope="row"><label for="dbm_connection_key">Ключ підключення</label></th><td>';
+        echo '<tr><th scope="row"><label for="dbm_connection_key">Ключ подключения</label></th><td>';
         echo '<textarea id="dbm_connection_key" name="dbm_settings[connection_key]" rows="4" class="large-text code" autocomplete="off" spellcheck="false" placeholder="DBM1..."></textarea>';
-        echo '<p class="description">Ключ показується у Core один раз. Він містить тільки секрет підпису для цього сайту, без адреси CRM.</p>';
+        echo '<p class="description">Ключ показывается в Core один раз. Он содержит только секрет подписи для этого сайта, без адреса CRM.</p>';
         echo '</td></tr>';
-        echo '<tr><th scope="row"><label for="dbm_shortcode">Назва шорткоду</label></th><td>';
+        echo '<tr><th scope="row"><label for="dbm_shortcode">Название shortcode</label></th><td>';
         echo '<input id="dbm_shortcode" type="text" name="dbm_settings[shortcode]" value="' . esc_attr((string) ($options['shortcode'] ?? 'dbm')) . '" class="regular-text">';
         echo '</td></tr>';
-        echo '<tr><th scope="row"><label for="dbm_css_class">CSS-клас виводу</label></th><td>';
+        echo '<tr><th scope="row"><label for="dbm_css_class">CSS-класс вывода</label></th><td>';
         echo '<input id="dbm_css_class" type="text" name="dbm_settings[css_class]" value="' . esc_attr((string) ($options['css_class'] ?? '')) . '" class="regular-text">';
         echo '</td></tr>';
         echo '</tbody></table>';
-        submit_button('Зберегти підключення');
+        submit_button('Сохранить настройки');
         echo '</form></div>';
     }
 
@@ -217,30 +250,30 @@ class AdminPages
 
         $this->adminStyles();
 
-        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Геосимуляція</span><h1>Перевірка гео</h1><p>Симуляція країни для перевірки видимості даних у плагіні.</p></div>';
+        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Геосимуляция</span><h1>Проверка гео</h1><p>Симуляция страны для проверки видимости данных в плагине.</p></div>';
         echo '<div class="dbm-status-card">' . ($simulated !== null ? $this->stateBadge('pinned') : $this->stateBadge('ok')) . '</div></div>';
 
         if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
-            echo '<div class="updated notice is-dismissible"><p>Налаштування геосимуляції збережено.</p></div>';
+            echo '<div class="updated notice is-dismissible"><p>Настройки геосимуляции сохранены.</p></div>';
         }
 
         echo '<div class="dbm-stats">';
-        echo '<div class="dbm-stat"><span>Режим</span><strong>' . ($simulated !== null ? 'увімкнено' : 'вимкнено') . '</strong></div>';
-        echo '<div class="dbm-stat"><span>IP-країна</span><strong>' . esc_html($realCountry) . '</strong></div>';
-        echo '<div class="dbm-stat"><span>Активна країна</span><strong>' . esc_html($currentEffective) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>Режим</span><strong>' . ($simulated !== null ? 'включен' : 'выключен') . '</strong></div>';
+        echo '<div class="dbm-stat"><span>IP-страна</span><strong>' . esc_html($realCountry) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>Активная страна</span><strong>' . esc_html($currentEffective) . '</strong></div>';
         echo '</div>';
 
         echo '<form method="post" action="" class="dbm-card dbm-form">';
-        echo '<h2>Країна для симуляції</h2>';
+        echo '<h2>Страна для симуляции</h2>';
         wp_nonce_field('dbm_geosim_save', 'dbm_geosim_nonce');
-        echo '<p><label for="simulated_country"><strong>Країна</strong></label><br>';
+        echo '<p><label for="simulated_country"><strong>Страна</strong></label><br>';
         echo '<select name="simulated_country" id="simulated_country" class="dbm-select">';
-        echo '<option value="disabled" ' . selected($simulated, null, false) . '>Вимкнути симуляцію</option>';
+        echo '<option value="disabled" ' . selected($simulated, null, false) . '>Отключить симуляцию</option>';
         foreach ($countries as $country) {
             echo '<option value="' . esc_attr($country) . '" ' . selected($simulated, $country, false) . '>' . esc_html($country) . '</option>';
         }
         echo '</select></p>';
-        echo '<p><input type="submit" class="button button-primary" value="Зберегти"></p>';
+        echo '<p><input type="submit" class="button button-primary" value="Сохранить"></p>';
         echo '</form></div>';
     }
 
@@ -282,6 +315,10 @@ class AdminPages
 .dbm-badge,.dbm-chip,.dbm-state{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;line-height:1}
 .dbm-badge{background:var(--dbm-accent-soft);color:var(--dbm-accent)}
 .dbm-chip{margin:2px;background:#eef2f5;color:var(--dbm-muted)}.dbm-chip--deny{background:#fdeeee;color:var(--dbm-bad)}
+.dbm-net-badge{display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;text-transform:uppercase;padding:2px 5px;border-radius:4px;margin-left:6px;cursor:help;line-height:1;border:1px solid var(--dbm-line);background:#f1f4f6;color:var(--dbm-muted);vertical-align:middle}
+.dbm-net-badge--telegram{background:#eaf5fc;color:#315f8a;border-color:#bce0f2}
+.dbm-net-badge--whatsapp{background:#eef7f2;color:#1f7a4d;border-color:#c5f2d6}
+.dbm-net-badge--viber{background:#f6f1fc;color:#7360f2;border-color:#dfcff7}
 .dbm-state{background:#eef6f1;color:var(--dbm-ok)}
 .dbm-state--warn,.dbm-state--on_reserve,.dbm-state--pinned{background:#fff6e5;color:var(--dbm-warn)}
 .dbm-state--bad,.dbm-state--hidden,.dbm-state--exhausted{background:#fdeeee;color:var(--dbm-bad)}
@@ -311,19 +348,19 @@ HTML;
 
     private function typeBadge(string $type): string
     {
-        $labels = ['phone' => 'Телефон', 'messenger' => 'Месенджер', 'price' => 'Ціна'];
-        return '<span class="dbm-badge">' . esc_html($labels[$type] ?? ($type !== '' ? $type : 'значення')) . '</span>';
+        $labels = ['phone' => 'Телефон', 'messenger' => 'Мессенджер', 'price' => 'Цена'];
+        return '<span class="dbm-badge">' . esc_html($labels[$type] ?? ($type !== '' ? $type : 'значение')) . '</span>';
     }
 
     private function stateBadge(string $state): string
     {
         $labels = [
             'ok' => '● активно',
-            'pinned' => '● закріплено',
+            'pinned' => '● закреплено',
             'on_reserve' => '● резерв',
-            'exhausted' => '● вичерпано',
-            'hidden' => '● приховано',
-            'pending' => '● очікує',
+            'exhausted' => '● исчерпано',
+            'hidden' => '● скрыто',
+            'pending' => '● ожидает',
         ];
         $safe = preg_replace('/[^a-z0-9_-]/i', '', strtolower($state)) ?: 'pending';
 
@@ -345,17 +382,40 @@ HTML;
     }
 
     /** @param array<string,mixed> $value */
-    private function valuePreview(array $value): string
+    private function valuePreview(array $value, array $allValues = []): string
     {
         $display = trim((string) ($value['display_value'] ?? $value['value'] ?? $value['name'] ?? $value['url'] ?? ''));
         $raw = trim((string) ($value['value'] ?? ''));
         $label = trim((string) ($value['label'] ?? $value['network'] ?? ''));
+        $type = (string) ($value['type'] ?? '');
 
         if ($display === '') {
             $display = '—';
         }
 
-        $html = '<span class="dbm-value"><strong>' . esc_html($display) . '</strong>';
+        $html = '<span class="dbm-value"><strong>' . esc_html($display);
+
+        if ($type === 'phone') {
+            $phoneKey = (string) ($value['key'] ?? '');
+            foreach ($allValues as $val) {
+                if (($val['type'] ?? '') === 'messenger') {
+                    $slots = $val['linked_slot'] ?? null;
+                    $match = false;
+                    if (is_array($slots)) {
+                        $match = in_array($phoneKey, $slots, true);
+                    } elseif (is_string($slots) && $slots === $phoneKey) {
+                        $match = true;
+                    }
+                    if ($match) {
+                        $netCode = strtolower((string) ($val['network'] ?? 'unknown'));
+                        $netName = esc_attr((string) ($val['name'] ?? $val['network'] ?? 'messenger'));
+                        $html .= '<span class="dbm-net-badge dbm-net-badge--' . esc_attr($netCode) . '" title="Прикреплен мессенджер: ' . $netName . '">' . esc_html(substr($netCode, 0, 2)) . '</span>';
+                    }
+                }
+            }
+        }
+
+        $html .= '</strong>';
         if ($label !== '') {
             $html .= '<small>' . esc_html($label) . '</small>';
         }

@@ -20,7 +20,10 @@ class ShortcodeController
                 $cache = get_option("dbm_cache"); $cache = is_array($cache) ? $cache : ["values" => []];
                 $st = get_option("dbm_settings");
                 $opts["class"] = $opts["class"] ?? (is_array($st) ? (string)($st["css_class"] ?? "") : "");
-                $opts["country"] = $opts["country"] ?? ($GLOBALS["dbm_country"] ?? "WORLD");
+                if (empty($opts["country"])) {
+                    $simulated = get_option("dbm_simulated_country");
+                    $opts["country"] = (!empty($simulated) && $simulated !== "disabled") ? strtoupper($simulated) : ($GLOBALS["dbm_country"] ?? "WORLD");
+                }
                 return dbm_render_from_cache($cache, $key, $opts);
             }');
         }
@@ -33,5 +36,20 @@ class ShortcodeController
 
             return dbm_get((string) $atts['key'], ['format' => (string) $atts['format'], 'country' => $country]);
         });
+
+        $presentationRenderer = new PresentationBlockRenderer();
+        $presentationShortcode = function ($atts) use ($presentationRenderer, $country) {
+            $atts = shortcode_atts(['title' => ''], $atts);
+            $cache = get_option('dbm_cache');
+            $cache = is_array($cache) ? $cache : ['values' => []];
+
+            return $presentationRenderer->render($cache, [
+                'title' => (string) ($atts['title'] ?? ''),
+                'country' => $country,
+            ]);
+        };
+
+        add_shortcode('dbm_presentation', $presentationShortcode);
+        add_shortcode('dbm_block', $presentationShortcode);
     }
 }
