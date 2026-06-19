@@ -842,6 +842,7 @@ class BulkOperations extends Component
 
         if (($value->type?->code ?? null) === 'phone') {
             return $value->phoneSlot?->entries
+                ->filter(fn (NumberEntry $entry) => $entry->priority === 0)
                 ->map(fn (NumberEntry $entry) => $entry->phoneNumber?->e164)
                 ->filter()
                 ->implode(', ') ?: '—';
