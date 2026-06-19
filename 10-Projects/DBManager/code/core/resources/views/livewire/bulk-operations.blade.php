@@ -16,8 +16,12 @@
             <span>Превʼю: <b>{{ $stats['preview'] }}</b></span>
         </div>
         @if($report)
-            <div class="shrink-0 rounded-md border border-ok-tx/20 bg-ok-bg px-2 py-1 text-ok-tx">
-                Змінено {{ $report['changed'] }} записів на {{ $report['sites'] }} сайтах
+            <div class="shrink-0 flex items-center gap-2 rounded-md border border-ok-tx/20 bg-ok-bg px-2 py-1 text-[11px] text-ok-tx">
+                <span>Змінено {{ $report['changed'] }} записів на {{ $report['sites'] }} сайтах</span>
+                <span class="text-ok-tx/40">·</span>
+                <a href="{{ route('admin.audit', ['tab' => 'changes', 'q' => $report['batch']]) }}" class="font-bold hover:underline inline-flex items-center gap-0.5">
+                    Лог аудиту @svg('arrow-right', 10)
+                </a>
             </div>
         @endif
     </div>
@@ -35,13 +39,45 @@
 
         <div class="space-y-3">
             <div>
-                <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Область</label>
-                <select wire:model.live="scope" class="w-full rounded-lg border border-[#dfe3e0] px-2.5 py-2 text-xs focus:border-acc focus:outline-none">
-                    <option value="all">Усі доступні сайти</option>
-                    <option value="group">Група сайтів</option>
-                    <option value="selected">Вибрані сайти</option>
-                    <option value="tree">Сайт і дочірні</option>
-                </select>
+                <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Область дії</label>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button type="button" wire:click="$set('scope', 'all')"
+                        @class([
+                            'flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-all',
+                            'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'all',
+                            'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'all',
+                        ])>
+                        @svg('globe', 15)
+                        <span class="mt-1 text-[10px] leading-tight">Усі сайти</span>
+                    </button>
+                    <button type="button" wire:click="$set('scope', 'group')"
+                        @class([
+                            'flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-all',
+                            'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'group',
+                            'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'group',
+                        ])>
+                        @svg('folder', 15)
+                        <span class="mt-1 text-[10px] leading-tight">Група</span>
+                    </button>
+                    <button type="button" wire:click="$set('scope', 'selected')"
+                        @class([
+                            'flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-all',
+                            'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'selected',
+                            'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'selected',
+                        ])>
+                        @svg('check-square', 15)
+                        <span class="mt-1 text-[10px] leading-tight">Вибрані ({{ count($selectedSiteIds) }})</span>
+                    </button>
+                    <button type="button" wire:click="$set('scope', 'tree')"
+                        @class([
+                            'flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-all',
+                            'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'tree',
+                            'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'tree',
+                        ])>
+                        @svg('git-branch', 15)
+                        <span class="mt-1 text-[10px] leading-tight">Ієрархія</span>
+                    </button>
+                </div>
             </div>
 
             @if($scope === 'group')
@@ -75,7 +111,14 @@
                     placeholder="domain або назва">
             </div>
 
-            <div class="max-h-[32vh] overflow-y-auto rounded-lg border border-[#dfe3e0]">
+            <div class="max-h-[32vh] overflow-y-auto rounded-lg border border-[#dfe3e0] relative">
+                <div wire:loading.delay wire:target="scope, groupId, rootSiteId, siteSearch, toggleSite, selectFilteredSites, clearSiteSelection" 
+                    class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                    <span class="text-xs text-mut animate-pulse font-semibold flex items-center gap-1.5">
+                        <span class="h-2 w-2 animate-spin rounded-full border border-mut border-t-transparent"></span>
+                        Оновлення...
+                    </span>
+                </div>
                 @forelse($siteOptions as $site)
                     @php $checked = in_array((int) $site->id, array_map('intval', $selectedSiteIds), true); @endphp
                     <button type="button" wire:click="toggleSite({{ $site->id }})"
@@ -149,7 +192,26 @@
             </div>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border border-[#dfe3e0] bg-white">
+        @if($targetType !== 'all' || $stateFilter !== '' || $geoFilter !== '' || $search !== '' || $phoneFilter !== '')
+            <div class="mb-3 flex items-center justify-between gap-2 bg-[#f6f8f6] border border-[#dfe3e0] rounded-lg px-3 py-1.5">
+                <span class="text-[11px] text-mut flex items-center gap-1">
+                    @svg('info', 13) Застосовано active-фільтри цілей
+                </span>
+                <button type="button" wire:click="resetFilters"
+                    class="inline-flex items-center gap-1 rounded-md border border-bad-tx/20 bg-bad-bg/5 px-2 py-0.5 text-[11px] font-semibold text-bad-tx hover:bg-bad-bg/15 transition-colors">
+                    @svg('x', 12) Скинути всі фільтри
+                </button>
+            </div>
+        @endif
+ 
+        <div class="overflow-x-auto rounded-lg border border-[#dfe3e0] bg-white relative">
+            <div wire:loading.delay wire:target="targetType, stateFilter, geoFilter, search, phoneFilter, scope, groupId, rootSiteId, selectedSiteIds, operation, findText, replaceText, contentValue, statusValue, geoCodes, geoMode, phoneReplacement, phoneStatus" 
+                class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                <span class="text-xs text-mut animate-pulse font-semibold flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border shadow-sm">
+                    <span class="h-3 w-3 animate-spin rounded-full border border-mut border-t-transparent"></span>
+                    Оновлення прев'ю...
+                </span>
+            </div>
             <div class="min-w-[980px]">
                 <div class="grid grid-cols-[minmax(150px,1.2fr)_minmax(110px,.8fr)_96px_110px_minmax(160px,1fr)_minmax(190px,1.4fr)] gap-2 border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
                     <div>Сайт</div>
@@ -169,20 +231,81 @@
                             </div>
                             <div class="min-w-0 truncate text-mut">{{ $row['group'] }}</div>
                             <div>
-                                <span class="inline-flex rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">{{ $row['type'] }}</span>
-                                <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
+                                <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
+                                    @if($row['type'] === 'phone')
+                                        @svg('phone', 9)
+                                    @elseif($row['type'] === 'messenger')
+                                        @svg('message-circle', 9)
+                                    @elseif($row['type'] === 'price')
+                                        @svg('tag', 9)
+                                    @elseif($row['type'] === 'text')
+                                        @svg('file-text', 9)
+                                    @elseif($row['type'] === 'address')
+                                        @svg('map-pin', 9)
+                                    @elseif($row['type'] === 'social')
+                                        @svg('share-2', 9)
+                                    @else
+                                        @svg('help-circle', 9)
+                                    @endif
+                                    {{ $row['type'] }}
+                                </span>
+                                
+                                @if($row['changed'] && $row['state'] !== $row['new_state'])
+                                    <span class="mt-1 block text-[10px] leading-tight font-semibold">
+                                        <span class="line-through text-bad-tx">{{ $row['state'] }}</span>
+                                        <span class="text-mut">→</span>
+                                        <span class="text-ok-tx">{{ $row['new_state'] }}</span>
+                                    </span>
+                                @else
+                                    <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
+                                @endif
                             </div>
-                            <div class="flex min-w-0 flex-wrap gap-1">
-                                @foreach($row['geo'] as $geo)
-                                    <span @class([
-                                        'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                                        'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
-                                        'bg-[#eef1ee] text-mut' => !str_starts_with($geo, '!'),
-                                    ])>{{ $geo }}</span>
-                                @endforeach
+                            <div class="flex min-w-0 flex-wrap gap-1 items-center">
+                                @if($row['changed'] && $row['geo'] !== $row['new_geo'])
+                                    <span class="text-mut line-through flex flex-wrap gap-0.5 opacity-60">
+                                        @foreach($row['geo'] as $geo)
+                                            <span class="text-[9px]">{{ $geo }}</span>
+                                        @endforeach
+                                    </span>
+                                    <span class="text-mut text-[9px]">→</span>
+                                    <span class="flex flex-wrap gap-0.5">
+                                        @foreach($row['new_geo'] as $geo)
+                                            <span @class([
+                                                'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                                                'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
+                                                'bg-ok-bg text-ok-tx font-bold' => !in_array($geo, $row['geo'], true),
+                                                'bg-[#eef1ee] text-mut' => in_array($geo, $row['geo'], true) && !str_starts_with($geo, '!'),
+                                            ])>{{ $geo }}</span>
+                                        @endforeach
+                                    </span>
+                                @else
+                                    @foreach($row['geo'] as $geo)
+                                        <span @class([
+                                            'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                                            'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
+                                            'bg-[#eef1ee] text-mut' => !str_starts_with($geo, '!'),
+                                        ])>{{ $geo }}</span>
+                                    @endforeach
+                                @endif
                             </div>
-                            <div class="min-w-0 truncate font-mono text-[#3c5a42]">{{ $row['key'] }}</div>
-                            <div class="min-w-0 truncate text-ink" title="{{ $row['value'] }}">{{ $row['value'] }}</div>
+                            <div class="min-w-0 font-mono text-[#3c5a42] text-[11px]" title="{{ $row['key'] }}">
+                                @if($row['changed'] && isset($row['new_key']) && $row['key'] !== $row['new_key'])
+                                    <span class="line-through text-bad-tx block truncate">{{ $row['key'] }}</span>
+                                    <span class="text-mut block text-[9px] leading-none my-0.5">▼</span>
+                                    <span class="text-ok-tx font-bold bg-ok-bg/50 px-1 rounded block truncate">{{ $row['new_key'] }}</span>
+                                @else
+                                    <span class="block truncate">{{ $row['key'] }}</span>
+                                @endif
+                            </div>
+                            <div class="min-w-0 text-ink text-[11px]" title="{{ $row['value'] }}">
+                                @if($row['changed'] && $row['value'] !== $row['new_value'])
+                                    <span class="line-through text-bad-tx block truncate opacity-70">{{ $row['value'] }}</span>
+                                    <span class="text-mut text-[9px] block leading-none my-0.5">▼</span>
+                                    <span class="text-ok-tx font-semibold block truncate bg-ok-bg/60 px-1.5 py-0.5 rounded">{{ $row['new_value'] }}</span>
+                                @else
+                                    <span class="block truncate">{{ $row['value'] }}</span>
+                                @endif
+                            </div>
                         </div>
                     @empty
                         <div class="px-4 py-12 text-center">
@@ -288,7 +411,7 @@
                     Фільтр “Номер” вище визначає, які записи замінювати.
                 </div>
                 @error('phoneFilter') <div class="mt-1 text-[11px] text-bad-tx">{{ $message }}</div> @enderror
-                <div>
+                    <div>
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Новий номер</label>
                     <input wire:model.live="phoneReplacement" type="text" class="w-full rounded-lg border border-[#dfe3e0] px-2.5 py-2 text-xs focus:border-acc focus:outline-none" placeholder="+380...">
                     @error('phoneReplacement') <div class="mt-1 text-[11px] text-bad-tx">{{ $message }}</div> @enderror
@@ -310,18 +433,43 @@
 
             <button type="button" wire:click="apply"
                 wire:confirm="Застосувати масову операцію до поточної вибірки?"
+                wire:loading.attr="disabled"
                 @disabled($applyDisabled)
                 @class([
-                    'inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold',
-                    'bg-acc text-white hover:bg-acc/90' => !$applyDisabled,
+                    'inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-all duration-150',
+                    'bg-acc text-white hover:bg-acc/90 active:scale-[0.98]' => !$applyDisabled,
                     'cursor-not-allowed bg-[#dfe3e0] text-mut' => $applyDisabled,
                 ])>
-                @svg('check') Застосувати до {{ $stats['matched'] }} цілей
+                <span wire:loading.remove wire:target="apply" class="flex items-center gap-1.5">
+                    @svg('check', 14) Застосувати до {{ $stats['matched'] }} цілей
+                </span>
+                <span wire:loading wire:target="apply" class="flex items-center gap-1.5">
+                    <span class="h-3.5 w-3.5 animate-spin rounded-full border border-white border-t-transparent"></span>
+                    Застосування...
+                </span>
             </button>
 
             @if($report)
-                <div class="rounded-lg border border-ok-tx/20 bg-ok-bg px-3 py-2 text-[12px] text-ok-tx">
-                    Batch: <span class="font-mono">{{ $report['batch'] }}</span>
+                <div class="rounded-lg border border-ok-tx/20 bg-ok-bg p-3 text-[12px] text-ok-tx space-y-2.5 shadow-sm">
+                    <div class="font-bold flex items-center gap-1.5 text-ok-tx">
+                        @svg('check-circle', 14) Операцію успішно виконано!
+                    </div>
+                    <div class="text-[11px] text-ok-tx/90 space-y-1">
+                        <div>UUID сесії (Batch):</div>
+                        <div class="flex items-center gap-1">
+                            <code class="bg-white/70 px-1.5 py-0.5 rounded font-mono select-all shrink-0 text-[10px] text-ok-tx border border-ok-tx/10">{{ $report['batch'] }}</code>
+                            <button type="button" onclick="navigator.clipboard.writeText('{{ $report['batch'] }}'); alert('UUID сесії скопійовано!');" 
+                                class="p-1 hover:bg-white/40 rounded transition-colors text-ok-tx" title="Скопіювати UUID">
+                                @svg('copy', 12)
+                            </button>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-ok-tx/10">
+                        <a href="{{ route('admin.audit', ['tab' => 'changes', 'q' => $report['batch']]) }}" 
+                            class="inline-flex items-center gap-1 text-[11px] font-bold text-ok-tx hover:underline">
+                            @svg('eye', 12) Переглянути в логах аудиту
+                        </a>
+                    </div>
                 </div>
             @endif
         </div>

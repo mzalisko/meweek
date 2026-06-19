@@ -124,6 +124,16 @@ class BulkOperations extends Component
         $this->report = null;
     }
 
+    public function resetFilters(): void
+    {
+        $this->targetType = 'all';
+        $this->stateFilter = '';
+        $this->geoFilter = '';
+        $this->search = '';
+        $this->phoneFilter = '';
+        $this->report = null;
+    }
+
     public function apply(): void
     {
         $this->resetValidation();
@@ -500,6 +510,8 @@ class BulkOperations extends Component
     private function previewRows(): array
     {
         $sites = $this->editableTargetSites()->keyBy('id');
+        $geoMap = GeoTag::pluck('code', 'id')->all();
+        $geoCodeToIdMap = array_flip($geoMap);
 
         if ($this->isPhoneOperation()) {
             return $this->matchedNumberEntries()
@@ -507,6 +519,8 @@ class BulkOperations extends Component
                 ->map(function (NumberEntry $entry) use ($sites): array {
                     $value = $entry->slot?->dataValue;
                     $site = $value ? $sites->get((int) $value->scope_id) : null;
+
+                    $calc = $this->calculateNewPhone($entry);
 
                     return [
                         'kind' => 'phone',
@@ -517,6 +531,10 @@ class BulkOperations extends Component
                         'geo' => $value ? ($this->valueGeoCodes($value) ?: ['WORLD']) : ['WORLD'],
                         'state' => $entry->phoneNumber?->status ?? 'unknown',
                         'value' => $entry->phoneNumber?->e164 ?? '—',
+                        'changed' => $calc['changed'],
+                        'new_value' => $calc['new_value'],
+                        'new_state' => $calc['new_state'],
+                        'new_geo' => $value ? ($this->valueGeoCodes($value) ?: ['WORLD']) : ['WORLD'],
                     ];
                 })
                 ->values()
@@ -525,9 +543,11 @@ class BulkOperations extends Component
 
         return $this->matchedDataValues()
             ->take(80)
-            ->map(function (DataValue $value) use ($sites): array {
+            ->map(function (DataValue $value) use ($sites, $geoMap, $geoCodeToIdMap): array {
                 $site = $sites->get((int) $value->scope_id);
                 $type = $value->type?->code ?? 'unknown';
+
+                $calc = $this->calculateNewValue($value, $geoMap, $geoCodeToIdMap);
 
                 return [
                     'kind' => 'value',
@@ -538,10 +558,137 @@ class BulkOperations extends Component
                     'geo' => $this->valueGeoCodes($value) ?: ['WORLD'],
                     'state' => $value->status,
                     'value' => $this->displayValue($value),
+                    'changed' => $calc['changed'],
+                    'new_value' => $calc['new_value'],
+                    'new_state' => $calc['new_state'],
+                    'new_geo' => $calc['new_geo'],
+                    'new_key' => $calc['new_key'],
                 ];
             })
             ->values()
             ->all();
+    }
+
+    private function calculateNewValue(DataValue $value, array $geoMap, array $geoCodeToIdMap): array
+    {
+        $cloned = clone $value;
+        $changed = false;
+        $newKey = $value->key;
+        $newStatus = $value->status;
+
+        $currentGeo = $this->valueGeoCodes($value);
+        $newGeo = $currentGeo;
+
+        if ($this->operation === 'replace_text' && trim($this->findText) !== '') {
+            $content = $cloned->content ?? [];
+            $contentChanges = 0;
+            $newKey = str_replace($this->findText, $this->replaceText, $cloned->key, $keyChanges);
+            $newContent = $this->replaceRecursively($content, $this->findText, $this->replaceText, $contentChanges);
+
+            if ($keyChanges > 0 || $contentChanges > 0) {
+                $cloned->key = $newKey;
+                $cloned->content = $newContent;
+                $changed = true;
+            }
+        } elseif ($this->operation === 'set_value') {
+            $content = $cloned->content ?? [];
+            $content['value'] = $this->contentValue;
+            $cloned->content = $content;
+            $changed = true;
+        } elseif ($this->operation === 'set_status') {
+            if ($cloned->status !== $this->statusValue) {
+                $cloned->status = $this->statusValue;
+                $newStatus = $this->statusValue;
+                $changed = true;
+            }
+        } elseif ($this->operation === 'set_geo') {
+            $currentGeoIds = $value->geoTags->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            $selectedGeoIds = [];
+            foreach ($this->geoCodes as $code) {
+                if (isset($geoCodeToIdMap[$code])) {
+                    $selectedGeoIds[] = (int) $geoCodeToIdMap[$code];
+                }
+            }
+
+            $nextGeoIds = match ($this->geoMode) {
+                'add' => array_values(array_unique(array_merge($currentGeoIds, $selectedGeoIds))),
+                'remove' => array_values(array_diff($currentGeoIds, $selectedGeoIds)),
+                default => $selectedGeoIds,
+            };
+
+            $newGeo = [];
+            foreach ($nextGeoIds as $id) {
+                if (isset($geoMap[$id])) {
+                    $newGeo[] = $geoMap[$id];
+                }
+            }
+
+            if (($cloned->type?->code ?? null) === 'price') {
+                $content = $cloned->content ?? [];
+                $prices = collect($content['prices'] ?? [])
+                    ->map(function (array $price): array {
+                        $currentCodes = $price['geo'] ?? ['WORLD'];
+                        $currentCodes = $currentCodes === [] ? ['WORLD'] : $currentCodes;
+                        $selectedCodes = $this->geoCodes === [] ? ['WORLD'] : $this->geoCodes;
+
+                        $nextCodes = match ($this->geoMode) {
+                            'add' => array_values(array_unique(array_merge($currentCodes, $selectedCodes))),
+                            'remove' => array_values(array_diff($currentCodes, $selectedCodes)),
+                            default => $selectedCodes,
+                        };
+
+                        $price['geo'] = $nextCodes === [] ? ['WORLD'] : array_values($nextCodes);
+
+                        return $price;
+                    })
+                    ->all();
+
+                if (($content['prices'] ?? []) !== $prices) {
+                    $content['prices'] = $prices;
+                    $cloned->content = $content;
+                    $changed = true;
+                }
+            } else {
+                if ($this->sameIds($currentGeoIds, $nextGeoIds) === false) {
+                    $changed = true;
+                }
+            }
+        }
+
+        return [
+            'changed' => $changed || ($newKey !== $value->key),
+            'new_key' => $newKey,
+            'new_value' => $this->displayValue($cloned),
+            'new_state' => $newStatus,
+            'new_geo' => $newGeo ?: ['WORLD'],
+        ];
+    }
+
+    private function calculateNewPhone(NumberEntry $entry): array
+    {
+        $changed = false;
+        $newPhone = $entry->phoneNumber?->e164 ?? '—';
+        $newStatus = $entry->phoneNumber?->status ?? 'unknown';
+
+        if ($this->operation === 'replace_phone' && trim($this->phoneReplacement) !== '') {
+            $normalized = $this->normalizePhone($this->phoneReplacement);
+            if ($normalized !== null && $newPhone !== $normalized) {
+                $newPhone = $normalized;
+                $changed = true;
+            }
+        } elseif ($this->operation === 'set_phone_status') {
+            if ($newStatus !== $this->phoneStatus) {
+                $newStatus = $this->phoneStatus;
+                $changed = true;
+            }
+        }
+
+        return [
+            'changed' => $changed,
+            'new_value' => $newPhone,
+            'new_state' => $newStatus,
+        ];
     }
 
     private function stats(array $previewRows, array $editableSiteIds): array
