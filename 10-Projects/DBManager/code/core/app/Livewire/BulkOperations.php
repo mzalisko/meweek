@@ -513,10 +513,17 @@ class BulkOperations extends Component
         $geoMap = GeoTag::pluck('code', 'id')->all();
         $geoCodeToIdMap = array_flip($geoMap);
 
+        $translateState = fn (?string $s) => match ($s) {
+            'active' => 'Активний',
+            'hidden' => 'Прихований',
+            'down' => 'Збій',
+            default => $s ?? 'Невідомо',
+        };
+
         if ($this->isPhoneOperation()) {
             return $this->matchedNumberEntries()
                 ->take(80)
-                ->map(function (NumberEntry $entry) use ($sites): array {
+                ->map(function (NumberEntry $entry) use ($sites, $translateState): array {
                     $value = $entry->slot?->dataValue;
                     $site = $value ? $sites->get((int) $value->scope_id) : null;
 
@@ -529,11 +536,11 @@ class BulkOperations extends Component
                         'key' => $value?->key ?? 'phone',
                         'type' => 'phone',
                         'geo' => $value ? ($this->valueGeoCodes($value) ?: ['WORLD']) : ['WORLD'],
-                        'state' => $entry->phoneNumber?->status ?? 'unknown',
+                        'state' => $translateState($entry->phoneNumber?->status ?? 'unknown'),
                         'value' => $entry->phoneNumber?->e164 ?? '—',
                         'changed' => $calc['changed'],
                         'new_value' => $calc['new_value'],
-                        'new_state' => $calc['new_state'],
+                        'new_state' => $translateState($calc['new_state']),
                         'new_geo' => $value ? ($this->valueGeoCodes($value) ?: ['WORLD']) : ['WORLD'],
                     ];
                 })
@@ -543,7 +550,7 @@ class BulkOperations extends Component
 
         return $this->matchedDataValues()
             ->take(80)
-            ->map(function (DataValue $value) use ($sites, $geoMap, $geoCodeToIdMap): array {
+            ->map(function (DataValue $value) use ($sites, $geoMap, $geoCodeToIdMap, $translateState): array {
                 $site = $sites->get((int) $value->scope_id);
                 $type = $value->type?->code ?? 'unknown';
 
@@ -556,11 +563,11 @@ class BulkOperations extends Component
                     'key' => $value->key,
                     'type' => $type,
                     'geo' => $this->valueGeoCodes($value) ?: ['WORLD'],
-                    'state' => $value->status,
+                    'state' => $translateState($value->status),
                     'value' => $this->displayValue($value),
                     'changed' => $calc['changed'],
                     'new_value' => $calc['new_value'],
-                    'new_state' => $calc['new_state'],
+                    'new_state' => $translateState($calc['new_state']),
                     'new_geo' => $calc['new_geo'],
                     'new_key' => $calc['new_key'],
                 ];

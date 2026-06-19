@@ -165,7 +165,7 @@
                     <option value="">Будь-який</option>
                     <option value="active">Активний</option>
                     <option value="hidden">Прихований</option>
-                    <option value="down">Є впалий номер</option>
+                    <option value="down">Збій</option>
                 </select>
             </div>
             <div>
@@ -355,7 +355,7 @@
                     <option value="set_geo">Змінити geo-теги</option>
                     <option value="set_status">Показати / приховати слот</option>
                     <option value="replace_phone">Замінити номер</option>
-                    <option value="set_phone_status">Стан номера active/down</option>
+                    <option value="set_phone_status">Стан номера active/down (Збій)</option>
                 </select>
                 @error('operation') <div class="mt-1 text-[11px] text-bad-tx">{{ $message }}</div> @enderror
             </div>
@@ -421,7 +421,7 @@
                     <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Стан номера</label>
                     <select wire:model.live="phoneStatus" class="w-full rounded-lg border border-[#dfe3e0] px-2.5 py-2 text-xs focus:border-acc focus:outline-none">
                         <option value="active">active</option>
-                        <option value="down">down</option>
+                        <option value="down">down (Збій)</option>
                     </select>
                 </div>
             @endif
