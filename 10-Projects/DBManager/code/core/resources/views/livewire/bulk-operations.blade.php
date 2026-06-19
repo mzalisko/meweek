@@ -56,7 +56,7 @@
                             'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'group',
                             'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'group',
                         ])>
-                        @svg('folder', 15)
+                        @svg('grid', 14)
                         <span class="mt-1 text-[10px] leading-tight">Група</span>
                     </button>
                     <button type="button" wire:click="$set('scope', 'selected')"
@@ -65,7 +65,7 @@
                             'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'selected',
                             'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'selected',
                         ])>
-                        @svg('check-square', 15)
+                        @svg('check', 14)
                         <span class="mt-1 text-[10px] leading-tight">Вибрані ({{ count($selectedSiteIds) }})</span>
                     </button>
                     <button type="button" wire:click="$set('scope', 'tree')"
@@ -74,7 +74,7 @@
                             'border-acc bg-acc-bg text-acc-tx font-semibold shadow-sm' => $scope === 'tree',
                             'border-[#dfe3e0] bg-white text-mut hover:border-acc hover:text-ink' => $scope !== 'tree',
                         ])>
-                        @svg('git-branch', 15)
+                        @svg('link', 14)
                         <span class="mt-1 text-[10px] leading-tight">Ієрархія</span>
                     </button>
                 </div>
@@ -233,19 +233,19 @@
                             <div>
                                 <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
                                     @if($row['type'] === 'phone')
-                                        @svg('phone', 9)
+                                        @svg('phone', 10)
                                     @elseif($row['type'] === 'messenger')
-                                        @svg('message-circle', 9)
+                                        @svg('msg', 10)
                                     @elseif($row['type'] === 'price')
-                                        @svg('tag', 9)
+                                        @svg('tag', 10)
                                     @elseif($row['type'] === 'text')
-                                        @svg('file-text', 9)
+                                        @svg('text', 10)
                                     @elseif($row['type'] === 'address')
-                                        @svg('map-pin', 9)
+                                        @svg('pin', 10)
                                     @elseif($row['type'] === 'social')
-                                        @svg('share-2', 9)
+                                        @svg('link', 10)
                                     @else
-                                        @svg('help-circle', 9)
+                                        @svg('alert', 10)
                                     @endif
                                     {{ $row['type'] }}
                                 </span>
@@ -260,18 +260,18 @@
                                     <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
                                 @endif
                             </div>
-                            <div class="flex min-w-0 flex-wrap gap-1 items-center">
+                            <div class="flex min-w-0 flex-wrap gap-[3px] items-center">
                                 @if($row['changed'] && $row['geo'] !== $row['new_geo'])
-                                    <span class="text-mut line-through flex flex-wrap gap-0.5 opacity-60">
+                                    <span class="text-mut line-through flex flex-wrap gap-[2px] opacity-60">
                                         @foreach($row['geo'] as $geo)
-                                            <span class="text-[9px]">{{ $geo }}</span>
+                                            <span class="text-[8px]">{{ $geo }}</span>
                                         @endforeach
                                     </span>
-                                    <span class="text-mut text-[9px]">→</span>
-                                    <span class="flex flex-wrap gap-0.5">
+                                    <span class="text-mut text-[8px] select-none">→</span>
+                                    <span class="flex flex-wrap gap-[2px]">
                                         @foreach($row['new_geo'] as $geo)
                                             <span @class([
-                                                'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                                                'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
                                                 'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
                                                 'bg-ok-bg text-ok-tx font-bold' => !in_array($geo, $row['geo'], true),
                                                 'bg-[#eef1ee] text-mut' => in_array($geo, $row['geo'], true) && !str_starts_with($geo, '!'),
@@ -281,7 +281,7 @@
                                 @else
                                     @foreach($row['geo'] as $geo)
                                         <span @class([
-                                            'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                                            'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
                                             'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
                                             'bg-[#eef1ee] text-mut' => !str_starts_with($geo, '!'),
                                         ])>{{ $geo }}</span>
