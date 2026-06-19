@@ -12,11 +12,17 @@ if (! function_exists('dbm_render_from_cache')) {
     {
         $value = null;
         $fallback = null;
-        $country = $opts['country'] ?? 'WORLD';
+        $country = strtoupper($opts['country'] ?? 'WORLD');
 
         foreach ($payload['values'] ?? [] as $candidate) {
             if (($candidate['key'] ?? null) === $key) {
-                $geo = $candidate['geo'] ?? [];
+                $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                
+                // Якщо є пряме виключення цієї країни (наприклад, !RU)
+                if (in_array('!' . $country, $geo, true)) {
+                    continue;
+                }
+                
                 if (in_array($country, $geo, true)) {
                     $value = $candidate;
                     break;
@@ -34,11 +40,17 @@ if (! function_exists('dbm_render_from_cache')) {
         if ($value === null || in_array($value['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
             return '';
         }
-        $geo = $value['geo'] ?? [];
+        
+        $geo = array_map('strtoupper', $value['geo'] ?? []);
+        if (in_array('!' . $country, $geo, true)) {
+            return ''; // виключено для цієї країни
+        }
+        
         if ($geo !== [] && ! in_array('WORLD', $geo, true) && ! in_array($country, $geo, true)) {
             return ''; // не для цієї країни
         }
         $raw = (string) ($value['value'] ?? '');
+        $display = (string) ($value['display_value'] ?? $raw);
         if ($raw === '') {
             return '';
         }
@@ -47,7 +59,7 @@ if (! function_exists('dbm_render_from_cache')) {
             ? ' class="' . htmlspecialchars((string) $opts['class'], ENT_QUOTES) . '"'
             : '';
 
-        $text = htmlspecialchars($raw, ENT_QUOTES);
+        $text = htmlspecialchars($display, ENT_QUOTES);
         $format = $opts['format'] ?? '';
 
         if ($format === 'tel') {
