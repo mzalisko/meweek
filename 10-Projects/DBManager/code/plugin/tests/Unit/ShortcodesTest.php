@@ -132,7 +132,7 @@ namespace DBM\Tests\Unit {
             $priceCallbackUA = $test_shortcodes['dbm_price'];
 
             $htmlUA = $priceCallbackUA(['key' => 'romania']);
-            $this->assertSame('<span>100 грн</span>', $htmlUA);
+            $this->assertSame('<span>100</span>', $htmlUA);
 
             // 2. Test for RO visitor
             $controllerRO = new ShortcodeController($settings, 'RO');
@@ -140,7 +140,7 @@ namespace DBM\Tests\Unit {
             $priceCallbackRO = $test_shortcodes['dbm_price'];
             
             $htmlRO = $priceCallbackRO(['key' => 'romania']);
-            $this->assertSame('<span>15 RON</span>', $htmlRO);
+            $this->assertSame('<span>15</span>', $htmlRO);
 
             // 3. Test for PL visitor (WORLD fallback)
             $controllerPL = new ShortcodeController($settings, 'PL');
@@ -148,7 +148,7 @@ namespace DBM\Tests\Unit {
             $priceCallbackPL = $test_shortcodes['dbm_price'];
             
             $htmlPL = $priceCallbackPL(['key' => 'romania']);
-            $this->assertSame('<span>5 EUR</span>', $htmlPL);
+            $this->assertSame('<span>5</span>', $htmlPL);
         }
 
         public function test_price_shortcode_attributes(): void
@@ -177,7 +177,7 @@ namespace DBM\Tests\Unit {
                 'tag' => 'strong',
                 'class' => 'my-price'
             ]);
-            $this->assertSame('<strong class="my-price">100 грн</strong>', $html);
+            $this->assertSame('<strong class="my-price">100</strong>', $html);
 
             // show_label="no" attribute
             $htmlNoLabel = $priceCallback([
@@ -266,7 +266,7 @@ namespace DBM\Tests\Unit {
 
             // Test global dbm_price
             $this->assertTrue(function_exists('dbm_price'));
-            $this->assertSame('<span>100 грн</span>', dbm_price('romania'));
+            $this->assertSame('<span>100</span>', dbm_price('romania'));
 
             // Test global dbm_phone_block
             $this->assertTrue(function_exists('dbm_phone_block'));
@@ -321,7 +321,7 @@ namespace DBM\Tests\Unit {
             $priceCallback = $test_shortcodes['dbm_price'];
 
             $htmlWorld = $priceCallback(['key' => 'romania_world']);
-            $this->assertSame('<span>5 EUR</span>', $htmlWorld);
+            $this->assertSame('<span>5</span>', $htmlWorld);
 
             // romania_ua from PL visitor
             $controllerPL = new ShortcodeController($settings, 'PL');
@@ -329,7 +329,7 @@ namespace DBM\Tests\Unit {
             $priceCallbackPL = $test_shortcodes['dbm_price'];
 
             $htmlUa = $priceCallbackPL(['key' => 'romania_ua']);
-            $this->assertSame('<span>100 грн</span>', $htmlUa);
+            $this->assertSame('<span>100</span>', $htmlUa);
 
             // 2. RU/BY visitor must not fall back to WORLD price
             $controllerRU = new ShortcodeController($settings, 'RU');
@@ -342,17 +342,17 @@ namespace DBM\Tests\Unit {
             // 3. Label-based suffix matches
             $controllerUA->register();
             $priceCallbackUA = $test_shortcodes['dbm_price'];
-            $this->assertSame('<span>1200 uk</span>', $priceCallbackUA(['key' => 'price_ro_uk']));
-            $this->assertSame('<span>1200 uk</span>', $priceCallbackUA(['key' => 'price_ro uk']));
-            $this->assertSame('<span>5000 фів</span>', $priceCallbackUA(['key' => 'price_ro_фів']));
-            $this->assertSame('<span>5000 фів</span>', $priceCallbackUA(['key' => 'price_ro фів']));
+            $this->assertSame('<span>1200</span>', $priceCallbackUA(['key' => 'price_ro_uk']));
+            $this->assertSame('<span>1200</span>', $priceCallbackUA(['key' => 'price_ro uk']));
+            $this->assertSame('<span>5000</span>', $priceCallbackUA(['key' => 'price_ro_фів']));
+            $this->assertSame('<span>5000</span>', $priceCallbackUA(['key' => 'price_ro фів']));
 
             // 4. Dynamic country resolution for price_ro
-            $this->assertSame('<span>1200 uk</span>', $priceCallbackUA(['key' => 'price_ro'])); // UA
+            $this->assertSame('<span>1200</span>', $priceCallbackUA(['key' => 'price_ro'])); // UA
             
             $controllerPL->register();
             $priceCallbackPL = $test_shortcodes['dbm_price'];
-            $this->assertSame('<span>5000 фів</span>', $priceCallbackPL(['key' => 'price_ro'])); // PL -> WORLD
+            $this->assertSame('<span>5000</span>', $priceCallbackPL(['key' => 'price_ro'])); // PL -> WORLD
             
             $controllerRU->register();
             $priceCallbackRU = $test_shortcodes['dbm_price'];

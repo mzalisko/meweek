@@ -19,7 +19,28 @@ namespace DBM\Wp {
                 eval('function dbm_get(string $key, array $opts = []): string {
                     $cache = get_option("dbm_cache"); $cache = is_array($cache) ? $cache : ["values" => []];
                     $st = get_option("dbm_settings");
+                    $cust = get_option("dbm_custom_settings");
                     $opts["class"] = $opts["class"] ?? (is_array($st) ? (string)($st["css_class"] ?? "") : "");
+                    
+                    $type = "";
+                    foreach ($cache["values"] ?? [] as $val) {
+                        if (($val["key"] ?? null) === $key) {
+                            $type = (string) ($val["type"] ?? "");
+                            break;
+                        }
+                    }
+                    if ($type === "") {
+                        if (str_contains($key, " ") || str_contains($key, "_")) {
+                            $type = "price";
+                        }
+                    }
+                    if ($type !== "" && is_array($cust)) {
+                        $extraTypeClass = trim((string) ($cust["class_" . $type] ?? ""));
+                        if ($extraTypeClass !== "") {
+                            $opts["class"] = trim($opts["class"] . " " . $extraTypeClass);
+                        }
+                    }
+
                     if (empty($opts["country"])) {
                         $simulated = get_option("dbm_simulated_country");
                         $opts["country"] = (!empty($simulated) && $simulated !== "disabled") ? strtoupper($simulated) : ($GLOBALS["dbm_country"] ?? "WORLD");
@@ -133,16 +154,18 @@ namespace {
                 return '';
             }
 
-            $label = trim((string) ($price['label'] ?? ''));
-            $showLabel = isset($opts['show_label']) ? in_array(strtolower((string) $opts['show_label']), ['yes', '1', 'true'], true) : true;
-
             $display = esc_html($val);
-            if ($showLabel && $label !== '') {
-                $display .= ' ' . esc_html($label);
+
+            $cust = get_option('dbm_custom_settings');
+            $cust = is_array($cust) ? $cust : [];
+            $classPrice = trim((string) ($cust['class_price'] ?? ''));
+            $priceCls = ! empty($opts['class']) ? trim($opts['class']) : '';
+            if ($classPrice !== '') {
+                $priceCls = trim($priceCls . ' ' . $classPrice);
             }
 
             $tag = isset($opts['tag']) && in_array(strtolower($opts['tag']), ['span', 'div', 'strong', 'p', 'b'], true) ? strtolower($opts['tag']) : 'span';
-            $class = ! empty($opts['class']) ? ' class="' . esc_attr($opts['class']) . '"' : '';
+            $class = ! empty($priceCls) ? ' class="' . esc_attr($priceCls) . '"' : '';
 
             return '<' . $tag . $class . '>' . $display . '</' . $tag . '>';
         }
@@ -220,8 +243,15 @@ namespace {
                 }
             }
 
+            $cust = get_option('dbm_custom_settings');
+            $cust = is_array($cust) ? $cust : [];
+
             $layout = isset($opts['layout']) && in_array(strtolower($opts['layout']), ['row', 'column'], true) ? strtolower($opts['layout']) : 'row';
             $extraCls = ! empty($opts['class']) ? ' ' . esc_attr($opts['class']) : '';
+            $classPhone = trim((string) ($cust['class_phone'] ?? ''));
+            if ($classPhone !== '') {
+                $extraCls .= ' ' . esc_attr($classPhone);
+            }
 
             $phoneIcon = '<svg class="dbm-phone-block__phone-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
             
@@ -257,7 +287,10 @@ namespace {
                     $msgUrl = (string) ($msg['url'] ?? $msg['value'] ?? '');
                     if ($msgUrl !== '') {
                         $icon = '';
-                        if ($net === 'telegram') {
+                        $customImg = trim((string) ($cust['image_' . $net] ?? ''));
+                        if ($customImg !== '') {
+                            $icon = '<img class="dbm-phone-block__msg-icon dbm-phone-block__msg-icon--' . esc_attr($net) . '" src="' . esc_url($customImg) . '" alt="' . esc_attr($net) . '" style="width: 18px; height: 18px; object-fit: contain; vertical-align: middle;" />';
+                        } elseif ($net === 'telegram') {
                             $icon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587c-6.29 0-11.39 5.09-11.39 11.38 0 6.29 5.1 11.39 11.39 11.39 6.29 0 11.38-5.1 11.38-11.39 0-6.29-5.09-11.38-11.38-11.38zm5.28 7.42c-.17 1.77-.91 6.13-1.28 8.16-.16.86-.47 1.15-.78 1.18-.68.06-1.19-.45-1.85-.88-1.03-.68-1.61-1.1-2.61-1.76-1.16-.76-.41-1.18.25-1.87.17-.18 3.19-2.92 3.25-3.19.01-.03.01-.15-.06-.21-.07-.06-.17-.04-.25-.02-.11.02-1.91 1.21-5.4 3.56-.51.35-.97.52-1.39.51-.46-.01-1.35-.26-2.01-.48-.81-.27-1.46-.42-1.4-.88.03-.24.36-.49.99-.74 3.89-1.69 6.48-2.8 7.78-3.33 3.69-1.5 4.46-1.76 4.96-1.77.11 0 .36.03.52.16.14.11.18.27.2.42-.01.07-.01.19-.02.26z"/></svg>';
                         } elseif ($net === 'whatsapp') {
                             $icon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.023-5.116-2.887-6.98C16.526 1.897 14.05 .87 11.417.87c-5.442 0-9.869 4.42-9.873 9.863-.001 1.724.455 3.411 1.32 4.908l-.993 3.626 3.71-.973zm11.536-6.973c-.297-.148-1.758-.868-2.03-.967-.273-.099-.471-.148-.669.149-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.568-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>';
@@ -267,7 +300,12 @@ namespace {
                             $icon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>';
                         }
                         $msgName = esc_attr((string) ($msg['name'] ?? $msg['network'] ?? 'messenger'));
-                        $html .= '<a class="dbm-phone-block__msg-link dbm-phone-block__msg-link--' . esc_attr($net) . '" href="' . esc_url($msgUrl) . '" target="_blank" rel="noopener noreferrer" title="' . $msgName . '">' . $icon . '</a>';
+                        $classMessenger = trim((string) ($cust['class_messenger'] ?? ''));
+                        $msgLinkCls = 'dbm-phone-block__msg-link dbm-phone-block__msg-link--' . esc_attr($net);
+                        if ($classMessenger !== '') {
+                            $msgLinkCls .= ' ' . esc_attr($classMessenger);
+                        }
+                        $html .= '<a class="' . $msgLinkCls . '" href="' . esc_url($msgUrl) . '" target="_blank" rel="noopener noreferrer" title="' . $msgName . '">' . $icon . '</a>';
                     }
                 }
                 $html .= '</div>';

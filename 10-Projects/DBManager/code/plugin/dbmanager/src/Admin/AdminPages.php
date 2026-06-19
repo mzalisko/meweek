@@ -17,12 +17,14 @@ class AdminPages
             add_menu_page('DBManager', 'DBManager', 'edit_posts', 'dbm-data', [$this, 'renderData']);
             add_submenu_page('dbm-data', 'Данные', 'Данные', 'edit_posts', 'dbm-data', [$this, 'renderData']);
             add_submenu_page('dbm-data', 'Вставка', 'Вставка', 'edit_posts', 'dbm-insert', [$this, 'renderInsert']);
+            add_submenu_page('dbm-data', 'Кастомизация', 'Кастомизация', 'manage_options', 'dbm-custom', [$this, 'renderCustom']);
             add_submenu_page('dbm-data', 'Геосимуляция', 'Геосимуляция', 'edit_posts', 'dbm-geosim', [$this, 'renderGeoSim']);
             add_submenu_page('dbm-data', 'Настройки', 'Настройки', 'manage_options', 'dbm-settings', [$this, 'renderSettings']);
         });
 
         add_action('admin_init', function (): void {
             register_setting('dbm', 'dbm_settings', ['sanitize_callback' => [$this, 'sanitizeSettings']]);
+            register_setting('dbm_custom', 'dbm_custom_settings', ['sanitize_callback' => [$this, 'sanitizeCustomSettings']]);
 
             if (isset($_POST['dbm_geosim_nonce']) && wp_verify_nonce($_POST['dbm_geosim_nonce'], 'dbm_geosim_save')) {
                 if (current_user_can('edit_posts')) {
@@ -86,6 +88,24 @@ class AdminPages
         }
 
         return $settings;
+    }
+
+    public function sanitizeCustomSettings($input): array
+    {
+        $input = is_array($input) ? $input : [];
+        $output = [];
+
+        $output['class_phone'] = sanitize_text_field((string) ($input['class_phone'] ?? ''));
+        $output['class_messenger'] = sanitize_text_field((string) ($input['class_messenger'] ?? ''));
+        $output['class_price'] = sanitize_text_field((string) ($input['class_price'] ?? ''));
+
+        foreach ($input as $key => $value) {
+            if (str_starts_with((string) $key, 'image_')) {
+                $output[$key] = esc_url_raw((string) $value);
+            }
+        }
+
+        return $output;
     }
 
     public function renderData(): void
@@ -370,6 +390,125 @@ class AdminPages
         echo '</form></div>';
     }
 
+    public function renderCustom(): void
+    {
+        wp_enqueue_media();
+        
+        $options = get_option('dbm_custom_settings');
+        $options = is_array($options) ? $options : [];
+
+        $this->adminStyles();
+
+        echo '<div class="wrap dbm-admin">';
+        echo '<div class="dbm-hero"><div><span class="dbm-eyebrow">Кастомизация</span><h1>Внешний вид элементов</h1><p>Настройка изображений мессенджеров и дополнительных CSS-классов.</p></div></div>';
+        
+        settings_errors('dbm_custom_settings');
+
+        echo '<form method="post" action="options.php" class="dbm-card dbm-form">';
+        echo '<h2>Изображения мессенджеров</h2>';
+        echo '<p class="dbm-muted">Загрузите изображения, которые заменят стандартные SVG-иконки в блоках телефонов.</p>';
+        
+        settings_fields('dbm_custom');
+        
+        echo '<table class="form-table" role="presentation"><tbody>';
+        
+        $cache = get_option('dbm_cache');
+        $cache = is_array($cache) ? $cache : ['values' => []];
+        $networks = [];
+        foreach ($cache['values'] ?? [] as $val) {
+            if (($val['type'] ?? '') === 'messenger' && ! empty($val['network'])) {
+                $net = trim((string) $val['network']);
+                $netLower = strtolower($net);
+                if ($netLower !== '' && ! isset($networks[$netLower])) {
+                    $networks[$netLower] = $net;
+                }
+            }
+        }
+        if (empty($networks)) {
+            $networks = [
+                'telegram' => 'Telegram',
+                'whatsapp' => 'WhatsApp',
+                'viber' => 'Viber'
+            ];
+        }
+        
+        foreach ($networks as $net => $label) {
+            $val = esc_url((string) ($options['image_' . $net] ?? ''));
+            $displayStyle = $val === '' ? 'display:none;' : '';
+            
+            echo '<tr><th scope="row"><label for="dbm_image_' . $net . '">' . $label . '</label></th><td>';
+            echo '<div style="display:flex; align-items:center; gap:12px;">';
+            echo '<img id="dbm_preview_' . $net . '" src="' . $val . '" style="width:36px; height:36px; object-fit:contain; border:1px solid var(--dbm-line); padding:2px; border-radius:4px; background:#fff;' . $displayStyle . '" alt="Preview" />';
+            echo '<input id="dbm_image_' . $net . '" type="text" name="dbm_custom_settings[image_' . $net . ']" value="' . $val . '" class="regular-text" style="flex-grow:1; max-width:400px;" readonly>';
+            echo '<button type="button" class="button dbm-upload-btn" data-input="dbm_image_' . $net . '" data-preview="dbm_preview_' . $net . '">Загрузить</button>';
+            echo '<button type="button" class="button dbm-clear-btn" data-input="dbm_image_' . $net . '" data-preview="dbm_preview_' . $net . '">Очистить</button>';
+            echo '</div>';
+            echo '</td></tr>';
+        }
+        
+        echo '</tbody></table>';
+        
+        echo '<h2 style="margin-top:24px;">Дополнительные CSS-классы</h2>';
+        echo '<p class="dbm-muted">Добавьте произвольные CSS-классы к элементам для стилизации (классы разделяются пробелами).</p>';
+        
+        echo '<table class="form-table" role="presentation"><tbody>';
+        echo '<tr><th scope="row"><label for="dbm_class_phone">Для блоков телефонов</label></th><td>';
+        echo '<input id="dbm_class_phone" type="text" name="dbm_custom_settings[class_phone]" value="' . esc_attr((string) ($options['class_phone'] ?? '')) . '" class="regular-text">';
+        echo '<p class="description">Добавляется к контейнеру телефона .dbm-phone-block</p>';
+        echo '</td></tr>';
+        
+        echo '<tr><th scope="row"><label for="dbm_class_messenger">Для ссылок мессенджеров</label></th><td>';
+        echo '<input id="dbm_class_messenger" type="text" name="dbm_custom_settings[class_messenger]" value="' . esc_attr((string) ($options['class_messenger'] ?? '')) . '" class="regular-text">';
+        echo '<p class="description">Добавляется к ссылкам мессенджеров .dbm-phone-block__msg-link</p>';
+        echo '</td></tr>';
+        
+        echo '<tr><th scope="row"><label for="dbm_class_price">Для цен</label></th><td>';
+        echo '<input id="dbm_class_price" type="text" name="dbm_custom_settings[class_price]" value="' . esc_attr((string) ($options['class_price'] ?? '')) . '" class="regular-text">';
+        echo '<p class="description">Добавляется к тегу цены, выводимому через [dbm_price] или dbm_price()</p>';
+        echo '</td></tr>';
+        
+        echo '</tbody></table>';
+        
+        submit_button('Сохранить кастомизацию');
+        echo '</form></div>';
+        
+        echo '<script>
+        jQuery(document).ready(function($){
+            $(".dbm-upload-btn").click(function(e) {
+                e.preventDefault();
+                var button = $(this);
+                var inputId = button.data("input");
+                var previewId = button.data("preview");
+                
+                var custom_uploader = wp.media({
+                    title: "Выберите изображение",
+                    button: {
+                        text: "Использовать это изображение"
+                    },
+                    multiple: false
+                });
+                
+                custom_uploader.on("select", function() {
+                    var attachment = custom_uploader.state().get("selection").first().toJSON();
+                    $("#" + inputId).val(attachment.url);
+                    $("#" + previewId).attr("src", attachment.url).show();
+                });
+                
+                custom_uploader.open();
+            });
+            
+            $(".dbm-clear-btn").click(function(e) {
+                e.preventDefault();
+                var button = $(this);
+                var inputId = button.data("input");
+                var previewId = button.data("preview");
+                $("#" + inputId).val("");
+                $("#" + previewId).attr("src", "").hide();
+            });
+        });
+        </script>';
+    }
+
     public function renderGeoSim(): void
     {
         $simulated = $this->simulation->getSimulatedCountry();
@@ -468,7 +607,7 @@ class AdminPages
 @media (max-width:782px){.dbm-hero{display:block}.dbm-version,.dbm-status-card{text-align:left;margin-top:12px}.dbm-stats{grid-template-columns:1fr 1fr}.dbm-table{display:block;overflow-x:auto}.dbm-field-row{display:block}.dbm-field-row code,.dbm-field-row strong{display:inline-block;margin-top:5px}}
 .dbm-snippet-item{margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .dbm-snippet-item:last-child{margin-bottom:0}
-.dbm-snippet-item span,.dbm-snippet-item .dbm-label{color:var(--dbm-muted);font-size:10px;font-weight:700;text-transform:uppercase;min-width:115px;display:inline-block}
+.dbm-snippet-item span,.dbm-snippet-item .dbm-label{color:var(--dbm-muted);font-size:10px;font-weight:700;text-transform:uppercase;width:180px;flex-shrink:0;display:inline-block}
 .dbm-snippet-item code{vertical-align:middle}
 .dbm-copy-wrapper{display:inline-flex;align-items:center;background:#f5f7f8;border:1px solid var(--dbm-line);border-radius:6px;padding:2px 4px;gap:4px;vertical-align:middle}
 .dbm-copy-wrapper code{background:none !important;border:none !important;padding:0 6px !important;margin:0 !important;font-size:11px !important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dbm-ink);vertical-align:middle}
@@ -535,8 +674,12 @@ HTML;
         $html = '<div class="dbm-price-list">';
         foreach ($prices as $p) {
             $geos = $p['geo'] ?? ['WORLD'];
+            $lbl = trim((string) ($p['label'] ?? ''));
             $html .= '<div class="dbm-price-row">';
             $html .= $this->geoChips($geos);
+            if ($lbl !== '') {
+                $html .= ' <span class="dbm-price-lbl" style="font-size:11px; color:var(--dbm-muted); margin-left:6px; font-weight:normal;">[метка: ' . esc_html($lbl) . ']</span>';
+            }
             $html .= '</div>';
         }
         $html .= '</div>';
@@ -614,13 +757,7 @@ HTML;
             $html = '<div class="dbm-price-list">';
             foreach ($value['prices'] as $p) {
                 $val = trim((string) ($p['value'] ?? ''));
-                $lbl = trim((string) ($p['label'] ?? ''));
-
-                $disp = $val;
-                if ($lbl !== '') {
-                    $disp .= ' ' . $lbl;
-                }
-                $html .= '<div class="dbm-price-row"><strong>' . esc_html($disp) . '</strong></div>';
+                $html .= '<div class="dbm-price-row"><strong>' . esc_html($val) . '</strong></div>';
             }
             $html .= '</div>';
             return $html;
