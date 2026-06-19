@@ -80,37 +80,7 @@ add_action('init', function (): void {
             $simulated = get_option('dbm_simulated_country');
             $country = ! empty($simulated) && $simulated !== 'disabled' ? strtoupper($simulated) : 'WORLD';
 
-            $price = null;
-
-            // 1. Перевіряємо суфікс країни в ключі (наприклад, romania_ua або romania_world)
-            if (str_contains($key, '_')) {
-                $lastUnderscore = strrpos($key, '_');
-                $baseKey = substr($key, 0, $lastUnderscore);
-                $suffix = strtoupper(substr($key, $lastUnderscore + 1));
-
-                if (strlen($suffix) === 2 || $suffix === 'WORLD') {
-                    foreach ($values as $candidate) {
-                        if (($candidate['key'] ?? null) === $baseKey && ($candidate['type'] ?? null) === 'price') {
-                            $geo = array_map('strtoupper', $candidate['geo'] ?? []);
-                            if (in_array($suffix, $geo, true) || ($suffix === 'WORLD' && empty($geo))) {
-                                $price = $candidate;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Якщо ключ універсальний (без суфікса), обираємо ціну динамічно залежно від країни відвідувача
-            if ($price === null) {
-                $candidates = [];
-                foreach ($values as $candidate) {
-                    if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
-                        $candidates[] = $candidate;
-                    }
-                }
-                $price = dbm_select_price_candidate($candidates, $country);
-            }
+            $price = dbm_resolve_price_candidate($values, $key, $country);
 
             if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
                 return '';

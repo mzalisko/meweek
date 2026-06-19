@@ -179,8 +179,30 @@ class AdminPages
                 echo '<div class="dbm-snippet-item"><span>Блок с мессенджерами:</span> <code>[dbm_phone_block key="' . esc_html($key) . '"]</code></div>';
             } elseif ($type === 'price') {
                 echo '<div class="dbm-snippet-item"><span>Универсальная цена:</span> <code>[dbm_price key="' . esc_html($key) . '"]</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Цена для UA:</span> <code>[dbm_price key="' . esc_html($key) . '_ua"]</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Цена для WORLD:</span> <code>[dbm_price key="' . esc_html($key) . '_world"]</code></div>';
+                
+                $prices = $value['prices'] ?? [];
+                foreach ($prices as $p) {
+                    $lbl = trim((string) ($p['label'] ?? ''));
+                    $geos = $p['geo'] ?? ['WORLD'];
+                    if (! is_array($geos)) {
+                        $geos = [$geos];
+                    }
+                    
+                    $suffix = '';
+                    $suffixLabel = '';
+                    if ($lbl !== '') {
+                        $suffix = strtolower($lbl);
+                        $suffixLabel = 'Цена для ' . $lbl . ':';
+                    } else {
+                        $firstGeo = strtoupper(trim((string) ($geos[0] ?? 'WORLD')));
+                        $suffix = strtolower($firstGeo);
+                        $suffixLabel = 'Цена для ' . $firstGeo . ':';
+                    }
+                    
+                    $suffixKey = $key . '_' . $suffix;
+                    echo '<div class="dbm-snippet-item"><span>' . esc_html($suffixLabel) . '</span> <code>[dbm_price key="' . esc_html($suffixKey) . '"]</code></div>';
+                }
+                
                 echo '<div class="dbm-snippet-item"><span>Числовое значение:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
             } else {
                 echo '<div class="dbm-snippet-item"><code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
@@ -193,8 +215,30 @@ class AdminPages
                 echo '<div class="dbm-snippet-item"><span>Блок:</span> <code>dbm_phone_block(\'' . esc_html($key) . '\')</code></div>';
             } elseif ($type === 'price') {
                 echo '<div class="dbm-snippet-item"><span>Универсальная:</span> <code>dbm_price(\'' . esc_html($key) . '\')</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Цена для UA:</span> <code>dbm_price(\'' . esc_html($key) . '_ua\')</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Цена для WORLD:</span> <code>dbm_price(\'' . esc_html($key) . '_world\')</code></div>';
+                
+                $prices = $value['prices'] ?? [];
+                foreach ($prices as $p) {
+                    $lbl = trim((string) ($p['label'] ?? ''));
+                    $geos = $p['geo'] ?? ['WORLD'];
+                    if (! is_array($geos)) {
+                        $geos = [$geos];
+                    }
+                    
+                    $suffix = '';
+                    $suffixLabel = '';
+                    if ($lbl !== '') {
+                        $suffix = strtolower($lbl);
+                        $suffixLabel = 'Цена для ' . $lbl . ':';
+                    } else {
+                        $firstGeo = strtoupper(trim((string) ($geos[0] ?? 'WORLD')));
+                        $suffix = strtolower($firstGeo);
+                        $suffixLabel = 'Цена для ' . $firstGeo . ':';
+                    }
+                    
+                    $suffixKey = $key . '_' . $suffix;
+                    echo '<div class="dbm-snippet-item"><span>' . esc_html($suffixLabel) . '</span> <code>dbm_price(\'' . esc_html($suffixKey) . '\')</code></div>';
+                }
+                
                 echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
             } else {
                 echo '<div class="dbm-snippet-item"><code>dbm_get(\'' . esc_html($key) . '\')</code></div>';

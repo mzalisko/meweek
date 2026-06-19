@@ -293,6 +293,22 @@ namespace DBM\Tests\Unit {
                     'value' => '5',
                     'label' => 'EUR',
                     'state' => 'ok'
+                ],
+                [
+                    'key' => 'price_ro',
+                    'type' => 'price',
+                    'geo' => ['UA'],
+                    'value' => '1200',
+                    'label' => 'uk',
+                    'state' => 'ok'
+                ],
+                [
+                    'key' => 'price_ro',
+                    'type' => 'price',
+                    'geo' => ['WORLD'],
+                    'value' => '5000',
+                    'label' => 'фів',
+                    'state' => 'ok'
                 ]
             ]);
 
@@ -322,6 +338,25 @@ namespace DBM\Tests\Unit {
 
             $htmlRU = $priceCallbackRU(['key' => 'romania']);
             $this->assertSame('', $htmlRU);
+
+            // 3. Label-based suffix matches
+            $controllerUA->register();
+            $priceCallbackUA = $test_shortcodes['dbm_price'];
+            $this->assertSame('<span>1200 uk</span>', $priceCallbackUA(['key' => 'price_ro_uk']));
+            $this->assertSame('<span>1200 uk</span>', $priceCallbackUA(['key' => 'price_ro uk']));
+            $this->assertSame('<span>5000 фів</span>', $priceCallbackUA(['key' => 'price_ro_фів']));
+            $this->assertSame('<span>5000 фів</span>', $priceCallbackUA(['key' => 'price_ro фів']));
+
+            // 4. Dynamic country resolution for price_ro
+            $this->assertSame('<span>1200 uk</span>', $priceCallbackUA(['key' => 'price_ro'])); // UA
+            
+            $controllerPL->register();
+            $priceCallbackPL = $test_shortcodes['dbm_price'];
+            $this->assertSame('<span>5000 фів</span>', $priceCallbackPL(['key' => 'price_ro'])); // PL -> WORLD
+            
+            $controllerRU->register();
+            $priceCallbackRU = $test_shortcodes['dbm_price'];
+            $this->assertSame('', $priceCallbackRU(['key' => 'price_ro'])); // RU -> no WORLD fallback
         }
     }
 }
