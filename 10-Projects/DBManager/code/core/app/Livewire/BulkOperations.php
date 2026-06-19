@@ -95,12 +95,13 @@ class BulkOperations extends Component
                 $this->selectedSiteIds,
                 fn ($id) => (int) $id !== $siteId
             ));
-
-            return;
+        } else {
+            $this->selectedSiteIds[] = $siteId;
+            $this->selectedSiteIds = array_values(array_unique(array_map('intval', $this->selectedSiteIds)));
         }
 
-        $this->selectedSiteIds[] = $siteId;
-        $this->selectedSiteIds = array_values(array_unique(array_map('intval', $this->selectedSiteIds)));
+        $this->scope = 'selected';
+        $this->report = null;
     }
 
     public function selectFilteredSites(): void
@@ -110,11 +111,17 @@ class BulkOperations extends Component
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+        $this->scope = 'selected';
+        $this->report = null;
     }
 
     public function clearSiteSelection(): void
     {
         $this->selectedSiteIds = [];
+        if ($this->scope === 'selected') {
+            $this->scope = 'all';
+        }
+        $this->report = null;
     }
 
     public function apply(): void
@@ -134,6 +141,7 @@ class BulkOperations extends Component
     public function render()
     {
         $accessibleSites = app(AccessControl::class)->accessibleSites(auth()->user());
+        $siteOptions = $this->sitePool(false);
         $editableSiteIds = $this->editableTargetSites()->pluck('id')->map(fn ($id) => (int) $id)->all();
         $previewRows = $this->previewRows();
         $stats = $this->stats($previewRows, $editableSiteIds);
@@ -148,6 +156,7 @@ class BulkOperations extends Component
 
         return view('livewire.bulk-operations', [
             'sites' => $accessibleSites,
+            'siteOptions' => $siteOptions,
             'groups' => $groups,
             'geoTags' => $geoTags,
             'previewRows' => $previewRows,

@@ -54,6 +54,43 @@ class BulkOperationsTest extends TestCase
         $this->assertDatabaseHas('geo_tags', ['id' => $ua->id, 'code' => 'UA']);
     }
 
+    public function test_clicking_site_switches_to_selected_scope_and_limits_targets(): void
+    {
+        $siteA = Site::factory()->create(['domain' => 'a.test']);
+        $siteB = Site::factory()->create(['domain' => 'b.test']);
+        GeoTag::firstOrCreate(['code' => 'UA'], ['name' => 'Україна']);
+
+        $valueA = DataValue::factory()->forSite($siteA)->create(['key' => 'address']);
+        $valueB = DataValue::factory()->forSite($siteB)->create(['key' => 'address']);
+
+        Livewire::test(BulkOperations::class)
+            ->assertSet('scope', 'all')
+            ->call('toggleSite', $siteA->id)
+            ->assertSet('scope', 'selected')
+            ->assertSet('selectedSiteIds', [$siteA->id])
+            ->set('operation', 'set_geo')
+            ->set('geoCodes', ['UA'])
+            ->set('publishAfterApply', false)
+            ->call('apply')
+            ->assertSet('report.changed', 1)
+            ->assertHasNoErrors();
+
+        $this->assertSame(['UA'], $valueA->fresh('geoTags')->geoTags->pluck('code')->all());
+        $this->assertSame([], $valueB->fresh('geoTags')->geoTags->pluck('code')->all());
+    }
+
+    public function test_select_filtered_sites_switches_to_selected_scope(): void
+    {
+        $siteA = Site::factory()->create(['domain' => 'a.test']);
+        Site::factory()->create(['domain' => 'b.test']);
+
+        Livewire::test(BulkOperations::class)
+            ->set('siteSearch', 'a.test')
+            ->call('selectFilteredSites')
+            ->assertSet('scope', 'selected')
+            ->assertSet('selectedSiteIds', [$siteA->id]);
+    }
+
     public function test_bulk_phone_replace_changes_only_matching_numbers(): void
     {
         $siteA = Site::factory()->create(['domain' => 'a.test']);

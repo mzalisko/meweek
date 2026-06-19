@@ -29,7 +29,7 @@
             <h1 class="text-[15px] font-semibold text-acc-tx">Вибірка</h1>
             <button type="button" wire:click="selectFilteredSites"
                 class="inline-flex items-center gap-1 rounded-lg border border-[#dfe3e0] px-2 py-1 text-[11px] font-semibold text-mut hover:border-acc hover:text-acc-tx">
-                @svg('check', 14) Сайти
+                @svg('check', 14) Вибрати видимі
             </button>
         </div>
 
@@ -76,7 +76,7 @@
             </div>
 
             <div class="max-h-[32vh] overflow-y-auto rounded-lg border border-[#dfe3e0]">
-                @forelse($sites->sortBy('domain') as $site)
+                @forelse($siteOptions as $site)
                     @php $checked = in_array((int) $site->id, array_map('intval', $selectedSiteIds), true); @endphp
                     <button type="button" wire:click="toggleSite({{ $site->id }})"
                         class="flex w-full items-center gap-2 border-b border-[#edf0ed] px-2.5 py-2 text-left text-[11px] last:border-b-0 hover:bg-[#f6f8f6]">
