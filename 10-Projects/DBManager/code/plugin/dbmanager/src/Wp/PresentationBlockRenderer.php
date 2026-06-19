@@ -299,13 +299,7 @@ class PresentationBlockRenderer
         $html = '<article class="dbm-present__item dbm-present__item--' . $this->e($type) . '" data-dbm-item data-type="' . $this->e($type) . '" data-search="' . $search . '">';
         $html .= '<div class="dbm-present__item-main">';
         $html .= '<span class="dbm-present__item-title"><span>' . $this->e((string) $item['title']) . '</span><span class="dbm-present__type">' . $this->e($this->typeLabel($type)) . '</span></span>';
-        $html .= '<strong class="dbm-present__item-value">' . $this->e($display);
-        foreach ((array) ($item['networks'] ?? []) as $net) {
-            $netCode = strtolower($net['network']);
-            $netName = htmlspecialchars($net['name'], ENT_QUOTES);
-            $html .= '<span class="dbm-net-badge dbm-net-badge--' . $this->e($netCode) . '" title="Прикреплен мессенджер: ' . $netName . '">' . $this->e(substr($netCode, 0, 2)) . '</span>';
-        }
-        $html .= '</strong>';
+        $html .= '<strong class="dbm-present__item-value">' . $this->e($display) . '</strong>';
         if ($raw !== '' && $raw !== $display) {
             $html .= '<small class="dbm-present__raw">' . $this->e($raw) . '</small>';
         }
