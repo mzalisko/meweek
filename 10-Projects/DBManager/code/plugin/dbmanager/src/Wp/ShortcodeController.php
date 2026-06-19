@@ -181,5 +181,63 @@ class ShortcodeController
 
             return $html;
         });
+
+        add_shortcode('dbm_price', function ($atts) use ($country) {
+            $atts = shortcode_atts([
+                'key' => '',
+                'show_label' => 'yes', // yes або no
+                'class' => '',
+                'tag' => 'span', // span, div, strong і т.д.
+            ], $atts);
+
+            $key = (string) $atts['key'];
+            if ($key === '') {
+                return '';
+            }
+
+            $cache = get_option('dbm_cache');
+            $values = is_array($cache) && isset($cache['values']) ? $cache['values'] : [];
+
+            $chosen = null;
+            $fallback = null;
+            foreach ($values as $candidate) {
+                if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
+                    $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                    if (in_array('!' . $country, $geo, true)) {
+                        continue;
+                    }
+                    if (in_array($country, $geo, true)) {
+                        $chosen = $candidate;
+                        break;
+                    }
+                    if (empty($geo) || in_array('WORLD', $geo, true)) {
+                        $fallback = $candidate;
+                    }
+                }
+            }
+            $price = $chosen ?? $fallback;
+
+            if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
+                return '';
+            }
+
+            $val = trim((string) ($price['value'] ?? ''));
+            if ($val === '') {
+                return '';
+            }
+
+            $label = trim((string) ($price['label'] ?? ''));
+            $showLabel = in_array(strtolower($atts['show_label']), ['yes', '1', 'true'], true);
+
+            $display = esc_html($val);
+            if ($showLabel && $label !== '') {
+                $display .= ' ' . esc_html($label);
+            }
+
+            $tag = in_array(strtolower($atts['tag']), ['span', 'div', 'strong', 'p', 'b'], true) ? strtolower($atts['tag']) : 'span';
+            $class = $atts['class'] !== '' ? ' class="' . esc_attr($atts['class']) . '"' : '';
+
+            return '<' . $tag . $class . '>' . $display . '</' . $tag . '>';
+        });
     }
 }
