@@ -224,12 +224,12 @@
 
                 <div class="max-h-[calc(100vh-245px)] overflow-y-auto">
                     @forelse($previewRows as $row)
-                        <div class="grid grid-cols-[minmax(150px,1.2fr)_minmax(110px,.8fr)_96px_110px_minmax(160px,1fr)_minmax(190px,1.4fr)] gap-2 border-b border-[#edf0ed] px-3 py-2 text-[12px] last:border-b-0 hover:bg-[#fafbfa]">
-                            <div class="min-w-0 font-mono text-ink">
+                        <div class="grid grid-cols-[minmax(150px,1.2fr)_minmax(110px,.8fr)_96px_110px_minmax(160px,1fr)_minmax(190px,1.4fr)] gap-2 border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                            <div class="min-w-0 font-mono text-ink text-[13px]">
                                 <span class="block truncate">{{ $row['site'] }}</span>
-                                <span class="text-[10px] text-mut">{{ $row['kind'] === 'phone' ? 'номер' : 'значення' }}</span>
+                                <span class="text-[11px] text-mut">{{ $row['kind'] === 'phone' ? 'номер' : 'значення' }}</span>
                             </div>
-                            <div class="min-w-0 truncate text-mut">{{ $row['group'] }}</div>
+                            <div class="min-w-0 truncate text-mut text-[13px]">{{ $row['group'] }}</div>
                             <div>
                                 <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
                                     @if($row['type'] === 'phone')
@@ -288,20 +288,20 @@
                                     @endforeach
                                 @endif
                             </div>
-                            <div class="min-w-0 font-mono text-[#3c5a42] text-[11px]" title="{{ $row['key'] }}">
+                            <div class="min-w-0 font-mono text-[#3c5a42] text-[13px]" title="{{ $row['key'] }}">
                                 @if($row['changed'] && isset($row['new_key']) && $row['key'] !== $row['new_key'])
                                     <span class="line-through text-bad-tx block truncate">{{ $row['key'] }}</span>
-                                    <span class="text-mut block text-[9px] leading-none my-0.5">▼</span>
-                                    <span class="text-ok-tx font-bold bg-ok-bg/50 px-1 rounded block truncate">{{ $row['new_key'] }}</span>
+                                    <span class="text-mut block text-[10px] leading-none my-0.5">▼</span>
+                                    <span class="text-ok-tx font-bold bg-ok-bg/50 px-1 rounded block truncate text-[13px]">{{ $row['new_key'] }}</span>
                                 @else
                                     <span class="block truncate">{{ $row['key'] }}</span>
                                 @endif
                             </div>
-                            <div class="min-w-0 text-ink text-[11px]" title="{{ $row['value'] }}">
+                            <div class="min-w-0 text-ink text-[13px]" title="{{ $row['value'] }}">
                                 @if($row['changed'] && $row['value'] !== $row['new_value'])
-                                    <span class="line-through text-bad-tx block truncate opacity-70">{{ $row['value'] }}</span>
-                                    <span class="text-mut text-[9px] block leading-none my-0.5">▼</span>
-                                    <span class="text-ok-tx font-semibold block truncate bg-ok-bg/60 px-1.5 py-0.5 rounded">{{ $row['new_value'] }}</span>
+                                    <span class="line-through text-bad-tx block truncate opacity-70 text-[13px]">{{ $row['value'] }}</span>
+                                    <span class="text-mut text-[10px] block leading-none my-0.5">▼</span>
+                                    <span class="text-ok-tx font-semibold block truncate bg-ok-bg/60 px-1.5 py-0.5 rounded text-[13px]">{{ $row['new_value'] }}</span>
                                 @else
                                     <span class="block truncate">{{ $row['value'] }}</span>
                                 @endif
