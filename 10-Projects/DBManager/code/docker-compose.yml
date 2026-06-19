@@ -48,6 +48,22 @@ services:
       - bridge-mysql
       - redis
 
+  bridge-worker:
+    build: ./docker/core
+    volumes:
+      - ./bridge:/app
+    command: php artisan queue:work --sleep=1 --tries=3 --timeout=30
+    environment:
+      DB_HOST: bridge-mysql
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+    depends_on:
+      - bridge
+      - bridge-mysql
+      - redis
+
   bridge-mysql:
     image: mysql:8.4
     environment:

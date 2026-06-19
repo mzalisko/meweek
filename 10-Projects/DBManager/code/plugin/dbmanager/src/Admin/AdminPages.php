@@ -45,7 +45,7 @@ class AdminPages
             'signing_secret' => (string) ($old['signing_secret'] ?? ''),
             'shortcode' => sanitize_key((string) ($input['shortcode'] ?? ($old['shortcode'] ?? 'dbm'))),
             'css_class' => sanitize_html_class((string) ($input['css_class'] ?? ($old['css_class'] ?? ''))),
-            'connection_site' => sanitize_text_field((string) ($old['connection_site'] ?? '')),
+            'connection_site_id' => (int) ($old['connection_site_id'] ?? 0),
             'connection_ping_url' => esc_url_raw((string) ($old['connection_ping_url'] ?? '')),
             'connection_saved_at' => sanitize_text_field((string) ($old['connection_saved_at'] ?? '')),
         ];
@@ -71,7 +71,7 @@ class AdminPages
 
             $settings['signing_secret'] = (string) $decoded['signing_secret'];
             $settings['shortcode'] = sanitize_key((string) ($decoded['shortcode'] ?: $settings['shortcode']));
-            $settings['connection_site'] = sanitize_text_field((string) $decoded['site']);
+            $settings['connection_site_id'] = (int) ($decoded['site_id'] ?? 0);
             $settings['connection_ping_url'] = esc_url_raw((string) $decoded['ping_url']);
             $settings['connection_saved_at'] = function_exists('current_time')
                 ? (string) current_time('mysql')
@@ -101,7 +101,7 @@ class AdminPages
         echo '<div class="dbm-hero"><div><span class="dbm-eyebrow">DBManager</span><h1>Данные сайта</h1><p>Плагин показывает кеш, доставленный из центральной CRM. Редактирование происходит только в Core.</p></div>';
         echo '<div class="dbm-version"><span>Версия</span><strong>' . (int) ($cache['version'] ?? 0) . '</strong></div></div>';
         echo '<div class="dbm-stats">';
-        echo '<div class="dbm-stat"><span>Сайт</span><strong>' . esc_html((string) ($cache['site'] ?? 'локальный кеш')) . '</strong></div>';
+        echo '<div class="dbm-stat"><span>ID сайта</span><strong>' . (isset($cache['site_id']) && $cache['site_id'] > 0 ? (int) $cache['site_id'] : 'локальный кеш') . '</strong></div>';
         echo '<div class="dbm-stat"><span>Номера</span><strong>' . (int) ($counts['phone'] ?? 0) . '</strong></div>';
         echo '<div class="dbm-stat"><span>Мессенджеры</span><strong>' . (int) ($counts['messenger'] ?? 0) . '</strong></div>';
         echo '<div class="dbm-stat"><span>Цены</span><strong>' . (int) ($counts['price'] ?? 0) . '</strong></div>';
@@ -120,7 +120,11 @@ class AdminPages
             $type = (string) ($value['type'] ?? '');
             echo '<tr class="dbm-row" data-type="' . esc_attr($type) . '">';
             echo '<td><div class="dbm-key">' . esc_html((string) ($value['key'] ?? '')) . '</div>' . $this->typeBadge($type) . '</td>';
-            echo '<td>' . $this->geoChips($value['geo'] ?? []) . '</td>';
+            if ($type === 'price' && ! empty($value['prices'])) {
+                echo '<td>' . $this->geoPricesList($value['prices']) . '</td>';
+            } else {
+                echo '<td>' . $this->geoChips($value['geo'] ?? []) . '</td>';
+            }
             echo '<td>' . $this->stateBadge((string) ($value['state'] ?? 'ok')) . '</td>';
             echo '<td>' . $this->valuePreview($value, $values) . '</td>';
             echo '</tr>';
@@ -161,10 +165,13 @@ class AdminPages
 
         $this->adminStyles();
 
-        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Вставка</span><h1>Коды для сайта</h1><p>Готовые шорткоды для значений и презентационного блока.</p></div></div>';
-        echo '<div class="dbm-card dbm-highlight"><div><h2>Презентационный блок</h2><p>Интерактивный блок с телефонами, мессенджерами и ценами из локального кеша.</p></div><code>[dbm_presentation]</code><code>[dbm_block]</code></div>';
+        echo '<div class="wrap dbm-admin"><div class="dbm-hero"><div><span class="dbm-eyebrow">Вставка</span><h1>Коды для сайта</h1><p>Готовые shortcode для значений и презентационного блока.</p></div></div>';
+        echo '<div class="dbm-card dbm-highlight" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;"><div><h2>Презентационный блок</h2><p>Интерактивный блок с телефонами, мессенджерами и ценами из локального кеша.</p></div><div style="display:flex; gap:12px;">'
+            . $this->copyableSnippet('', '[dbm_presentation]')
+            . $this->copyableSnippet('', '[dbm_block]')
+            . '</div></div>';
         echo '<div class="dbm-card"><div class="dbm-card-head"><div><h2>Отдельные значения</h2><p>Для каждого типа данных доступны специализированные шорткоды и PHP-функции.</p></div></div>';
-        echo '<table class="dbm-table"><thead><tr><th>Данные</th><th>Шорткоды для вставки</th><th>PHP вызовы</th></tr></thead><tbody>';
+        echo '<table class="dbm-table"><thead><tr><th style="width:20%">Данные</th><th style="width:40%">Шорткоды для вставки</th><th style="width:40%">PHP вызовы</th></tr></thead><tbody>';
         foreach ($this->orderedValues($cache) as $value) {
             $key = (string) ($value['key'] ?? '');
             $type = (string) ($value['type'] ?? '');
@@ -174,11 +181,11 @@ class AdminPages
             
             echo '<td>';
             if ($type === 'phone') {
-                echo '<div class="dbm-snippet-item"><span>Стандартный:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Ссылка tel:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '" format="tel"]</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Блок с мессенджерами:</span> <code>[dbm_phone_block key="' . esc_html($key) . '"]</code></div>';
+                echo $this->copyableSnippet('Стандартный:', '[' . $this->settings->shortcode . ' key="' . $key . '"]');
+                echo $this->copyableSnippet('Ссылка tel:', '[' . $this->settings->shortcode . ' key="' . $key . '" format="tel"]');
+                echo $this->copyableSnippet('Блок с мессенджерами:', '[dbm_phone_block key="' . $key . '"]');
             } elseif ($type === 'price') {
-                echo '<div class="dbm-snippet-item"><span>Универсальная цена:</span> <code>[dbm_price key="' . esc_html($key) . '"]</code></div>';
+                echo $this->copyableSnippet('Универсальная цена:', '[dbm_price key="' . $key . '"]');
                 
                 $prices = $value['prices'] ?? [];
                 foreach ($prices as $p) {
@@ -200,21 +207,21 @@ class AdminPages
                     }
                     
                     $suffixKey = $key . '_' . $suffix;
-                    echo '<div class="dbm-snippet-item"><span>' . esc_html($suffixLabel) . '</span> <code>[dbm_price key="' . esc_html($suffixKey) . '"]</code></div>';
+                    echo $this->copyableSnippet($suffixLabel, '[dbm_price key="' . $suffixKey . '"]');
                 }
                 
-                echo '<div class="dbm-snippet-item"><span>Числовое значение:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
+                echo $this->copyableSnippet('Числовое значение:', '[' . $this->settings->shortcode . ' key="' . $key . '"]');
             } else {
-                echo '<div class="dbm-snippet-item"><code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
+                echo $this->copyableSnippet('', '[' . $this->settings->shortcode . ' key="' . $key . '"]');
             }
             echo '</td>';
             
             echo '<td>';
             if ($type === 'phone') {
-                echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
-                echo '<div class="dbm-snippet-item"><span>Блок:</span> <code>dbm_phone_block(\'' . esc_html($key) . '\')</code></div>';
+                echo $this->copyableSnippet('Значение:', 'dbm_get(\'' . $key . '\')');
+                echo $this->copyableSnippet('Блок:', 'dbm_phone_block(\'' . $key . '\')');
             } elseif ($type === 'price') {
-                echo '<div class="dbm-snippet-item"><span>Универсальная:</span> <code>dbm_price(\'' . esc_html($key) . '\')</code></div>';
+                echo $this->copyableSnippet('Универсальная:', 'dbm_price(\'' . $key . '\')');
                 
                 $prices = $value['prices'] ?? [];
                 foreach ($prices as $p) {
@@ -236,17 +243,73 @@ class AdminPages
                     }
                     
                     $suffixKey = $key . '_' . $suffix;
-                    echo '<div class="dbm-snippet-item"><span>' . esc_html($suffixLabel) . '</span> <code>dbm_price(\'' . esc_html($suffixKey) . '\')</code></div>';
+                    echo $this->copyableSnippet($suffixLabel, 'dbm_price(\'' . $suffixKey . '\')');
                 }
                 
-                echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
+                echo $this->copyableSnippet('Значение:', 'dbm_get(\'' . $key . '\')');
             } else {
-                echo '<div class="dbm-snippet-item"><code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
+                echo $this->copyableSnippet('', 'dbm_get(\'' . $key . '\')');
             }
             echo '</td>';
             echo '</tr>';
         }
-        echo '</tbody></table></div></div>';
+        echo '</tbody></table></div>';
+        
+        echo '<script>
+        (function() {
+            var btns = document.querySelectorAll(".dbm-copy-btn");
+            btns.forEach(function(btn) {
+                btn.addEventListener("click", function() {
+                    var text = btn.getAttribute("data-clipboard");
+                    if (!text) return;
+                    
+                    function copyToClipboard(val) {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            return navigator.clipboard.writeText(val);
+                        } else {
+                            var textArea = document.createElement("textarea");
+                            textArea.value = val;
+                            textArea.style.position = "fixed";
+                            textArea.style.left = "-999999px";
+                            textArea.style.top = "-999999px";
+                            document.body.appendChild(textArea);
+                            textArea.focus();
+                            textArea.select();
+                            return new Promise(function(resolve, reject) {
+                                if (document.execCommand("copy")) {
+                                    resolve();
+                                } else {
+                                    reject();
+                                }
+                                textArea.remove();
+                            });
+                        }
+                    }
+                    
+                    copyToClipboard(text).then(function() {
+                        btn.classList.add("copied");
+                        var copyIcon = btn.querySelector(".dbm-copy-icon");
+                        var checkIcon = btn.querySelector(".dbm-check-icon");
+                        if (copyIcon && checkIcon) {
+                            copyIcon.style.display = "none";
+                            checkIcon.style.display = "inline";
+                        }
+                        
+                        setTimeout(function() {
+                            btn.classList.remove("copied");
+                            if (copyIcon && checkIcon) {
+                                copyIcon.style.display = "inline";
+                                checkIcon.style.display = "none";
+                            }
+                        }, 2000);
+                    }).catch(function(err) {
+                        console.error("Failed to copy: ", err);
+                    });
+                });
+            });
+        })();
+        </script>';
+        echo '</div>';
     }
 
     public function renderSettings(): void
@@ -270,8 +333,8 @@ class AdminPages
         if ($listenerUrl !== '') {
             echo '<div class="dbm-field-row"><span>Локальный endpoint</span><code>' . esc_html($listenerUrl) . '</code></div>';
         }
-        if (! empty($options['connection_site'])) {
-            echo '<div class="dbm-field-row"><span>Сайт</span><strong>' . esc_html((string) $options['connection_site']) . '</strong></div>';
+        if (! empty($options['connection_site_id'])) {
+            echo '<div class="dbm-field-row"><span>ID сайта</span><strong>' . (int) $options['connection_site_id'] . '</strong></div>';
             if (! empty($options['connection_ping_url'])) {
                 echo '<div class="dbm-field-row"><span>Endpoint доставки</span><code>' . esc_html((string) $options['connection_ping_url']) . '</code></div>';
             }
@@ -405,8 +468,15 @@ class AdminPages
 @media (max-width:782px){.dbm-hero{display:block}.dbm-version,.dbm-status-card{text-align:left;margin-top:12px}.dbm-stats{grid-template-columns:1fr 1fr}.dbm-table{display:block;overflow-x:auto}.dbm-field-row{display:block}.dbm-field-row code,.dbm-field-row strong{display:inline-block;margin-top:5px}}
 .dbm-snippet-item{margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .dbm-snippet-item:last-child{margin-bottom:0}
-.dbm-snippet-item span{color:var(--dbm-muted);font-size:10px;font-weight:700;text-transform:uppercase;min-width:115px;display:inline-block}
+.dbm-snippet-item span,.dbm-snippet-item .dbm-label{color:var(--dbm-muted);font-size:10px;font-weight:700;text-transform:uppercase;min-width:115px;display:inline-block}
 .dbm-snippet-item code{vertical-align:middle}
+.dbm-copy-wrapper{display:inline-flex;align-items:center;background:#f5f7f8;border:1px solid var(--dbm-line);border-radius:6px;padding:2px 4px;gap:4px;vertical-align:middle}
+.dbm-copy-wrapper code{background:none !important;border:none !important;padding:0 6px !important;margin:0 !important;font-size:11px !important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dbm-ink);vertical-align:middle}
+.dbm-copy-btn{background:#fff;border:1px solid var(--dbm-line);border-radius:4px;padding:3px 5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--dbm-muted);transition:all .15s ease}
+.dbm-copy-btn:hover{color:var(--dbm-accent);border-color:var(--dbm-accent);background:var(--dbm-accent-soft)}
+.dbm-copy-btn.copied{color:var(--dbm-ok);border-color:var(--dbm-ok);background:#eef6f1}
+.dbm-price-list{display:flex;flex-direction:column;gap:6px}
+.dbm-price-row{display:flex;align-items:center;min-height:24px}
 </style>
 HTML;
     }
@@ -460,6 +530,37 @@ HTML;
         }, $geo));
     }
 
+    private function geoPricesList(array $prices): string
+    {
+        $html = '<div class="dbm-price-list">';
+        foreach ($prices as $p) {
+            $geos = $p['geo'] ?? ['WORLD'];
+            $html .= '<div class="dbm-price-row">';
+            $html .= $this->geoChips($geos);
+            $html .= '</div>';
+        }
+        $html .= '</div>';
+        return $html;
+    }
+
+    private function copyableSnippet(string $label, string $code): string
+    {
+        $escapedCode = esc_attr($code);
+        $escapedHtml = esc_html($code);
+        $escapedLabel = esc_html($label);
+
+        return '<div class="dbm-snippet-item">'
+            . '<span class="dbm-label">' . $escapedLabel . '</span>'
+            . '<div class="dbm-copy-wrapper">'
+            . '<code>' . $escapedHtml . '</code>'
+            . '<button type="button" class="dbm-copy-btn" data-clipboard="' . $escapedCode . '" title="Копировать">'
+            . '<svg class="dbm-copy-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>'
+            . '<svg class="dbm-check-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+            . '</button>'
+            . '</div>'
+            . '</div>';
+    }
+
     private function groupCacheValues(array $values): array
     {
         $grouped = [];
@@ -510,25 +611,18 @@ HTML;
         $type = (string) ($value['type'] ?? '');
 
         if ($type === 'price' && ! empty($value['prices'])) {
-            $html = '<span class="dbm-value">';
-            $parts = [];
+            $html = '<div class="dbm-price-list">';
             foreach ($value['prices'] as $p) {
                 $val = trim((string) ($p['value'] ?? ''));
                 $lbl = trim((string) ($p['label'] ?? ''));
-                $geos = $p['geo'] ?? ['WORLD'];
-                if (! is_array($geos)) {
-                    $geos = [$geos];
-                }
-                $geosStr = implode(', ', array_map('strtoupper', $geos));
 
                 $disp = $val;
                 if ($lbl !== '') {
                     $disp .= ' ' . $lbl;
                 }
-                $parts[] = '<strong>' . esc_html($disp) . '</strong> <small style="margin-left: 2px; background: #eef2f5; padding: 2px 4px; border-radius: 4px; font-weight: bold;">' . esc_html($geosStr) . '</small>';
+                $html .= '<div class="dbm-price-row"><strong>' . esc_html($disp) . '</strong></div>';
             }
-            $html .= implode('<span style="margin: 0 8px; color: #ccc;">|</span>', $parts);
-            $html .= '</span>';
+            $html .= '</div>';
             return $html;
         }
 

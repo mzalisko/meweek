@@ -379,10 +379,12 @@ class SitesManager extends Component
         $this->authorizeSiteManagement();
 
         $site = Site::findOrFail($this->editingSiteId);
-        $this->visibleToken = app(SiteProvisioner::class)->issueToken($site);
+        $connection = app(SiteProvisioner::class)->issuePluginConnection($site);
+        $this->visibleToken = $connection['connection_key'];
         $this->auditToken('token.issued', $site->id);
+        $this->publishCurrentPayload($site);
 
-        $this->dispatch('toast', message: 'Токен видано. Скопіюйте зараз — більше не покажемо.');
+        $this->dispatch('toast', message: 'Ключ підключення створено. Скопіюйте зараз — більше не покажемо.');
     }
 
     public function revokeToken(): void
@@ -404,10 +406,12 @@ class SitesManager extends Component
         $site = Site::findOrFail($this->editingSiteId);
         $provisioner = app(SiteProvisioner::class);
         $provisioner->revokeToken($site);
-        $this->visibleToken = $provisioner->issueToken($site);
+        $connection = $provisioner->issuePluginConnection($site);
+        $this->visibleToken = $connection['connection_key'];
         $this->auditToken('token.rotated', $site->id);
+        $this->publishCurrentPayload($site);
 
-        $this->dispatch('toast', message: 'Токен зротовано. Старий більше не діє.');
+        $this->dispatch('toast', message: 'Ключ підключення оновлено. Старий більше не діє.');
     }
 
     public function hasNoData(): bool
@@ -541,7 +545,7 @@ class SitesManager extends Component
     }
 
     /**
-     * @return array{lastSeenAt: ?string, lastVersion: ?int, hasActiveToken: bool}
+     * @return array{lastSeenAt: ?string, lastVersion: ?int, hasActiveToken: bool, pingUrl: ?string}
      */
     private function connectionStatus(Site $site): array
     {
@@ -549,7 +553,14 @@ class SitesManager extends Component
             'lastSeenAt' => $site->tokens()->max('last_seen_at'),
             'lastVersion' => Publication::where('site_id', $site->id)->max('version'),
             'hasActiveToken' => $site->tokens()->whereNull('revoked_at')->exists(),
+            'pingUrl' => $site->ping_url,
         ];
+    }
+
+    private function publishCurrentPayload(Site $site): void
+    {
+        $publication = app(SitePayloadCompiler::class)->publish($site->fresh());
+        app(BridgePublisher::class)->push($publication);
     }
 
     public function render()

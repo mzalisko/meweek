@@ -56,7 +56,7 @@
             <button data-site-select @click="open = !open" @disabled(!$currentGroupId)
                 class="flex items-center gap-2 bg-[#f4f5f3] hover:bg-[#ebede9] px-3 py-1.5 rounded-lg border border-[#e3e5e1] text-xs font-bold text-ink transition-colors outline-none focus:outline-none disabled:cursor-not-allowed select-none">
                 <span class="text-mut text-[10px] font-bold uppercase tracking-wider">Сайт</span>
-                <span class="text-ink font-mono font-medium">{{ $siteModel?->domain ?? 'Оберіть сайт' }}</span>
+                <span class="text-ink font-mono font-medium">{{ $siteModel ? ($siteModel->domain . ' [ID: ' . $siteModel->id . ']') : 'Оберіть сайт' }}</span>
                 <svg class="w-3.5 h-3.5 text-mut transition-transform duration-200 shrink-0" :class="open ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
@@ -82,7 +82,7 @@
                     @foreach($selectedGroupSites->sortBy('domain') as $s)
                         <a href="{{ route('admin.site', ['group' => $s->site_group_id, 'site' => $s->id]) }}"
                            class="flex items-center justify-between px-3.5 py-2 text-xs text-ink hover:bg-[#eef1ee] hover:text-acc-tx font-mono transition-colors {{ (int) $siteModel?->id === (int) $s->id ? 'bg-[#eef1ee] text-acc-tx font-semibold' : '' }}">
-                            <span>{{ $s->domain }}</span>
+                            <span>{{ $s->domain }} <span class="text-mut text-[10px] font-sans ml-1">ID: {{ $s->id }}</span></span>
                             @if((int) $siteModel?->id === (int) $s->id)
                                 <svg class="w-3.5 h-3.5 text-acc-tx" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                             @endif
@@ -97,7 +97,7 @@
 <x-slot name="context">
     <div class="bg-acc-bg border-b border-acc-bd px-[18px] py-2 text-xs text-acc-tx flex gap-3 items-center">
         @svg('globe')
-        <span>Сайт: <b>{{ $siteModel?->domain ?? '—' }}</b></span>
+        <span>Сайт: <b>{{ $siteModel ? ($siteModel->domain . ' [ID: ' . $siteModel->id . ']') : '—' }}</b></span>
         @if($siteModel?->group)
             <span class="text-mut">·</span>
             <span>Група: {{ $siteModel->group->name }}</span>
@@ -120,7 +120,7 @@
                 </span>
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-[.08em] text-mut">Поточний сайт</div>
-                    <h1 class="truncate font-mono text-[18px] font-semibold leading-6 text-ink" title="{{ $siteModel->domain }}">{{ $siteModel->domain }}</h1>
+                    <h1 class="truncate font-mono text-[18px] font-semibold leading-6 text-ink" title="{{ $siteModel->domain }}">{{ $siteModel->domain }} <span class="text-mut text-[12px] font-normal ml-2">ID: {{ $siteModel->id }}</span></h1>
                     @if($siteModel?->group)
                         <div class="truncate text-[11px] text-mut">Група: {{ $siteModel->group->name }}</div>
                     @endif

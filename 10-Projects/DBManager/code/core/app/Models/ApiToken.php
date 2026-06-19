@@ -13,6 +13,7 @@ class ApiToken extends Model
     protected $guarded = [];
 
     protected $casts = [
+        'push_secret' => 'encrypted',
         'revoked_at' => 'datetime',
         'last_seen_at' => 'datetime',
     ];

@@ -7,6 +7,7 @@ use App\Models\DataValue;
 use App\Models\GeoTag;
 use App\Models\Site;
 use App\Models\SiteGroup;
+use App\Support\PhoneFormatter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\BuildsSlots;
 use Tests\TestCase;
@@ -102,5 +103,25 @@ class SiteGridReaderTest extends TestCase
         $this->assertSame('current_site', $childRow['source']);
         $this->assertSame('цього сайту', $childRow['source_label']);
         $this->assertSame('Child value', $childRow['value']);
+    }
+
+    public function test_phone_row_contains_display_values_from_format_pattern(): void
+    {
+        $site = Site::factory()->create();
+        [$slot, $entries] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update([
+            'key' => 'phone_fmt',
+            'scope_type' => 'site',
+            'scope_id' => $site->id,
+            'content' => ['phone_format' => '+### ## ### ## ##'],
+        ]);
+
+        $rows = app(SiteGridReader::class)->forSite($site);
+        $phone = collect($rows['phone'] ?? [])->firstWhere('key', 'phone_fmt');
+
+        $this->assertSame($entries[0]->phoneNumber->e164, $phone['value']);
+        $expected = PhoneFormatter::format($entries[0]->phoneNumber->e164, '+### ## ### ## ##');
+        $this->assertSame($expected, $phone['display_value']);
+        $this->assertSame($expected, $phone['numbers'][0]['display_value']);
     }
 }

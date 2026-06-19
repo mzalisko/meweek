@@ -24,7 +24,7 @@ class SiteTokenTest extends TestCase
         Livewire::test(SitesManager::class)
             ->call('editSite', $site->id)
             ->call('issueToken')
-            ->assertSet('visibleToken', fn ($value) => is_string($value) && strlen($value) >= 32);
+            ->assertSet('visibleToken', fn ($value) => is_string($value) && str_starts_with($value, 'DBM1.'));
 
         $this->assertSame(1, ApiToken::where('site_id', $site->id)->whereNull('revoked_at')->count());
         $this->assertTrue(
@@ -59,7 +59,7 @@ class SiteTokenTest extends TestCase
         Livewire::test(SitesManager::class)
             ->call('editSite', $site->id)
             ->call('rotateToken')
-            ->assertSet('visibleToken', fn ($value) => is_string($value) && strlen($value) >= 32);
+            ->assertSet('visibleToken', fn ($value) => is_string($value) && str_starts_with($value, 'DBM1.'));
 
         $this->assertNotNull($old->fresh()->revoked_at);
         $this->assertSame(1, ApiToken::where('site_id', $site->id)->whereNull('revoked_at')->count());

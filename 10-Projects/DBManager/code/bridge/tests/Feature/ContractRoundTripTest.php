@@ -40,6 +40,7 @@ class ContractRoundTripTest extends TestCase
         $ingestBody = json_encode([
             'domain' => 'domen.ua',
             'token_hash' => hash('sha256', $rawToken),
+            'push_secret' => 'site-listener-secret-with-enough-length',
             'ping_url' => 'https://domen.ua/ping',
             'version' => 2,
             'payload' => $payload,

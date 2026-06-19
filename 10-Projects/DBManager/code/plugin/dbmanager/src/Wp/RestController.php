@@ -9,9 +9,7 @@ use DBM\Sync\PayloadVerifier;
 
 class RestController
 {
-    public function __construct(
-        private Settings $settings
-    ) {}
+    public function __construct(private Settings $settings) {}
 
     public function register(): void
     {
@@ -23,7 +21,7 @@ class RestController
         $controller = new PingController(
             new PayloadVerifier(),
             new WpOptionCacheStore(),
-            $this->settings->signingSecret
+            $this->settings->signingSecret,
         );
 
         register_rest_route('dbm/v1', '/ping', [
@@ -32,10 +30,11 @@ class RestController
             'callback' => function ($request) use ($controller) {
                 $status = $controller->handle(
                     (string) $request->get_body(),
-                    (string) $request->get_header('x-signature')
+                    (string) $request->get_header('x-signature'),
+                    (string) $request->get_header('x-timestamp')
                 );
 
-                return new \WP_REST_Response(null, $status);
+                return new \WP_REST_Response(['accepted' => $status === 200], $status);
             },
         ]);
     }

@@ -49,4 +49,31 @@ class SlotPanelSaveTest extends TestCase
                 && json_decode($r->body(), true)['domain'] === 'domen.ua'
         );
     }
+
+    public function test_save_phone_format_on_slot(): void
+    {
+        config([
+            'services.bridge.ingest_url'     => 'https://bridge.local/api/internal/publish',
+            'services.bridge.publish_secret' => 'pub',
+        ]);
+
+        Http::fake(['*' => Http::response(['stored_version' => 1], 200)]);
+
+        $site = Site::factory()->create(['domain' => 'domen.ua']);
+        app(SiteProvisioner::class)->issueToken($site);
+
+        [$slot] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update(['scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(SlotPanel::class)
+            ->call('open', $slot->dataValue->id)
+            ->set('phoneFormat', '+### (##) ###-##-##')
+            ->call('save')
+            ->assertSet('open', false);
+
+        $this->assertSame(
+            '+### (##) ###-##-##',
+            $slot->dataValue->fresh()->content['phone_format'] ?? null
+        );
+    }
 }

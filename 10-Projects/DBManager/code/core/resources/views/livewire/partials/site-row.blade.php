@@ -9,7 +9,7 @@
         @endif
         <div class="min-w-0">
             <div class="flex items-center gap-2">
-                <span class="font-medium text-ink truncate">{{ $site->domain }}</span>
+                <span class="font-medium text-ink truncate">{{ $site->domain }} <small class="text-mut text-[10px] ml-1">ID: {{ $site->id }}</small></span>
                 @if($site->country_hint)
                     <span class="rounded bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut">{{ $site->country_hint }}</span>
                 @endif

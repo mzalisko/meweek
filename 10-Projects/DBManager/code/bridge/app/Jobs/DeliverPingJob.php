@@ -32,26 +32,53 @@ class DeliverPingJob implements ShouldQueue
             return; // сайт зник або не має URL для пінга — нічого робити
         }
 
-        $secret = (string) config('services.ping.secret');
+        $secret = (string) $site->push_secret;
         if ($secret === '') {
-            // Без секрета не шлемо пінг із порожнім ключем — fail-closed.
-            throw new \RuntimeException('Ping secret is not configured');
+            return; // сайт ще не має listener-секрета — нічого доставляти
         }
 
-        $body = json_encode([
-            'domain' => $site->domain,
-            'version' => (int) $site->version,
-        ], JSON_UNESCAPED_SLASHES);
+        $body = json_encode($site->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $timestamp = (string) time();
 
-        $signature = hash_hmac('sha256', $body, $secret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
 
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'X-Signature' => $signature,
-        ])->withBody($body, 'application/json')->post($site->ping_url);
+        $response = $this->postPayload($site->ping_url, $body, $signature, $timestamp);
 
-        if ($response->failed()) {
+        if ($this->looksLikeHtml($response->body())) {
+            $fallbackUrl = $this->plainWordPressRestUrl($site->ping_url);
+            if ($fallbackUrl !== null && $fallbackUrl !== $site->ping_url) {
+                $response = $this->postPayload($fallbackUrl, $body, $signature, $timestamp);
+            }
+        }
+
+        if ($response->failed() || $this->looksLikeHtml($response->body())) {
             throw new \RuntimeException("Ping failed for {$site->domain}: HTTP {$response->status()}");
         }
+    }
+
+    private function postPayload(string $url, string $body, string $signature, string $timestamp): \Illuminate\Http\Client\Response
+    {
+        return Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'X-Signature' => $signature,
+            'X-Timestamp' => $timestamp,
+        ])->withBody($body, 'application/json')->post($url);
+    }
+
+    private function plainWordPressRestUrl(string $url): ?string
+    {
+        if (! str_contains($url, '/wp-json/dbm/v1/ping')) {
+            return null;
+        }
+
+        return preg_replace('#/wp-json/dbm/v1/ping/?$#', '/?rest_route=/dbm/v1/ping', $url) ?: null;
+    }
+
+    private function looksLikeHtml(string $body): bool
+    {
+        $body = ltrim($body);
+
+        return str_starts_with($body, '<!DOCTYPE html')
+            || str_starts_with($body, '<html');
     }
 }

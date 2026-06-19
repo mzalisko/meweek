@@ -30,12 +30,12 @@ class PresentationBlockRenderer
                 . '</div>';
         }
 
-        $site = trim((string) ($cache['site'] ?? ''));
+        $siteId = (int) ($cache['site_id'] ?? 0);
         $version = (int) ($cache['version'] ?? 0);
         $generatedAt = trim((string) ($cache['generated_at'] ?? ''));
         $title = trim((string) ($options['title'] ?? ''));
         if ($title === '') {
-            $title = $site !== '' ? $site : 'DBManager';
+            $title = $siteId > 0 ? 'ID: ' . $siteId : 'DBManager';
         }
 
         $counts = $this->counts($items);
@@ -46,7 +46,7 @@ class PresentationBlockRenderer
         $html .= '<span class="dbm-present__eyebrow">Текущие данные</span>';
         $html .= '<h2>' . $this->e($title) . '</h2>';
         $html .= '<span class="dbm-present__meta">';
-        $html .= $site !== '' ? $this->e($site) : 'локальный кэш';
+        $html .= $siteId > 0 ? 'ID: ' . $siteId : 'локальный кэш';
         if ($version > 0) {
             $html .= ' · v' . $version;
         }

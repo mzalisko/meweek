@@ -28,13 +28,15 @@ class BridgePublisherTest extends TestCase
         Http::fake(['*' => Http::response(['stored_version' => 3], 200)]);
 
         $site = Site::factory()->create(['domain' => 'domen.ua', 'ping_url' => 'https://domen.ua/ping']);
-        $raw = app(SiteProvisioner::class)->issueToken($site);
+        $provisioner = app(SiteProvisioner::class);
+        $raw = $provisioner->issueToken($site);
+        $pushSecret = $provisioner->activePushSecret($site);
         $publication = app(SitePayloadCompiler::class)->publish($site);
 
         $ok = app(BridgePublisher::class)->push($publication);
 
         $this->assertTrue($ok);
-        Http::assertSent(function ($request) use ($site, $raw, $publication) {
+        Http::assertSent(function ($request) use ($site, $raw, $pushSecret, $publication) {
             $body = $request->body();
             $expectedSig = hash_hmac('sha256', $body, 'pub-secret');
             $data = json_decode($body, true);
@@ -43,9 +45,10 @@ class BridgePublisherTest extends TestCase
                 && $request->hasHeader('X-Signature', $expectedSig)
                 && $data['domain'] === 'domen.ua'
                 && $data['token_hash'] === hash('sha256', $raw)
+                && $data['push_secret'] === $pushSecret
                 && $data['ping_url'] === 'https://domen.ua/ping'
                 && $data['version'] === $publication->version
-                && $data['payload']['site'] === 'domen.ua';
+                && $data['payload']['site_id'] === $site->id;
         });
     }
 

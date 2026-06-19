@@ -26,6 +26,7 @@ class IngestController extends Controller
         $data = $request->validate([
             'domain' => ['required', 'string', 'max:255'],
             'token_hash' => ['required', 'string', 'max:64'],
+            'push_secret' => ['required', 'string', 'min:32', 'max:128'],
             'ping_url' => ['nullable', 'string', 'max:255'],
             'version' => ['required', 'integer', 'min:0'],
             'payload' => ['required', 'array'],
@@ -38,7 +39,11 @@ class IngestController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if ($existing && $data['version'] <= $existing->version) {
+            if ($existing && $data['version'] < $existing->version) {
+                return ['stale' => true];
+            }
+
+            if ($existing && $data['version'] === $existing->version && $existing->payload !== $data['payload']) {
                 return ['stale' => true];
             }
 
@@ -46,6 +51,7 @@ class IngestController extends Controller
                 ['domain' => $data['domain']],
                 [
                     'token_hash' => $data['token_hash'],
+                    'push_secret' => $data['push_secret'],
                     'ping_url' => $data['ping_url'],
                     'version' => $data['version'],
                     'payload' => $data['payload'],

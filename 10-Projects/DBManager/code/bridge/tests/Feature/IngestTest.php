@@ -25,6 +25,7 @@ class IngestTest extends TestCase
         return array_merge([
             'domain' => 'domen.ua',
             'token_hash' => hash('sha256', 'raw-token'),
+            'push_secret' => 'site-listener-secret-with-enough-length',
             'ping_url' => 'https://domen.ua/wp-json/dbm/v1/ping',
             'version' => 1,
             'payload' => ['site' => 'domen.ua', 'version' => 1, 'values' => []],
@@ -98,5 +99,26 @@ class IngestTest extends TestCase
             ->assertStatus(409);
 
         $this->assertSame([], PublishedSite::where('domain', 'domen.ua')->first()->payload['values']);
+    }
+
+    public function test_ingest_allows_equal_version_when_payload_is_same_to_rotate_delivery_secret(): void
+    {
+        Queue::fake();
+        $payload = ['site' => 'domen.ua', 'version' => 5, 'values' => []];
+        $this->postSigned($this->body([
+            'version' => 5,
+            'push_secret' => 'old-listener-secret-with-enough-length',
+            'payload' => $payload,
+        ]))->assertOk();
+
+        $this->postSigned($this->body([
+            'version' => 5,
+            'push_secret' => 'new-listener-secret-with-enough-length',
+            'payload' => $payload,
+        ]))->assertOk();
+
+        $site = PublishedSite::where('domain', 'domen.ua')->first();
+        $this->assertSame('new-listener-secret-with-enough-length', $site->push_secret);
+        Queue::assertPushed(DeliverPingJob::class, 2);
     }
 }

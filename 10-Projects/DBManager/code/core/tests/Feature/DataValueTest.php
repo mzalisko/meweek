@@ -14,7 +14,7 @@ class DataValueTest extends TestCase
 
     public function test_seeded_dictionaries_exist(): void
     {
-        $this->assertSame(4, GeoTag::count());
+        $this->assertSame(13, GeoTag::count());
         $this->assertTrue(GeoTag::where('code', 'WORLD')->where('is_protected', true)->exists());
     }
 

@@ -21,8 +21,9 @@ class BridgePublisher
         }
 
         $tokenHash = $this->provisioner->activeTokenHash($site);
-        if (! $tokenHash) {
-            return false; // сайт без токена — публікувати нікуди
+        $pushSecret = $this->provisioner->activePushSecret($site);
+        if (! $tokenHash || ! $pushSecret) {
+            return false; // сайт без активного підключення — публікувати нікуди
         }
 
         $url = (string) config('services.bridge.ingest_url');
@@ -34,6 +35,7 @@ class BridgePublisher
         $body = json_encode([
             'domain' => $site->domain,
             'token_hash' => $tokenHash,
+            'push_secret' => $pushSecret,
             'ping_url' => $site->ping_url,
             'version' => (int) $publication->version,
             'payload' => $publication->payload,

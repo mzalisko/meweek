@@ -11,5 +11,8 @@ class PublishedSite extends Model
 
     protected $guarded = [];
 
-    protected $casts = ['payload' => 'array'];
+    protected $casts = [
+        'payload' => 'array',
+        'push_secret' => 'encrypted',
+    ];
 }

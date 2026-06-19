@@ -17,6 +17,7 @@ use App\Services\Failover\FailoverEngine;
 use App\Services\Failover\SlotResolver;
 use App\Services\Publishing\BridgePublisher;
 use App\Services\Publishing\SitePayloadCompiler;
+use App\Support\PhoneFormatter;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -41,6 +42,8 @@ class SlotPanel extends Component
     public string $emergencyNumber = '';
 
     public string $slotKey = '';
+
+    public string $phoneFormat = '';
 
     #[On('close-slot-panel')]
     public function closePanel(): void
@@ -75,6 +78,7 @@ class SlotPanel extends Component
         $this->geoTagIds        = $value->geoTags->pluck('id')->toArray();
         $this->emergencyNumber  = $value->phoneSlot->emergency_number ?? '';
         $this->slotKey          = $value->key;
+        $this->phoneFormat      = (string) ($value->content['phone_format'] ?? '');
         $this->open             = true;
         $this->acquireEditLock($this->editLockKey('data-value', $value->id), $value->key);
     }
@@ -604,6 +608,11 @@ class SlotPanel extends Component
         $this->persistSettings(false);
     }
 
+    public function updatedPhoneFormat(): void
+    {
+        $this->persistSettings(false);
+    }
+
     public function hideSlot(): void
     {
         $this->setSlotVisibility('hidden');
@@ -681,10 +690,18 @@ class SlotPanel extends Component
         $newGeoIds = collect($this->geoTagIds)->map(fn ($id) => (int) $id)->sort()->values()->toArray();
         $slot = $value->phoneSlot;
         $newEmergency = $this->emergencyNumber ?: null;
+        $newPhoneFormat = $this->normalizedPhoneFormat();
+        if ($newPhoneFormat === null) {
+            return;
+        }
+
+        $oldContent = $value->content ?? [];
+        $oldPhoneFormat = (string) ($oldContent['phone_format'] ?? '');
         $geoChanged = $oldGeoIds !== $newGeoIds;
         $emergencyChanged = ($slot->emergency_number ?? null) !== $newEmergency;
+        $formatChanged = $oldPhoneFormat !== $newPhoneFormat;
 
-        if (! $geoChanged && ! $emergencyChanged && ! $notify) {
+        if (! $geoChanged && ! $emergencyChanged && ! $formatChanged && ! $notify) {
             return;
         }
 
@@ -708,6 +725,25 @@ class SlotPanel extends Component
 
         if ($emergencyChanged) {
             $slot->update(['emergency_number' => $newEmergency]);
+            $changed = true;
+        }
+
+        if ($formatChanged) {
+            $newContent = $oldContent;
+            if ($newPhoneFormat === '') {
+                unset($newContent['phone_format']);
+            } else {
+                $newContent['phone_format'] = $newPhoneFormat;
+            }
+            $value->update(['content' => $newContent]);
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'phone.format_changed',
+                'subject_type' => 'DataValue',
+                'subject_id'   => $value->id,
+                'old'          => ['phone_format' => $oldPhoneFormat],
+                'new'          => ['phone_format' => $newPhoneFormat],
+            ]);
             $changed = true;
         }
 
@@ -875,6 +911,7 @@ class SlotPanel extends Component
         $entries             = collect();
         $resolved            = null;
         $allGeoTags          = GeoTag::orderBy('code')->get();
+        $phoneFormatPreview  = null;
 
         if ($this->open && $this->dataValueId) {
             $value = DataValue::with([
@@ -890,6 +927,7 @@ class SlotPanel extends Component
 
                 try {
                     $resolved = app(SlotResolver::class)->resolve($slot);
+                    $phoneFormatPreview = PhoneFormatter::format($resolved?->number, $this->phoneFormat);
                 } catch (\Throwable) {
                     $resolved = null;
                 }
@@ -904,6 +942,21 @@ class SlotPanel extends Component
             'entries'             => $entries,
             'resolved'            => $resolved,
             'allGeoTags'          => $allGeoTags,
+            'phoneFormatPreview'  => $phoneFormatPreview,
         ]);
+    }
+
+    private function normalizedPhoneFormat(): ?string
+    {
+        $this->resetErrorBag('phoneFormat');
+
+        $format = trim($this->phoneFormat);
+        if (! PhoneFormatter::isValidPattern($format)) {
+            $this->addError('phoneFormat', 'Використовуйте # для цифр і роздільники: пробіл, +, -, (), крапка.');
+
+            return null;
+        }
+
+        return $format;
     }
 }

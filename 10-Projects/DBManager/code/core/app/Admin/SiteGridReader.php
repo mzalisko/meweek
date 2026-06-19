@@ -5,6 +5,7 @@ namespace App\Admin;
 use App\Models\DataValue;
 use App\Models\Site;
 use App\Services\Failover\SlotResolver;
+use App\Support\PhoneFormatter;
 use Illuminate\Support\Collection;
 
 class SiteGridReader
@@ -101,12 +102,15 @@ class SiteGridReader
         }
 
         $resolved = $this->resolver->resolve($slot);
+        $phoneFormat = trim((string) ($value->content['phone_format'] ?? ''));
+        $display = fn (?string $number): ?string => PhoneFormatter::format($number, $phoneFormat);
         $numbers = $slot->entries
             ->sortBy('priority')
             ->map(fn ($entry) => [
                 'entry_id' => $entry->id,
                 'priority' => $entry->priority,
                 'e164' => $entry->phoneNumber?->e164,
+                'display_value' => $display($entry->phoneNumber?->e164),
                 'status' => $entry->phoneNumber?->status,
                 'is_current' => $entry->id === $resolved->entryId,
                 'is_pinned' => $entry->id === $slot->pinned_number_entry_id,
@@ -118,6 +122,8 @@ class SiteGridReader
             return array_merge($base, [
                 'state' => 'hidden',
                 'value' => $resolved->number ?? $slot->last_active_e164,
+                'display_value' => $display($resolved->number ?? $slot->last_active_e164),
+                'phone_format' => $phoneFormat,
                 'numbers' => $numbers,
                 'entry_id' => $resolved->entryId,
                 'reserves' => max(0, $slot->entries->count() - 1),
@@ -129,6 +135,8 @@ class SiteGridReader
             'reserves' => max(0, $slot->entries->count() - 1),
             'state' => $resolved->visible ? $resolved->state : 'hidden',
             'value' => $resolved->visible ? $resolved->number : null,
+            'display_value' => $resolved->visible ? $display($resolved->number) : null,
+            'phone_format' => $phoneFormat,
             'entry_id' => $resolved->entryId,
             'exhaustion_policy' => $slot->exhaustion_policy,
             'numbers' => $numbers,

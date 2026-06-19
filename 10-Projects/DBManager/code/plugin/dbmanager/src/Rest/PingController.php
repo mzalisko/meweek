@@ -13,19 +13,36 @@ class PingController
         private string $signingSecret,
     ) {}
 
-    /** Повертає HTTP-статус: 200 успішно оновлено, 400 пошкоджений payload, 401 невірний підпис. */
-    public function handle(string $rawBody, string $signature): int
+    /** Returns HTTP status: 200 accepted, 400 malformed, 401 bad signature, 409 stale version. */
+    public function handle(string $rawBody, string $signature, string $timestamp): int
     {
-        if (! $this->verifier->verify($rawBody, $signature, $this->signingSecret)) {
+        if (! ctype_digit($timestamp)) {
+            return 401;
+        }
+
+        if (abs(time() - (int) $timestamp) > 300) {
+            return 401;
+        }
+
+        if (! $this->verifier->verify($timestamp.'.'.$rawBody, $signature, $this->signingSecret)) {
             return 401;
         }
 
         $payload = json_decode($rawBody, true);
-        if (! is_array($payload) || ! isset($payload['version'])) {
+        if (! is_array($payload) || ! isset($payload['version']) || ! is_array($payload['values'] ?? null)) {
             return 400;
         }
 
-        $this->cache->put($payload);
+        $incomingVersion = (int) $payload['version'];
+        $currentVersion = $this->cache->version();
+
+        if ($incomingVersion < $currentVersion) {
+            return 409;
+        }
+
+        if ($incomingVersion > $currentVersion) {
+            $this->cache->put($payload);
+        }
 
         return 200;
     }

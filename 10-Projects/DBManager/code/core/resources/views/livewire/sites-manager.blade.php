@@ -266,7 +266,7 @@
                         <option value="">Без сайта-джерела</option>
                         @foreach($siteOptions as $id => $domain)
                             @if((int) $id !== (int) $editingSiteId)
-                                <option value="{{ $id }}">{{ $domain }}</option>
+                                <option value="{{ $id }}">{{ $domain }} [ID: {{ $id }}]</option>
                             @endif
                         @endforeach
                     </select>
@@ -319,12 +319,20 @@
                             Публікація:
                             {{ $tokenStatus['lastVersion'] ? 'Версія '.$tokenStatus['lastVersion'] : 'ще не публікувалось' }}
                         </div>
+                        @if($tokenStatus['pingUrl'])
+                            <div class="break-all">
+                                Listener:
+                                <code>{{ $tokenStatus['pingUrl'] }}</code>
+                            </div>
+                        @endif
                     </div>
 
                     @if($visibleToken)
                         <div class="rounded-lg border border-acc-bd bg-acc-bg px-3 py-2">
-                            <div class="mb-1 text-[11px] text-acc-tx">Сирий токен (показуємо один раз):</div>
-                            <code class="block select-all break-all text-[12px] text-ink">{{ $visibleToken }}</code>
+                            <div class="mb-1 text-[11px] font-semibold text-acc-tx">Ключ підключення плагіна (показуємо один раз):</div>
+                            <textarea readonly rows="5"
+                                class="block w-full resize-y select-all rounded-md border border-acc-bd bg-white px-2 py-1 font-mono text-[11px] leading-4 text-ink">{{ $visibleToken }}</textarea>
+                            <p class="mt-1 text-[11px] text-mut">Вставте цей ключ у WordPress: DBManager → Налаштування. Сирий API token плагіну не передається.</p>
                         </div>
                     @endif
 

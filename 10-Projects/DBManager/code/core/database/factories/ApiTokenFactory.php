@@ -13,6 +13,7 @@ class ApiTokenFactory extends Factory
         return [
             'site_id' => Site::factory(),
             'token_hash' => hash('sha256', Str::random(48)),
+            'push_secret' => Str::random(64),
             'label' => null,
             'revoked_at' => null,
         ];

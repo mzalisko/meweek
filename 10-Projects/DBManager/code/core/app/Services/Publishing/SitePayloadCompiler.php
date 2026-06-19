@@ -53,7 +53,7 @@ class SitePayloadCompiler
         }
 
         return [
-            'site' => $site->domain,
+            'site_id' => $site->id,
             'version' => 0,
             'generated_at' => now()->toIso8601String(),
             'values' => $items,
