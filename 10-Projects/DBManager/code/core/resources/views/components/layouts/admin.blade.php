@@ -14,14 +14,7 @@
     <header class="bg-white border-b border-[#e3e5e1] px-5 py-2.5 flex justify-between items-center shrink-0">
         <div class="flex gap-4 items-center min-w-0">
             <span class="flex items-center gap-2.5 shrink-0">
-                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f4f5f3] border border-[#e3e5e1] text-acc shadow-sm">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <rect x="3" y="3" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.6"></rect>
-                        <rect x="13" y="13" width="8" height="8" rx="1.5" fill="currentColor"></rect>
-                        <path d="M11 7h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-                        <path d="M7 11v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-                    </svg>
-                </span>
+                <x-application-logo class="h-8 w-auto shrink-0" />
                 <b class="text-[16px] text-acc-tx whitespace-nowrap font-bold tracking-tight">DataBridge Core</b>
             </span>
             <div class="min-w-0">{{ $breadcrumb ?? '' }}</div>

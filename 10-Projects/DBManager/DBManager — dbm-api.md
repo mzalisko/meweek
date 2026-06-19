@@ -69,7 +69,67 @@ POST /api/monitoring/numbers
 | `e164` | string | так | Номер у форматі E.164. Має існувати в `phone_numbers.e164`. |
 | `status` | string | так | `down` або `active`. |
 
+Поведінка:  
+X-Signature: <hmac-sha256(raw-json-body, MONITORING_WEBHOOK_SECRET)>
+
+```
+
+  
+
+Важливо: підпис рахується від сирого тіла запиту рівно в тому вигляді, в якому воно відправляється. Не можна рахувати підпис від pretty-printed JSON, а надсилати minified JSON.
+
+  
+
+## Реалізовано зараз: падіння номера
+
+  
+
+Endpoint:
+
+  
+
+```http
+
+POST /api/monitoring/numbers
+
+```
+
+  
+
+Тіло запиту:
+
+  
+
+```json
+
+{
+
+"e164": "+380441112233",
+
+"status": "down"
+
+}
+
+```
+
+  
+
+Поля:
+
+  
+
+|Поле|Тип|Обов'язково|Опис|
+|---|--:|--:|---|
+|`e164`|string|так|Номер у форматі E.164. Має існувати в `phone_numbers.e164`.|
+|`status`|string|так|`down` або `active`.|
+
+  
+
 Поведінка:
+
+  
+
+- `down` переводить `phone_numbers.status` у `down`, ставить `down_since`, перераховує всі слоти, де використовується це
 
 - `down` переводить `phone_numbers.status` у `down`, ставить `down_since`, перераховує всі слоти, де використовується цей номер.
 - `active` повертає номер у `active`, очищає `down_since`, перераховує всі пов'язані слоти.
