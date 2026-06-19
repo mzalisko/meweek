@@ -274,5 +274,54 @@ namespace DBM\Tests\Unit {
             $this->assertStringContainsString('href="tel:+380441234567"', $htmlBlock);
             $this->assertStringContainsString('+380 (44) 123-45-67', $htmlBlock);
         }
+
+        public function test_price_suffix_and_rubyp_rules(): void
+        {
+            $this->setupCache([
+                [
+                    'key' => 'romania',
+                    'type' => 'price',
+                    'geo' => ['UA'],
+                    'value' => '100',
+                    'label' => 'грн',
+                    'state' => 'ok'
+                ],
+                [
+                    'key' => 'romania',
+                    'type' => 'price',
+                    'geo' => ['WORLD'],
+                    'value' => '5',
+                    'label' => 'EUR',
+                    'state' => 'ok'
+                ]
+            ]);
+
+            $settings = new Settings('', 'dbm', '');
+            
+            // 1. Explicit country selection via suffix (romania_world from UA visitor)
+            $controllerUA = new ShortcodeController($settings, 'UA');
+            $controllerUA->register();
+            global $test_shortcodes;
+            $priceCallback = $test_shortcodes['dbm_price'];
+
+            $htmlWorld = $priceCallback(['key' => 'romania_world']);
+            $this->assertSame('<span>5 EUR</span>', $htmlWorld);
+
+            // romania_ua from PL visitor
+            $controllerPL = new ShortcodeController($settings, 'PL');
+            $controllerPL->register();
+            $priceCallbackPL = $test_shortcodes['dbm_price'];
+
+            $htmlUa = $priceCallbackPL(['key' => 'romania_ua']);
+            $this->assertSame('<span>100 грн</span>', $htmlUa);
+
+            // 2. RU/BY visitor must not fall back to WORLD price
+            $controllerRU = new ShortcodeController($settings, 'RU');
+            $controllerRU->register();
+            $priceCallbackRU = $test_shortcodes['dbm_price'];
+
+            $htmlRU = $priceCallbackRU(['key' => 'romania']);
+            $this->assertSame('', $htmlRU);
+        }
     }
 }

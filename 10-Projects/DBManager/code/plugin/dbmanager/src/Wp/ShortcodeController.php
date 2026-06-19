@@ -77,6 +77,42 @@ namespace DBM\Wp {
 }
 
 namespace {
+    if (! function_exists('dbm_select_price_candidate')) {
+        function dbm_select_price_candidate(array $candidates, string $country): ?array
+        {
+            $country = strtoupper($country);
+            
+            // 1. Пошук прямого співпадіння для конкретної країни (наприклад, UA, RU, BY, RO тощо)
+            foreach ($candidates as $candidate) {
+                $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                if (in_array('!' . $country, $geo, true)) {
+                    continue;
+                }
+                if (in_array($country, $geo, true)) {
+                    return $candidate;
+                }
+            }
+            
+            // 2. Якщо відвідувач з Росії або Білорусі, ми НЕ показуємо WORLD ціну (заборонено)
+            if ($country === 'RU' || $country === 'BY') {
+                return null;
+            }
+            
+            // 3. Для всіх інших країн (не Україна, не Росія, не Білорусь) шукаємо WORLD ціну
+            foreach ($candidates as $candidate) {
+                $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                if (in_array('!' . $country, $geo, true)) {
+                    continue;
+                }
+                if (empty($geo) || in_array('WORLD', $geo, true)) {
+                    return $candidate;
+                }
+            }
+            
+            return null;
+        }
+    }
+
     if (! function_exists('dbm_get_price')) {
         function dbm_get_price(string $key, array $opts = []): string
         {
@@ -86,24 +122,37 @@ namespace {
             $simulated = get_option('dbm_simulated_country');
             $country = (! empty($simulated) && $simulated !== 'disabled') ? strtoupper($simulated) : ($GLOBALS['dbm_country'] ?? 'WORLD');
 
-            $chosen = null;
-            $fallback = null;
-            foreach ($values as $candidate) {
-                if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
-                    $geo = array_map('strtoupper', $candidate['geo'] ?? []);
-                    if (in_array('!' . $country, $geo, true)) {
-                        continue;
-                    }
-                    if (in_array($country, $geo, true)) {
-                        $chosen = $candidate;
-                        break;
-                    }
-                    if (empty($geo) || in_array('WORLD', $geo, true)) {
-                        $fallback = $candidate;
+            $price = null;
+
+            // 1. Перевіряємо суфікс країни в ключі (наприклад, romania_ua або romania_world)
+            if (str_contains($key, '_')) {
+                $lastUnderscore = strrpos($key, '_');
+                $baseKey = substr($key, 0, $lastUnderscore);
+                $suffix = strtoupper(substr($key, $lastUnderscore + 1));
+
+                if (strlen($suffix) === 2 || $suffix === 'WORLD') {
+                    foreach ($values as $candidate) {
+                        if (($candidate['key'] ?? null) === $baseKey && ($candidate['type'] ?? null) === 'price') {
+                            $geo = array_map('strtoupper', $candidate['geo'] ?? []);
+                            if (in_array($suffix, $geo, true) || ($suffix === 'WORLD' && empty($geo))) {
+                                $price = $candidate;
+                                break;
+                            }
+                        }
                     }
                 }
             }
-            $price = $chosen ?? $fallback;
+
+            // 2. Якщо ключ універсальний (без суфікса), обираємо ціну динамічно залежно від країни відвідувача
+            if ($price === null) {
+                $candidates = [];
+                foreach ($values as $candidate) {
+                    if (($candidate['key'] ?? null) === $key && ($candidate['type'] ?? null) === 'price') {
+                        $candidates[] = $candidate;
+                    }
+                }
+                $price = dbm_select_price_candidate($candidates, $country);
+            }
 
             if ($price === null || in_array($price['state'] ?? 'ok', ['hidden', 'exhausted'], true)) {
                 return '';

@@ -179,6 +179,8 @@ class AdminPages
                 echo '<div class="dbm-snippet-item"><span>Блок с мессенджерами:</span> <code>[dbm_phone_block key="' . esc_html($key) . '"]</code></div>';
             } elseif ($type === 'price') {
                 echo '<div class="dbm-snippet-item"><span>Универсальная цена:</span> <code>[dbm_price key="' . esc_html($key) . '"]</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Цена для UA:</span> <code>[dbm_price key="' . esc_html($key) . '_ua"]</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Цена для WORLD:</span> <code>[dbm_price key="' . esc_html($key) . '_world"]</code></div>';
                 echo '<div class="dbm-snippet-item"><span>Числовое значение:</span> <code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
             } else {
                 echo '<div class="dbm-snippet-item"><code>[' . esc_html($this->settings->shortcode) . ' key="' . esc_html($key) . '"]</code></div>';
@@ -190,7 +192,9 @@ class AdminPages
                 echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
                 echo '<div class="dbm-snippet-item"><span>Блок:</span> <code>dbm_phone_block(\'' . esc_html($key) . '\')</code></div>';
             } elseif ($type === 'price') {
-                echo '<div class="dbm-snippet-item"><span>Цена с валютой:</span> <code>dbm_price(\'' . esc_html($key) . '\')</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Универсальная:</span> <code>dbm_price(\'' . esc_html($key) . '\')</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Цена для UA:</span> <code>dbm_price(\'' . esc_html($key) . '_ua\')</code></div>';
+                echo '<div class="dbm-snippet-item"><span>Цена для WORLD:</span> <code>dbm_price(\'' . esc_html($key) . '_world\')</code></div>';
                 echo '<div class="dbm-snippet-item"><span>Значение:</span> <code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
             } else {
                 echo '<div class="dbm-snippet-item"><code>dbm_get(\'' . esc_html($key) . '\')</code></div>';
@@ -412,13 +416,81 @@ HTML;
         }, $geo));
     }
 
+    private function groupCacheValues(array $values): array
+    {
+        $grouped = [];
+        $priceSlots = [];
+
+        foreach ($values as $val) {
+            $type = (string) ($val['type'] ?? '');
+            $key = (string) ($val['key'] ?? '');
+
+            if ($type === 'price') {
+                if (! isset($priceSlots[$key])) {
+                    $priceSlots[$key] = [
+                        'key' => $key,
+                        'type' => 'price',
+                        'state' => $val['state'] ?? 'ok',
+                        'geo' => [],
+                        'prices' => [],
+                    ];
+                }
+
+                $candidateGeo = $val['geo'] ?? ['WORLD'];
+                if (! is_array($candidateGeo)) {
+                    $candidateGeo = [$candidateGeo];
+                }
+                foreach ($candidateGeo as $g) {
+                    $gUpper = strtoupper(trim((string) $g));
+                    if (! in_array($gUpper, $priceSlots[$key]['geo'], true)) {
+                        $priceSlots[$key]['geo'][] = $gUpper;
+                    }
+                }
+
+                $priceSlots[$key]['prices'][] = $val;
+            } else {
+                $grouped[] = $val;
+            }
+        }
+
+        foreach ($priceSlots as $slot) {
+            $grouped[] = $slot;
+        }
+
+        return $grouped;
+    }
+
     /** @param array<string,mixed> $value */
     private function valuePreview(array $value, array $allValues = []): string
     {
+        $type = (string) ($value['type'] ?? '');
+
+        if ($type === 'price' && ! empty($value['prices'])) {
+            $html = '<span class="dbm-value">';
+            $parts = [];
+            foreach ($value['prices'] as $p) {
+                $val = trim((string) ($p['value'] ?? ''));
+                $lbl = trim((string) ($p['label'] ?? ''));
+                $geos = $p['geo'] ?? ['WORLD'];
+                if (! is_array($geos)) {
+                    $geos = [$geos];
+                }
+                $geosStr = implode(', ', array_map('strtoupper', $geos));
+
+                $disp = $val;
+                if ($lbl !== '') {
+                    $disp .= ' ' . $lbl;
+                }
+                $parts[] = '<strong>' . esc_html($disp) . '</strong> <small style="margin-left: 2px; background: #eef2f5; padding: 2px 4px; border-radius: 4px; font-weight: bold;">' . esc_html($geosStr) . '</small>';
+            }
+            $html .= implode('<span style="margin: 0 8px; color: #ccc;">|</span>', $parts);
+            $html .= '</span>';
+            return $html;
+        }
+
         $display = trim((string) ($value['display_value'] ?? $value['value'] ?? $value['name'] ?? $value['url'] ?? ''));
         $raw = trim((string) ($value['value'] ?? ''));
         $label = trim((string) ($value['label'] ?? $value['network'] ?? ''));
-        $type = (string) ($value['type'] ?? '');
 
         if ($display === '') {
             $display = '—';
@@ -465,6 +537,8 @@ HTML;
             return [];
         }
 
+        $grouped = $this->groupCacheValues($values);
+
         $typeOrder = [
             'phone' => 0,
             'messenger' => 1,
@@ -472,11 +546,7 @@ HTML;
         ];
 
         $decorated = [];
-        foreach ($values as $index => $value) {
-            if (! is_array($value)) {
-                continue;
-            }
-
+        foreach ($grouped as $index => $value) {
             $decorated[] = ['index' => $index, 'value' => $value];
         }
 
