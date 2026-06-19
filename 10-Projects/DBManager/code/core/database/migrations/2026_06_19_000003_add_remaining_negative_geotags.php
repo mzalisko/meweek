@@ -1,19 +1,13 @@
 <?php
 
-namespace Database\Seeders;
-
 use App\Models\GeoTag;
-use Illuminate\Database\Seeder;
+use Illuminate\Database\Migrations\Migration;
 
-class GeoTagSeeder extends Seeder
+return new class extends Migration
 {
-    public function run(): void
+    public function up(): void
     {
         foreach ([
-            ['code' => 'WORLD', 'name' => 'Світ', 'is_protected' => true],
-            ['code' => 'UA', 'name' => 'Україна', 'is_protected' => false],
-            ['code' => 'RU', 'name' => 'Росія', 'is_protected' => false],
-            ['code' => 'BY', 'name' => 'Білорусь', 'is_protected' => false],
             ['code' => 'KZ', 'name' => 'Казахстан', 'is_protected' => false],
             ['code' => 'PL', 'name' => 'Польща', 'is_protected' => false],
             ['code' => 'RO', 'name' => 'Румунія', 'is_protected' => false],
@@ -27,4 +21,12 @@ class GeoTagSeeder extends Seeder
             GeoTag::firstOrCreate(['code' => $tag['code']], $tag);
         }
     }
-}
+
+    public function down(): void
+    {
+        GeoTag::whereIn('code', [
+            'KZ', 'PL', 'RO',
+            '!UA', '!RU', '!BY', '!KZ', '!PL', '!RO'
+        ])->where('is_protected', false)->delete();
+    }
+};

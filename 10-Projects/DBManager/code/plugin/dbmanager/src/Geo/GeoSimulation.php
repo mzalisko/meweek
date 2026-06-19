@@ -31,18 +31,30 @@ class GeoSimulation
     {
         $countries = ['WORLD', 'UA', 'RO', 'RU', 'BY', 'KZ', 'PL'];
         foreach ($cache['values'] ?? [] as $v) {
-            if (! empty($v['geos']) && is_array($v['geos'])) {
-                foreach ($v['geos'] as $g) {
-                    $countries[] = strtoupper($g);
-                }
-            }
-            if (! empty($v['geo'])) {
-                $countries[] = strtoupper($v['geo']);
-            }
+            $this->appendCountryCodes($countries, $v['geos'] ?? null);
+            $this->appendCountryCodes($countries, $v['geo'] ?? null);
         }
         $countries = array_unique($countries);
         sort($countries);
 
         return $countries;
+    }
+
+    /**
+     * @param array<int, string> $countries
+     * @param mixed $raw
+     */
+    private function appendCountryCodes(array &$countries, $raw): void
+    {
+        foreach (is_array($raw) ? $raw : [$raw] as $code) {
+            if (! is_scalar($code)) {
+                continue;
+            }
+
+            $code = trim((string) $code);
+            if ($code !== '' && ! str_starts_with($code, '!')) {
+                $countries[] = strtoupper($code);
+            }
+        }
     }
 }

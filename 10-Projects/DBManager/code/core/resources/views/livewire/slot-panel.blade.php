@@ -115,18 +115,49 @@
                 </div>
 
                 <div class="mt-4">
-                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Гео-мітки</div>
-                    <div class="flex flex-wrap gap-1.5">
-                        @foreach($allGeoTags as $gt)
-                            <label class="cursor-pointer inline-flex items-center rounded-[9px] border px-2.5 py-0.5 text-[11px] transition-colors
-                                {{ in_array($gt->id, $geoTagIds) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
-                                <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
-                                {{ $gt->code }}
-                            </label>
-                        @endforeach
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Формат відображення номера</div>
+                    <input type="text"
+                        wire:model.live.debounce.500ms="phoneFormat"
+                        placeholder="+### ## ### ## ##"
+                        class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-acc">
+                    <div class="mt-1 flex items-center justify-between gap-2 text-[11px] text-mut">
+                        <span># = цифра, можна використовувати пробіли, +, -, (), крапку.</span>
+                        @if($phoneFormatPreview)
+                            <span class="shrink-0 font-mono text-ink">{{ $phoneFormatPreview }}</span>
+                        @endif
+                    </div>
+                    @error('phoneFormat')<p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="mt-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-[10px] uppercase tracking-[.06em] text-ok-tx font-bold mb-1.5">Показувати в (Дозволено)</div>
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach($allGeoTags->filter(fn($gt) => !str_starts_with($gt->code, '!')) as $gt)
+                                    <label class="cursor-pointer inline-flex items-center rounded-[9px] border px-2.5 py-0.5 text-[11px] transition-colors
+                                        {{ in_array($gt->id, $geoTagIds) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
+                                        <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
+                                        {{ $gt->code }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] uppercase tracking-[.06em] text-bad-tx font-bold mb-1.5">Приховати в (Заборонено)</div>
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach($allGeoTags->filter(fn($gt) => str_starts_with($gt->code, '!')) as $gt)
+                                    <label class="cursor-pointer inline-flex items-center rounded-[9px] border px-2.5 py-0.5 text-[11px] transition-colors
+                                        {{ in_array($gt->id, $geoTagIds) ? 'border-bad-tx/50 bg-bad-bg text-bad-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-bad-tx/50' }}">
+                                        <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
+                                        {{ ltrim($gt->code, '!') }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
                     @if(count($geoTagIds) === 0)
-                        <p class="mt-1 text-[11px] text-bad-tx">Вибери хоча б одну гео-мітку.</p>
+                        <p class="mt-2 text-[11px] text-bad-tx">Вибери хоча б одну гео-мітку.</p>
                     @endif
                 </div>
 
