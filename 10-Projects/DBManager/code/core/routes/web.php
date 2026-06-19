@@ -2,6 +2,7 @@
 
 use App\Livewire\AccessManager;
 use App\Livewire\AuditManager;
+use App\Livewire\BulkOperations;
 use App\Livewire\SitesManager;
 use App\Livewire\ValuesGrid;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,7 @@ Route::middleware(['auth', 'admin.access'])->group(function () {
     Route::get('/admin', ValuesGrid::class)->name('admin.home');
     Route::get('/admin/site', ValuesGrid::class)->name('admin.site');
     Route::get('/admin/values', ValuesGrid::class)->name('admin.values');
+    Route::get('/admin/bulk', BulkOperations::class)->name('admin.bulk');
     Route::get('/admin/sites', SitesManager::class)->name('admin.sites');
     Route::get('/admin/access', AccessManager::class)->name('admin.access');
     Route::get('/admin/audit', AuditManager::class)->name('admin.audit');

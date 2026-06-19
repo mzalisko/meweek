@@ -47,7 +47,7 @@
                 $nav = [
                     ['Дашборд',          'grid',  null],
                     ['Сайт',             'grid',  route('admin.site')],
-                    ['Масові операції',  'search', route('admin.values')],
+                    ['Масові операції',  'search', route('admin.bulk')],
                     ['Сайти і групи',    'sites', route('admin.sites')],
                     ['Інциденти',        'alert', null],
                     ['Аудит',            'audit', route('admin.audit')],
