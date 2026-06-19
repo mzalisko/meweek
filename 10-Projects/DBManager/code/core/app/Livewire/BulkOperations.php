@@ -83,6 +83,11 @@ class BulkOperations extends Component
     public function updatedTargetType(): void
     {
         $this->report = null;
+        if ($this->targetType === 'phone_reserve') {
+            if (! in_array($this->operation, ['replace_phone', 'set_phone_status'], true)) {
+                $this->operation = 'replace_phone';
+            }
+        }
     }
 
     public function updatedOperation(): void
@@ -140,6 +145,14 @@ class BulkOperations extends Component
     {
         $this->resetValidation();
         $this->report = null;
+
+        if ($this->targetType === 'phone_reserve') {
+            if (! in_array($this->operation, ['replace_phone', 'set_phone_status'], true)) {
+                $this->addError('operation', 'Для резервних телефонів доступна лише заміна номера або зміна стану.');
+
+                return;
+            }
+        }
 
         if ($this->isPhoneOperation()) {
             $this->applyPhoneOperation();

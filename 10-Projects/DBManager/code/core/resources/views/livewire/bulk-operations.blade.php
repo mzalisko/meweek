@@ -381,13 +381,18 @@
             <div>
                 <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Дія</label>
                 <select wire:model.live="operation" class="w-full rounded-lg border border-[#dfe3e0] px-2.5 py-2 text-xs focus:border-acc focus:outline-none">
-                    <option value="replace_text">Знайти й замінити в key/content</option>
-                    <option value="set_value">Встановити content.value</option>
-                    <option value="set_geo">Змінити geo-теги</option>
-                    <option value="set_status">Показати / приховати слот</option>
-                    <option value="replace_phone">Замінити номер</option>
-                    <option value="set_phone_status">Стан номера active/down (Збій)</option>
-                    <option value="set_phone_format">Встановити формат телефону</option>
+                    @if($targetType === 'phone_reserve')
+                        <option value="replace_phone">Замінити номер</option>
+                        <option value="set_phone_status">Стан номера active/down (Збій)</option>
+                    @else
+                        <option value="replace_text">Знайти й замінити в key/content</option>
+                        <option value="set_value">Встановити content.value</option>
+                        <option value="set_geo">Змінити geo-теги</option>
+                        <option value="set_status">Показати / приховати слот</option>
+                        <option value="replace_phone">Замінити номер</option>
+                        <option value="set_phone_status">Стан номера active/down (Збій)</option>
+                        <option value="set_phone_format">Встановити формат телефону</option>
+                    @endif
                 </select>
                 @error('operation') <div class="mt-1 text-[11px] text-bad-tx">{{ $message }}</div> @enderror
             </div>
