@@ -155,7 +155,55 @@ class AuditRestorer
             return false;
         }
 
-        $success = DB::transaction(function () use ($log) {
+        if (str_starts_with($log->action, 'bulk.')) {
+            $batchId = $log->batch_id;
+            if (! $batchId) {
+                $success = self::restoreSingle($log, $actor);
+                if ($success) {
+                    self::publishChanges($log);
+                }
+                return $success;
+            }
+
+            $batchLogs = AuditLog::where('batch_id', $batchId)->get();
+            foreach ($batchLogs as $blog) {
+                if (! self::canRestore($actor, $blog)) {
+                    return false;
+                }
+            }
+
+            $success = DB::transaction(function () use ($batchLogs, $actor) {
+                foreach ($batchLogs as $blog) {
+                    $ok = self::restoreSingle($blog, $actor);
+                    if (! $ok) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            if ($success) {
+                foreach ($batchLogs as $blog) {
+                    self::publishChanges($blog);
+                }
+            }
+
+            return $success;
+        }
+
+        $success = self::restoreSingle($log, $actor);
+        if ($success) {
+            self::publishChanges($log);
+        }
+        return $success;
+    }
+
+    /**
+     * Відновлює окремий запис логу.
+     */
+    private static function restoreSingle(AuditLog $log, User $actor): bool
+    {
+        return DB::transaction(function () use ($log) {
             switch ($log->action) {
                 // Створення запису ➔ Відкат полягає у видаленні
                 case 'value.created':
@@ -244,9 +292,6 @@ class AuditRestorer
                     break;
 
                 case 'number.edited':
-                    // subject_type = 'DataValue', subject_id = data_value_id
-                    // old = ['e164' => старий, 'scope_type' => ..., 'scope_id' => ...]
-                    // new = ['e164' => новий, ...]
                     $dv = DataValue::with(['phoneSlot.entries.phoneNumber'])->find($log->subject_id);
                     $oldE164 = $log->old['e164'] ?? null;
                     $newE164 = $log->new['e164'] ?? null;
@@ -268,9 +313,6 @@ class AuditRestorer
                     break;
 
                 case 'phone.override_collapsed':
-                    // При згортанні оверайду видаляється оверайд і підставляється батьківське значення.
-                    // У полі new зберігаються site_id, source_id, key.
-                    // Але відкатати це важко, якщо старий оверайд не збережено повністю.
                     break;
 
                 case 'messenger.materialized':
@@ -283,17 +325,70 @@ class AuditRestorer
                         return true;
                     }
                     break;
+
+                // Відкат масових змін
+                case 'bulk.replace_text':
+                case 'bulk.set_value':
+                case 'bulk.set_status':
+                case 'bulk.set_phone_format':
+                case 'bulk.set_geo':
+                    $dv = DataValue::find($log->subject_id);
+                    if ($dv && is_array($log->old)) {
+                        if (isset($log->old['key'])) {
+                            $dv->key = $log->old['key'];
+                        }
+                        if (isset($log->old['content'])) {
+                            $dv->content = $log->old['content'];
+                        }
+                        if (isset($log->old['status'])) {
+                            $dv->status = $log->old['status'];
+                        }
+                        $dv->save();
+
+                        if (isset($log->old['geo'])) {
+                            $geoCodes = $log->old['geo'];
+                            $geoIds = GeoTag::whereIn('code', $geoCodes)->pluck('id')->all();
+                            $dv->geoTags()->sync($geoIds);
+                        }
+
+                        self::logRestoreAction($log, $dv);
+                        return true;
+                    }
+                    break;
+
+                case 'bulk.replace_phone':
+                    $oldPhone = $log->old['phone'] ?? null;
+                    $entryId = $log->old['entry_id'] ?? null;
+                    if ($oldPhone && $entryId) {
+                        $entry = NumberEntry::find($entryId);
+                        if ($entry) {
+                            app(PhoneNumberAssignment::class)->assign($entry, $oldPhone);
+                            self::logRestoreAction($log, $entry->slot?->dataValue);
+                            return true;
+                        }
+                    }
+                    break;
+
+                case 'bulk.set_phone_status':
+                    $oldStatus = $log->old['phone_status'] ?? null;
+                    $oldPhone = $log->old['phone'] ?? null;
+                    if ($oldStatus && $oldPhone) {
+                        $phone = PhoneNumber::where('e164', $oldPhone)->first();
+                        if ($phone) {
+                            $phone->update([
+                                'status' => $oldStatus,
+                                'down_since' => $oldStatus === 'down' ? now() : null,
+                            ]);
+                            $entry = NumberEntry::where('phone_number_id', $phone->id)->first();
+                            self::logRestoreAction($log, $entry?->slot?->dataValue);
+                            return true;
+                        }
+                    }
+                    break;
             }
 
             return false;
         });
-
-        if ($success) {
-            // Публікуємо зміни на сайти
-            self::publishChanges($log);
-        }
-
-        return $success;
     }
 
     /**

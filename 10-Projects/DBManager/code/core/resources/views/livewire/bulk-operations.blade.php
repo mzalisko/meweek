@@ -150,8 +150,9 @@
             <div>
                 <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Тип</label>
                 <select wire:model.live="targetType" class="w-full rounded-lg border border-[#dfe3e0] px-2.5 py-2 text-xs focus:border-acc focus:outline-none">
-                    <option value="all">Усі типи</option>
-                    <option value="phone">Телефони</option>
+                    <option value="all">Усі типи (тільки основні)</option>
+                    <option value="phone">Телефони (основні)</option>
+                    <option value="phone_reserve">Резервні телефони</option>
                     <option value="messenger">Месенджери</option>
                     <option value="price">Ціни</option>
                     <option value="text">Текст</option>
@@ -205,7 +206,7 @@
         @endif
  
         <div class="overflow-x-auto rounded-lg border border-[#dfe3e0] bg-white relative">
-            <div wire:loading.delay wire:target="targetType, stateFilter, geoFilter, search, phoneFilter, scope, groupId, rootSiteId, selectedSiteIds, operation, findText, replaceText, contentValue, statusValue, geoCodes, geoMode, phoneReplacement, phoneStatus" 
+            <div wire:loading.delay wire:target="targetType, stateFilter, geoFilter, search, phoneFilter, scope, groupId, rootSiteId, selectedSiteIds, operation, findText, replaceText, contentValue, statusValue, geoCodes, geoMode, phoneReplacement, phoneStatus, phoneFormat" 
                 class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
                 <span class="text-xs text-mut animate-pulse font-semibold flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border shadow-sm">
                     <span class="h-3 w-3 animate-spin rounded-full border border-mut border-t-transparent"></span>
@@ -213,26 +214,29 @@
                 </span>
             </div>
             <div class="min-w-[980px]">
-                <div class="grid grid-cols-[minmax(150px,1.2fr)_minmax(110px,.8fr)_96px_110px_minmax(160px,1fr)_minmax(190px,1.4fr)] gap-2 border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
+                <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
                     <div>Сайт</div>
                     <div>Група</div>
                     <div>Тип</div>
                     <div>Гео</div>
                     <div>Ключ</div>
                     <div>Поточне значення</div>
+                    <div>Форматування</div>
                 </div>
 
                 <div class="max-h-[calc(100vh-245px)] overflow-y-auto">
                     @forelse($previewRows as $row)
-                        <div class="grid grid-cols-[minmax(150px,1.2fr)_minmax(110px,.8fr)_96px_110px_minmax(160px,1fr)_minmax(190px,1.4fr)] gap-2 border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                        <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
                             <div class="min-w-0 font-mono text-ink text-[13px]">
                                 <span class="block truncate">{{ $row['site'] }}</span>
-                                <span class="text-[11px] text-mut">{{ $row['kind'] === 'phone' ? 'номер' : 'значення' }}</span>
+                                <span class="text-[11px] text-mut">{{ in_array($row['type'], ['phone', 'phone_reserve'], true) ? 'номер' : 'значення' }}</span>
                             </div>
                             <div class="min-w-0 truncate text-mut text-[13px]">{{ $row['group'] }}</div>
                             <div>
                                 <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
                                     @if($row['type'] === 'phone')
+                                        @svg('phone', 10)
+                                    @elseif($row['type'] === 'phone_reserve')
                                         @svg('phone', 10)
                                     @elseif($row['type'] === 'messenger')
                                         @svg('msg', 10)
@@ -247,7 +251,7 @@
                                     @else
                                         @svg('alert', 10)
                                     @endif
-                                    {{ $row['type'] }}
+                                    {{ $row['type'] === 'phone_reserve' ? 'резерв' : $row['type'] }}
                                 </span>
                                 
                                 @if($row['changed'] && $row['state'] !== $row['new_state'])
@@ -298,12 +302,37 @@
                                 @endif
                             </div>
                             <div class="min-w-0 text-ink text-[13px]" title="{{ $row['value'] }}">
-                                @if($row['changed'] && $row['value'] !== $row['new_value'])
-                                    <span class="line-through text-bad-tx block truncate opacity-70 text-[13px]">{{ $row['value'] }}</span>
+                                @php
+                                    $showChangedLayout = $row['changed'] && $row['value'] !== $row['new_value'];
+                                @endphp
+                                @if($showChangedLayout)
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="line-through text-bad-tx opacity-70 text-[13px]">{{ $row['value'] }}</span>
+                                    </div>
                                     <span class="text-mut text-[10px] block leading-none my-0.5">▼</span>
-                                    <span class="text-ok-tx font-semibold block truncate bg-ok-bg/60 px-1.5 py-0.5 rounded text-[13px]">{{ $row['new_value'] }}</span>
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-[13px] rounded px-1.5 py-0.5 text-ok-tx font-semibold bg-ok-bg/60">{{ $row['new_value'] }}</span>
+                                    </div>
                                 @else
-                                    <span class="block truncate">{{ $row['value'] }}</span>
+                                    <span class="text-[13px]">{{ $row['value'] }}</span>
+                                @endif
+                            </div>
+                            <div class="min-w-0 text-ink text-[13px]">
+                                @if(in_array($row['type'], ['phone', 'phone_reserve'], true))
+                                    @php
+                                        $hasFormatChange = ($row['format'] ?? '') !== ($row['new_format'] ?? '');
+                                    @endphp
+                                    @if($hasFormatChange)
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="line-through text-bad-tx opacity-70 font-mono text-[11px]">{{ $row['format'] ?: '—' }}</span>
+                                            <span class="text-mut text-[10px] select-none">▼</span>
+                                            <span class="text-ok-tx font-semibold bg-ok-bg/60 font-mono text-[11px] px-1.5 py-[0.5px] rounded">{{ $row['new_format'] ?: '—' }}</span>
+                                        </div>
+                                    @else
+                                        <span class="text-[11px] text-mut bg-acc-bg border border-acc-bd px-1.5 py-[0.5px] rounded font-mono select-none">{{ $row['format'] ?: '—' }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-mut">—</span>
                                 @endif
                             </div>
                         </div>
@@ -356,6 +385,7 @@
                     <option value="set_status">Показати / приховати слот</option>
                     <option value="replace_phone">Замінити номер</option>
                     <option value="set_phone_status">Стан номера active/down (Збій)</option>
+                    <option value="set_phone_format">Встановити формат телефону</option>
                 </select>
                 @error('operation') <div class="mt-1 text-[11px] text-bad-tx">{{ $message }}</div> @enderror
             </div>
@@ -424,6 +454,13 @@
                         <option value="down">down (Збій)</option>
                     </select>
                 </div>
+            @elseif($operation === 'set_phone_format')
+                <div>
+                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-mut">Формат телефону</label>
+                    <input wire:model.live="phoneFormat" type="text" class="w-full rounded-lg border border-[#dfe3e0] px-2.5 py-2 text-xs focus:border-acc focus:outline-none" placeholder="+### (##) ###-##-##">
+                    <p class="mt-1 text-[10px] text-mut">Використовуйте # для цифр і роздільники (пробіл, +, -, (), крапка). Залиште порожнім для видалення формату.</p>
+                    @error('phoneFormat') <div class="mt-1 text-[11px] text-bad-tx">{{ $message }}</div> @enderror
+                </div>
             @endif
 
             <label class="flex items-center gap-2 rounded-lg border border-[#dfe3e0] px-3 py-2 text-[12px] text-ink">
@@ -472,6 +509,62 @@
                     </div>
                 </div>
             @endif
+
+            <div class="mt-4 border-t border-[#edf0ed] pt-4">
+                <h3 class="text-xs font-bold uppercase tracking-wide text-mut mb-2">Останні масові зміни</h3>
+                @php
+                    $recentSessions = $this->getRecentBulkSessions();
+                @endphp
+                @if($recentSessions->isEmpty())
+                    <p class="text-[11px] text-mut">Немає недавніх масових операцій.</p>
+                @else
+                    <div class="space-y-2">
+                        @foreach($recentSessions as $session)
+                            <div class="rounded-lg border border-[#dfe3e0] bg-[#f6f8f6] p-2 text-[11px] flex flex-col gap-1">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-semibold text-ink">
+                                        {{ match($session['action']) {
+                                            'bulk.replace_text' => 'Пошук і заміна',
+                                            'bulk.set_value' => 'Встановлення значення',
+                                            'bulk.set_status' => 'Зміна стану слота',
+                                            'bulk.set_geo' => 'Зміна гео-тегів',
+                                            'bulk.replace_phone' => 'Заміна номера',
+                                            'bulk.set_phone_status' => 'Стан номера',
+                                            'bulk.set_phone_format' => 'Формат телефону',
+                                            default => $session['action']
+                                        } }}
+                                    </span>
+                                    <span class="text-[10px] text-mut">{{ $session['created_at']?->format('H:i:s d.m') }}</span>
+                                </div>
+                                <div class="text-[10px] text-mut">
+                                    Змінено записів: <span class="font-semibold text-ink">{{ $session['count'] }}</span>
+                                </div>
+                                
+                                <details open class="mt-1 group text-[10px]">
+                                    <summary class="text-acc-tx hover:underline cursor-pointer select-none font-semibold flex items-center gap-0.5 outline-none">
+                                        Деталі змін ({{ $session['details']->count() }}):
+                                    </summary>
+                                    <div class="mt-1.5 space-y-1 pl-1.5 border-l border-acc/20 max-h-[120px] overflow-y-auto font-mono text-[9px] text-mut">
+                                        @foreach($session['details'] as $det)
+                                            <div class="leading-tight">
+                                                <span class="text-ink font-semibold">{{ $det['site'] }}</span>: 
+                                                <span class="text-[#3c5a42] font-semibold">{{ $det['key'] }}</span> 
+                                                <span>({{ $det['change'] }})</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </details>
+
+                                <button type="button" wire:click="rollbackBatch('{{ $session['batch_id'] }}')"
+                                    wire:confirm="Скасувати цю сесію масових змін?"
+                                    class="mt-1.5 self-start inline-flex items-center gap-1 rounded bg-bad-bg/10 border border-bad-tx/20 px-2 py-0.5 text-[10px] font-bold text-bad-tx hover:bg-bad-bg/20 transition-colors">
+                                    @svg('trash', 10) Скасувати зміни
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
         </div>
     </aside>
 </div>

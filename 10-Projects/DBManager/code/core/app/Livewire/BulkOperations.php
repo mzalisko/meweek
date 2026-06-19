@@ -59,6 +59,8 @@ class BulkOperations extends Component
 
     public string $phoneStatus = 'active';
 
+    public string $phoneFormat = '';
+
     public bool $publishAfterApply = true;
 
     public ?array $report = null;
@@ -191,10 +193,13 @@ class BulkOperations extends Component
             return;
         }
 
-        if ($this->operation === 'set_geo' && $this->geoCodes === [] && $this->geoMode !== 'replace') {
-            $this->addError('geoCodes', 'Оберіть хоча б один geo-тег.');
+        if ($this->operation === 'set_phone_format') {
+            $format = trim($this->phoneFormat);
+            if ($format !== '' && ! \App\Support\PhoneFormatter::isValidPattern($format)) {
+                $this->addError('phoneFormat', 'Використовуйте # для цифр і роздільники: пробіл, +, -, (), крапка.');
 
-            return;
+                return;
+            }
         }
 
         $batchId = (string) Str::uuid();
@@ -233,6 +238,26 @@ class BulkOperations extends Component
                     if ($value->status !== $this->statusValue) {
                         $value->status = $this->statusValue;
                         $changed = true;
+                    }
+                } elseif ($this->operation === 'set_phone_format') {
+                    if (($value->type?->code ?? null) === 'phone') {
+                        $content = $value->content ?? [];
+                        $oldFormat = $content['phone_format'] ?? '';
+                        $newFormat = trim($this->phoneFormat);
+
+                        if ($newFormat === '') {
+                            if (isset($content['phone_format'])) {
+                                unset($content['phone_format']);
+                                $value->content = $content;
+                                $changed = true;
+                            }
+                        } else {
+                            if ($oldFormat !== $newFormat) {
+                                $content['phone_format'] = $newFormat;
+                                $value->content = $content;
+                                $changed = true;
+                            }
+                        }
                     }
                 }
 
@@ -419,10 +444,10 @@ class BulkOperations extends Component
         return DataValue::with(['type', 'geoTags', 'phoneSlot.entries.phoneNumber'])
             ->where('scope_type', 'site')
             ->whereIn('scope_id', $siteIds)
-            ->when($this->targetType !== 'all', fn (Builder $query) => $query->whereHas(
-                'type',
-                fn (Builder $typeQuery) => $typeQuery->where('code', $this->targetType)
-            ))
+            ->when($this->targetType !== 'all', function (Builder $query) {
+                $typeCode = $this->targetType === 'phone_reserve' ? 'phone' : $this->targetType;
+                $query->whereHas('type', fn (Builder $typeQuery) => $typeQuery->where('code', $typeCode));
+            })
             ->when(in_array($this->stateFilter, ['active', 'hidden'], true), fn (Builder $query) => $query->where('status', $this->stateFilter))
             ->get()
             ->filter(fn (DataValue $value) => $this->matchesValueFilters($value))
@@ -442,6 +467,12 @@ class BulkOperations extends Component
                 $query->where('scope_type', 'site')
                     ->whereIn('scope_id', $siteIds)
                     ->whereHas('type', fn (Builder $typeQuery) => $typeQuery->where('code', 'phone'));
+            })
+            ->when($this->targetType === 'phone_reserve', function ($query) {
+                $query->where('priority', '>', 0);
+            })
+            ->when($this->targetType !== 'phone_reserve', function ($query) {
+                $query->where('priority', 0);
             })
             ->get()
             ->filter(function (NumberEntry $entry): bool {
@@ -528,20 +559,23 @@ class BulkOperations extends Component
                     $site = $value ? $sites->get((int) $value->scope_id) : null;
 
                     $calc = $this->calculateNewPhone($entry);
+                    $format = $value ? ($value->content['phone_format'] ?? null) : null;
 
                     return [
                         'kind' => 'phone',
                         'site' => $site?->domain ?? 'site #' . ($value?->scope_id ?? '?'),
                         'group' => $site?->group?->name ?? 'Без групи',
                         'key' => $value?->key ?? 'phone',
-                        'type' => 'phone',
+                        'type' => $entry->priority === 0 ? 'phone' : 'phone_reserve',
                         'geo' => $value ? ($this->valueGeoCodes($value) ?: ['WORLD']) : ['WORLD'],
                         'state' => $translateState($entry->phoneNumber?->status ?? 'unknown'),
                         'value' => $entry->phoneNumber?->e164 ?? '—',
+                        'format' => $format,
                         'changed' => $calc['changed'],
                         'new_value' => $calc['new_value'],
                         'new_state' => $translateState($calc['new_state']),
                         'new_geo' => $value ? ($this->valueGeoCodes($value) ?: ['WORLD']) : ['WORLD'],
+                        'new_format' => $format,
                     ];
                 })
                 ->values()
@@ -555,6 +589,11 @@ class BulkOperations extends Component
                 $type = $value->type?->code ?? 'unknown';
 
                 $calc = $this->calculateNewValue($value, $geoMap, $geoCodeToIdMap);
+                $format = $type === 'phone' ? ($value->content['phone_format'] ?? null) : null;
+                $newFormat = $format;
+                if ($type === 'phone' && $this->operation === 'set_phone_format') {
+                    $newFormat = trim($this->phoneFormat);
+                }
 
                 return [
                     'kind' => 'value',
@@ -565,11 +604,13 @@ class BulkOperations extends Component
                     'geo' => $this->valueGeoCodes($value) ?: ['WORLD'],
                     'state' => $translateState($value->status),
                     'value' => $this->displayValue($value),
+                    'format' => $format,
                     'changed' => $calc['changed'],
                     'new_value' => $calc['new_value'],
                     'new_state' => $translateState($calc['new_state']),
                     'new_geo' => $calc['new_geo'],
                     'new_key' => $calc['new_key'],
+                    'new_format' => $newFormat,
                 ];
             })
             ->values()
@@ -606,6 +647,18 @@ class BulkOperations extends Component
             if ($cloned->status !== $this->statusValue) {
                 $cloned->status = $this->statusValue;
                 $newStatus = $this->statusValue;
+                $changed = true;
+            }
+        } elseif ($this->operation === 'set_phone_format') {
+            if (($cloned->type?->code ?? null) === 'phone') {
+                $content = $cloned->content ?? [];
+                $newFormat = trim($this->phoneFormat);
+                if ($newFormat === '') {
+                    unset($content['phone_format']);
+                } else {
+                    $content['phone_format'] = $newFormat;
+                }
+                $cloned->content = $content;
                 $changed = true;
             }
         } elseif ($this->operation === 'set_geo') {
@@ -849,5 +902,95 @@ class BulkOperations extends Component
                 $publication = app(SitePayloadCompiler::class)->publish($site);
                 app(BridgePublisher::class)->push($publication);
             });
+    }
+
+    public function getRecentBulkSessions(): Collection
+    {
+        return AuditLog::where('action', 'like', 'bulk.%')
+            ->whereNotNull('batch_id')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy('batch_id')
+            ->take(3)
+            ->map(function ($logs, $batchId) {
+                $first = $logs->first();
+                
+                $details = $logs->map(function ($log) {
+                    $siteId = $log->old['scope_id'] ?? $log->new['scope_id'] ?? null;
+                    $scopeType = $log->old['scope_type'] ?? $log->new['scope_type'] ?? null;
+                    $siteDomain = 'Сайт #' . $siteId;
+                    if ($scopeType === 'site' && $siteId) {
+                        $siteDomain = \App\Models\Site::where('id', $siteId)->value('domain') ?? $siteDomain;
+                    }
+                    
+                    $key = $log->old['key'] ?? $log->new['key'] ?? null;
+                    if (!$key && $log->subject_type === 'DataValue' && $log->subject_id) {
+                        $key = \App\Models\DataValue::where('id', $log->subject_id)->value('key');
+                    }
+                    
+                    $changeDesc = '';
+                    if ($log->action === 'bulk.replace_phone') {
+                        $changeDesc = ($log->old['phone'] ?? '—') . ' ➔ ' . ($log->new['phone'] ?? '—');
+                    } elseif ($log->action === 'bulk.set_phone_status') {
+                        $oldStat = ($log->old['phone_status'] ?? '') === 'down' ? 'збій' : (($log->old['phone_status'] ?? '') === 'active' ? 'активний' : ($log->old['phone_status'] ?? '—'));
+                        $newStat = ($log->new['phone_status'] ?? '') === 'down' ? 'збій' : (($log->new['phone_status'] ?? '') === 'active' ? 'активний' : ($log->new['phone_status'] ?? '—'));
+                        $changeDesc = ($log->new['phone'] ?? '') . ' [' . $oldStat . ' ➔ ' . $newStat . ']';
+                    } elseif ($log->action === 'bulk.set_phone_format') {
+                        $changeDesc = 'формат: ' . ($log->old['content']['phone_format'] ?? '—') . ' ➔ ' . ($log->new['content']['phone_format'] ?? '—');
+                    } elseif ($log->action === 'bulk.set_status') {
+                        $oldStat = ($log->old['status'] ?? '') === 'hidden' ? 'прихований' : (($log->old['status'] ?? '') === 'active' ? 'активний' : ($log->old['status'] ?? '—'));
+                        $newStat = ($log->new['status'] ?? '') === 'hidden' ? 'прихований' : (($log->new['status'] ?? '') === 'active' ? 'активний' : ($log->new['status'] ?? '—'));
+                        $changeDesc = 'статус: ' . $oldStat . ' ➔ ' . $newStat;
+                    } elseif ($log->action === 'bulk.set_geo') {
+                        $oldGeo = implode(',', $log->old['geo'] ?? []);
+                        $newGeo = implode(',', $log->new['geo'] ?? []);
+                        $changeDesc = 'гео: ' . ($oldGeo ?: '—') . ' ➔ ' . ($newGeo ?: '—');
+                    } else {
+                        $oldVal = $log->old['content']['value'] ?? $log->old['key'] ?? '';
+                        $newVal = $log->new['content']['value'] ?? $log->new['key'] ?? '';
+                        if (is_array($oldVal)) {
+                            $oldVal = json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+                        }
+                        if (is_array($newVal)) {
+                            $newVal = json_encode($newVal, JSON_UNESCAPED_UNICODE);
+                        }
+                        $changeDesc = \Illuminate\Support\Str::limit((string)$oldVal, 30) . ' ➔ ' . \Illuminate\Support\Str::limit((string)$newVal, 30);
+                    }
+                    
+                    return [
+                        'site' => $siteDomain,
+                        'key' => $key,
+                        'change' => $changeDesc,
+                    ];
+                })->values();
+
+                return [
+                    'batch_id' => $batchId,
+                    'action' => $first->action,
+                    'created_at' => $first->created_at,
+                    'count' => $logs->count(),
+                    'details' => $details,
+                ];
+            })
+            ->values();
+    }
+
+    public function rollbackBatch(string $batchId): void
+    {
+        $logs = AuditLog::where('batch_id', $batchId)->get();
+        if ($logs->isEmpty()) {
+            $this->dispatch('toast', message: 'Сесію не знайдено або вже скасовано.');
+            return;
+        }
+
+        $user = auth()->user();
+        $firstLog = $logs->first();
+
+        if (\App\Services\Audit\AuditRestorer::restore($firstLog, $user)) {
+            $this->dispatch('toast', message: 'Масові зміни скасовано!');
+            $this->report = null;
+        } else {
+            $this->dispatch('toast', message: 'Помилка при скасуванні змін.');
+        }
     }
 }

@@ -23,7 +23,7 @@ class SlotPanelTest extends TestCase
         $this->actingAs(User::factory()->create());
     }
 
-    public function test_opening_slot_shows_slot_settings_without_number_chain(): void
+    public function test_opening_slot_shows_slot_settings_with_reserve_numbers_chain(): void
     {
         $site = Site::factory()->create();
         [$slot, $entries] = $this->slotWithNumbers(['active', 'active']);
@@ -35,7 +35,7 @@ class SlotPanelTest extends TestCase
             ->assertSee('гео-мітки')
             ->assertSee('Повернення')
             ->assertSee('Якщо всі впали')
-            ->assertDontSee($entries[1]->phoneNumber->e164)
+            ->assertSee($entries[1]->phoneNumber->e164)
             ->assertSet('open', true);
     }
 

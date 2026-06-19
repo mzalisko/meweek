@@ -788,13 +788,23 @@ class SlotPanel extends Component
         $this->resetErrorBag($field);
 
         $value = trim($value);
-        if (! preg_match('/^\+\d{7,15}$/', $value)) {
+        if ($value === '') {
+            $this->addError($field, 'Введіть номер у форматі +380441112233.');
+            return null;
+        }
+
+        $normalized = preg_replace('/(?!^\+)[^\d]/', '', $value) ?? '';
+        if (! str_starts_with($normalized, '+')) {
+            $normalized = '+' . preg_replace('/\D+/', '', $normalized);
+        }
+
+        if (! preg_match('/^\+\d{7,15}$/', $normalized)) {
             $this->addError($field, 'Введіть номер у форматі +380441112233.');
 
             return null;
         }
 
-        return $value;
+        return $normalized;
     }
 
     private function publishSlotSites(PhoneSlot $slot): void

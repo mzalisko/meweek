@@ -51,7 +51,9 @@ class AuditManager extends Component
         'slot.removed', 'slot.suppressed', 'slot.renamed', 'slot.hidden', 'slot.shown',
         'phone.materialized', 'phone.override_collapsed',
         'number.added', 'number.removed', 'number.reordered', 'number.status_changed', 'number.edited',
-        'audit.restored'
+        'audit.restored',
+        'bulk.replace_text', 'bulk.set_value', 'bulk.set_status', 'bulk.set_geo',
+        'bulk.replace_phone', 'bulk.set_phone_status', 'bulk.set_phone_format'
     ];
 
     public const FAILOVER_ACTIONS = [

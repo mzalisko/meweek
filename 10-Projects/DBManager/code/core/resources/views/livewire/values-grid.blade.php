@@ -204,7 +204,8 @@
                     <button type="button"
                         @click="toggle('{{ $type }}')"
                         :aria-expanded="(!isCollapsed('{{ $type }}')).toString()"
-                        class="grid w-full grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(320px,2fr)_68px] gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-[#dfe3e0] rounded-t-lg text-left text-[10px] uppercase tracking-wide text-mut hover:bg-[#eef1ee] transition-colors"
+                        class="grid w-full gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-[#dfe3e0] rounded-t-lg text-left text-[10px] uppercase tracking-wide text-mut hover:bg-[#eef1ee] transition-colors"
+                        style="grid-template-columns: minmax(130px, 1fr) minmax(150px, 1fr) 92px minmax(280px, 1.8fr) 140px 68px;"
                         :class="isCollapsed('{{ $type }}') ? 'rounded-b-lg border-b-0' : 'border-b'">
                         <div class="flex gap-1.5 items-center min-w-0">
                             <span class="inline-flex transition-transform duration-150" :class="isCollapsed('{{ $type }}') ? '-rotate-90' : ''">@svg('chevron-down')</span>
@@ -214,7 +215,8 @@
                         </div>
                         <div>Гео</div>
                         <div>Стан</div>
-                        <div>Значення / резерви</div>
+                        <div>Значення</div>
+                        <div>Форматування</div>
                         <div></div>
                     </button>
 
@@ -223,7 +225,8 @@
                     @php
                         $st = $stateMap[$r['state']] ?? 'ok';
                     @endphp
-                    <div class="grid grid-cols-[minmax(130px,1fr)_minmax(150px,1fr)_92px_minmax(320px,2fr)_68px] gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors">
+                    <div class="grid gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors"
+                        style="grid-template-columns: minmax(130px, 1fr) minmax(150px, 1fr) 92px minmax(280px, 1.8fr) 140px 68px;">
                         {{-- Key --}}
                         <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate inline-block w-fit mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
 
@@ -272,73 +275,75 @@
                             @if($type === 'phone' && !empty($r['numbers']))
                                 <span class="flex flex-col gap-1">
                                     @foreach($r['numbers'] as $number)
-                                        @php
-                                            $isEditingNumber = $editingPhoneEntryId === $number['entry_id'];
-                                            $numberStatus = $number['status'] ?? 'active';
-                                            $isInactive = $numberStatus !== 'active';
-                                            $isPinned = $number['is_pinned'] ?? false;
-                                        @endphp
-                                        @if($isEditingNumber)
-                                            <span
-                                                x-data="{ initial: '{{ addslashes($number['e164']) }}' }"
-                                                @click.outside="
-                                                    const inp = $el.querySelector('input');
-                                                    if (inp && inp.value.trim() === initial) {
-                                                        $wire.cancelInlinePhoneEdit();
-                                                    }
-                                                "
-                                                class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
-                                            >
-                                                <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
-                                                    {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
-                                                </span>
-                                                <input
-                                                    wire:model.defer="editingPhoneNumber"
-                                                    wire:keydown.enter="saveInlinePhoneNumber"
-                                                    wire:keydown.escape="cancelInlinePhoneEdit"
-                                                    type="text"
-                                                    class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
-                                                    aria-label="Редагувати номер"
+                                        @if($number['priority'] === 0)
+                                            @php
+                                                $isEditingNumber = $editingPhoneEntryId === $number['entry_id'];
+                                                $numberStatus = $number['status'] ?? 'active';
+                                                $isInactive = $numberStatus !== 'active';
+                                                $isPinned = $number['is_pinned'] ?? false;
+                                            @endphp
+                                            @if($isEditingNumber)
+                                                <span
+                                                    x-data="{ initial: '{{ addslashes($number['e164']) }}' }"
+                                                    @click.outside="
+                                                        const inp = $el.querySelector('input');
+                                                        if (inp && inp.value.trim() === initial) {
+                                                            $wire.cancelInlinePhoneEdit();
+                                                        }
+                                                    "
+                                                    class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
                                                 >
-                                                <span class="shrink-0 flex items-center gap-1">
-                                                    <button wire:click.stop="saveInlinePhoneNumber" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
-                                                    <button wire:click.stop="cancelInlinePhoneEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
-                                                    <button wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+                                                    <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
+                                                        #1 основний
+                                                    </span>
+                                                    <input
+                                                        wire:model.defer="editingPhoneNumber"
+                                                        wire:keydown.enter="saveInlinePhoneNumber"
+                                                        wire:keydown.escape="cancelInlinePhoneEdit"
+                                                        type="text"
+                                                        class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
+                                                        aria-label="Редагувати номер"
+                                                    >
+                                                    <span class="shrink-0 flex items-center gap-1">
+                                                        <button wire:click.stop="saveInlinePhoneNumber" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
+                                                        <button wire:click.stop="cancelInlinePhoneEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
+                                                        <button wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
+                                                    </span>
                                                 </span>
-                                            </span>
-                                        @else
-                                            <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}">
-                                                <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
-                                                    {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
-                                                </span>
-                                                <span class="min-w-0 truncate text-ink" title="{{ $number['e164'] }}">
-                                                    {{ $number['display_value'] ?? $number['e164'] }}
-                                                </span>
-                                                <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
-                                                    @if($isInactive)
-                                                        <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
-                                                        <button wire:click.stop="restorePhoneNumber({{ $number['entry_id'] }})" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Повернути" aria-label="Повернути">@svg('eye')</button>
-                                                        <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('pin')</span>
-                                                    @else
-                                                        @if($number['is_current'])
-                                                            <span class="inline-flex items-center gap-1 rounded-md bg-ok-bg px-1.5 py-0.5 text-[10px] font-semibold text-ok-tx">● показується</span>
-                                                        @endif
-                                                        @if($isPinned)
-                                                            <button wire:click.stop="unpinPhoneSlot({{ $number['entry_id'] }})" class="text-acc-tx hover:opacity-80 px-1 py-0.5" title="Зняти ручний режим" aria-label="Зняти ручний режим">@svg('pin')</button>
+                                            @else
+                                                <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}">
+                                                    <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
+                                                        #1 основний
+                                                    </span>
+                                                    <span class="min-w-0 truncate text-ink" title="{{ $number['e164'] }}">
+                                                        {{ $number['display_value'] ?? $number['e164'] }}
+                                                    </span>
+                                                    <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                                        @if($isInactive)
+                                                            <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
+                                                            <button wire:click.stop="restorePhoneNumber({{ $number['entry_id'] }})" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Повернути" aria-label="Повернути">@svg('eye')</button>
+                                                            <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('pin')</span>
                                                         @else
-                                                            <button wire:click.stop="pinPhoneNumber({{ $number['entry_id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Показувати цей" aria-label="Показувати цей">@svg('pin')</button>
+                                                            @if($number['is_current'])
+                                                                <span class="inline-flex items-center gap-1 rounded-md bg-ok-bg px-1.5 py-0.5 text-[10px] font-semibold text-ok-tx">● показується</span>
+                                                            @endif
+                                                            @if($isPinned)
+                                                                <button wire:click.stop="unpinPhoneSlot({{ $number['entry_id'] }})" class="text-acc-tx hover:opacity-80 px-1 py-0.5" title="Зняти ручний режим" aria-label="Зняти ручний режим">@svg('pin')</button>
+                                                            @else
+                                                                <button wire:click.stop="pinPhoneNumber({{ $number['entry_id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Показувати цей" aria-label="Показувати цей">@svg('pin')</button>
+                                                            @endif
+                                                            <button wire:click.stop="deactivatePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Приховати номер і позначити його неактивним?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Приховати / деактивувати" aria-label="Приховати номер">@svg('ban')</button>
                                                         @endif
-                                                        <button wire:click.stop="deactivatePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Приховати номер і позначити його неактивним?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Приховати / деактивувати" aria-label="Приховати номер">@svg('ban')</button>
-                                                    @endif
-                                                    <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('link')</span>
-                                                    <button wire:click.stop="startInlinePhoneEdit({{ $number['entry_id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
+                                                        <span class="inline-flex w-6 justify-center px-1 py-0.5 text-transparent opacity-0" aria-hidden="true">@svg('link')</span>
+                                                        <button wire:click.stop="startInlinePhoneEdit({{ $number['entry_id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати номер" aria-label="Редагувати номер">@svg('edit')</button>
+                                                    </span>
                                                 </span>
-                                            </span>
-                                        @endif
-                                        @if($isEditingNumber)
-                                            @error('editingPhoneNumber')
-                                                <span class="ml-[5.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
-                                            @enderror
+                                            @endif
+                                            @if($isEditingNumber)
+                                                @error('editingPhoneNumber')
+                                                    <span class="ml-[5.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
+                                                @enderror
+                                            @endif
                                         @endif
                                     @endforeach
                                     @if($r['state'] === 'exhausted' && in_array($r['exhaustion_policy'] ?? null, ['last', 'emergency'], true))
@@ -347,20 +352,6 @@
                                             <span class="font-mono text-ink">{{ $r['display_value'] ?? $r['value'] ?? '—' }}</span>
                                         </span>
                                     @endif
-                                    <label class="mt-1.5 flex max-w-[220px] items-center gap-1.5 rounded-full border border-[#dfe3e0] bg-[#fafbfa] px-2.5 py-0.5 text-[10px] text-mut focus-within:border-acc transition-colors">
-                                        <span class="shrink-0 text-mut font-semibold">формат:</span>
-                                        <input
-                                            type="text"
-                                            value="{{ $r['phone_format'] ?? '' }}"
-                                            wire:change="savePhoneFormat({{ $r['id'] }}, $event.target.value)"
-                                            placeholder="+### ## ### ## ##"
-                                            class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[10px] text-ink placeholder:text-mut/60 focus:outline-none focus:ring-0"
-                                            aria-label="Формат номера"
-                                        >
-                                    </label>
-                                    @error("phoneFormatDraft.{$r['id']}")
-                                        <span class="text-[11px] text-bad-tx">{{ $message }}</span>
-                                    @enderror
                                     @if(!empty($r['messengers']))
                                         <div class="flex flex-wrap gap-1 mt-1.5 pl-2">
                                             @foreach($r['messengers'] as $lm)
@@ -580,6 +571,27 @@
                                 </span>
                             @endif
                         </span>
+
+                        {{-- Formatting Column --}}
+                        <div class="min-w-0 mt-0.5 w-full">
+                            @if($type === 'phone')
+                                <label class="flex items-center gap-1.5 rounded-md border border-[#dfe3e0] bg-[#fafbfa] px-2 py-0.5 text-[11px] text-mut focus-within:border-acc transition-colors">
+                                    <input
+                                        type="text"
+                                        value="{{ $r['phone_format'] ?? '' }}"
+                                        wire:change="savePhoneFormat({{ $r['id'] }}, $event.target.value)"
+                                        placeholder="без формату"
+                                        class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[11px] text-ink placeholder:text-mut/50 focus:outline-none focus:ring-0"
+                                        aria-label="Формат номера"
+                                    >
+                                </label>
+                                @error("phoneFormatDraft.{$r['id']}")
+                                    <span class="text-[10px] text-bad-tx block mt-0.5">{{ $message }}</span>
+                                @enderror
+                            @else
+                                <span class="text-mut text-[11px]">—</span>
+                            @endif
+                        </div>
 
                         {{-- Details --}}
                         <span class="inline-flex items-center justify-end gap-1.5 pt-1">

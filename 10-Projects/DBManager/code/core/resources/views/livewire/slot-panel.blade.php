@@ -175,6 +175,66 @@
                     @error('newNumber')<p class="mt-1 text-[11px] text-bad-tx">{{ $message }}</p>@enderror
                 </div>
 
+                <div class="mt-4 border-t border-[#edf0ed] pt-4">
+                    <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5 font-bold">Зміна резервів (резервні номери)</div>
+                    @php
+                        $reserveEntries = $entries->where('priority', '>', 0);
+                    @endphp
+                    @if($reserveEntries->isEmpty())
+                        <p class="text-[11px] text-mut">Немає резервних номерів.</p>
+                    @else
+                        <div class="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
+                            @foreach($reserveEntries as $entry)
+                                @php
+                                    $numStatus = $entry->phoneNumber?->status ?? 'active';
+                                    $isInactive = $numStatus !== 'active';
+                                    $isPinned = $slot->pinned_number_entry_id === $entry->id;
+                                    $isCurrent = $entry->id === ($resolved?->entryId ?? null);
+                                @endphp
+                                <div class="flex items-center justify-between gap-2 rounded-lg border border-[#dfe3e0] bg-[#f6f8f6] px-2.5 py-1.5 text-[12px]">
+                                    <div class="min-w-0">
+                                        <div class="font-mono text-ink leading-tight flex items-center gap-1.5">
+                                            <span class="text-[10px] text-mut font-semibold">#1.{{ $entry->priority }}</span>
+                                            <span class="{{ $isInactive ? 'line-through text-mut' : 'font-semibold' }}">{{ $entry->phoneNumber?->e164 }}</span>
+                                            @if($isCurrent)
+                                                <span class="inline-flex h-2 w-2 rounded-full bg-ok-tx animate-pulse" title="Зараз показується"></span>
+                                            @endif
+                                        </div>
+                                        @if($entry->phoneNumber?->status === 'down')
+                                            <span class="text-[10px] text-bad-tx font-semibold font-sans">● Збій</span>
+                                        @endif
+                                    </div>
+                                    <div class="shrink-0 flex items-center gap-1">
+                                        {{-- Pin/Unpin --}}
+                                        @if($isPinned)
+                                            <button type="button" wire:click="unpin" class="text-acc-tx hover:opacity-80 p-0.5" title="Зняти ручний режим">@svg('pin', 12)</button>
+                                        @else
+                                            <button type="button" wire:click="pin({{ $entry->id }})" class="text-mut hover:text-acc-tx p-0.5" title="Показувати цей">@svg('pin', 12)</button>
+                                        @endif
+
+                                        {{-- Edit --}}
+                                        <button type="button" wire:click="startEditNumber({{ $entry->id }})" class="text-mut hover:text-acc-tx p-0.5" title="Редагувати">@svg('edit', 12)</button>
+
+                                        {{-- Toggle Active/Down --}}
+                                        @if($entry->phoneNumber?->status === 'down')
+                                            <button type="button" wire:click="setNumberStatus({{ $entry->id }}, 'active')" class="text-ok-tx hover:opacity-80 p-0.5" title="Активувати">@svg('check', 12)</button>
+                                        @else
+                                            <button type="button" wire:click="setNumberStatus({{ $entry->id }}, 'down')" wire:confirm="Приховати номер і позначити його неактивним (Збій)?" class="text-mut hover:text-bad-tx p-0.5" title="Позначити збій">@svg('ban', 12)</button>
+                                        @endif
+
+                                        {{-- Reordering --}}
+                                        <button type="button" wire:click="moveUp({{ $entry->id }})" class="text-mut hover:text-ink p-0.5 font-bold" title="Вгору">▲</button>
+                                        <button type="button" wire:click="moveDown({{ $entry->id }})" class="text-mut hover:text-ink p-0.5 font-bold" title="Вниз">▼</button>
+
+                                        {{-- Delete --}}
+                                        <button type="button" wire:click="removeNumber({{ $entry->id }})" wire:confirm="Видалити цей резервний номер?" class="text-mut hover:text-bad-tx p-0.5" title="Видалити">@svg('trash', 12)</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
                 <div class="mt-4">
                     <div class="text-[11px] uppercase tracking-[.06em] text-mut mb-1.5">Поведінка</div>
 

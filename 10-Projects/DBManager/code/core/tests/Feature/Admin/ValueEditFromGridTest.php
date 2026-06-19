@@ -117,7 +117,7 @@ class ValueEditFromGridTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'number.removed')->exists());
     }
 
-    public function test_phone_chain_labels_show_reserve_belongs_to_primary(): void
+    public function test_phone_chain_does_not_show_reserves_in_grid(): void
     {
         $site = Site::factory()->create();
         [$slot] = $this->slotWithNumbers(['active', 'active']);
@@ -125,7 +125,7 @@ class ValueEditFromGridTest extends TestCase
 
         Livewire::test(ValuesGrid::class, ['site' => $site->id])
             ->assertSee('#1 основний')
-            ->assertSee('#1.1 резерв');
+            ->assertDontSee('#1.1 резерв');
     }
 
     public function test_down_phone_status_is_rendered_in_ukrainian(): void

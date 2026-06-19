@@ -32,6 +32,13 @@
         'number.status_changed' => 'Зміна статусу номера',
         'number.edited' => 'Редагування номера',
         'audit.restored' => 'Відновлено дані з аудиту',
+        'bulk.replace_text' => 'Масова заміна тексту',
+        'bulk.set_value' => 'Масове встановлення значення',
+        'bulk.set_geo' => 'Масова зміна гео-тегів',
+        'bulk.set_status' => 'Масове перемикання слотів',
+        'bulk.replace_phone' => 'Масова заміна телефону',
+        'bulk.set_phone_status' => 'Масова зміна статусу телефонів',
+        'bulk.set_phone_format' => 'Масова зміна формату телефонів',
         'user.login' => 'Вхід у систему',
         'user.logout' => 'Вихід із системи',
         'user.login_failed' => 'Невдала спроба входу',
@@ -67,7 +74,13 @@
         $old = $log->old;
         $new = $log->new;
 
-        $excludeKeys = ['scope_type', 'scope_id', 'value_type_id', 'status', 'geo_tag_ids', 'phone_slot', 'key'];
+        $excludeKeys = ['scope_type', 'scope_id', 'value_type_id', 'geo_tag_ids', 'phone_slot'];
+        if ($action !== 'bulk.replace_text') {
+            $excludeKeys[] = 'key';
+        }
+        if ($action !== 'bulk.set_status' && $action !== 'value.updated') {
+            $excludeKeys[] = 'status';
+        }
 
         $labels = [
             'value' => 'Значення',
@@ -86,6 +99,7 @@
             'current_messenger_id' => 'Активний месенджер',
             'last_active_value' => 'Останнє значення',
             'last_active_url' => 'Останнє URL',
+            'phone_format' => 'Формат телефону',
         ];
 
         if ($action === 'audit.restored') {
@@ -97,7 +111,7 @@
                 '</div>';
         }
 
-        if (in_array($action, ['value.updated', 'messenger.toggled', 'messenger.pinned', 'messenger.unpinned', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'slot.hidden', 'slot.shown'])) {
+        if (in_array($action, ['value.updated', 'messenger.toggled', 'messenger.pinned', 'messenger.unpinned', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'slot.hidden', 'slot.shown', 'bulk.replace_text', 'bulk.set_value', 'bulk.set_status', 'bulk.set_phone_format'])) {
             if (is_array($old) && is_array($new)) {
                 $changes = [];
                 $allKeys = array_unique(array_merge(array_keys($old), array_keys($new)));
@@ -121,8 +135,14 @@
                             $oldStr = $formatPrices($oldVal);
                             $newStr = $formatPrices($newVal);
                         } else {
-                            $oldStr = is_bool($oldVal) ? ($oldVal ? 'так' : 'ні') : (is_array($oldVal) ? implode(', ', $oldVal) : (string)$oldVal);
-                            $newStr = is_bool($newVal) ? ($newVal ? 'так' : 'ні') : (is_array($newVal) ? implode(', ', $newVal) : (string)$newVal);
+                            if ($k === 'status') {
+                                $statusMap = ['active' => 'активний', 'hidden' => 'прихований', 'down' => 'збій'];
+                                $oldStr = $statusMap[$oldVal] ?? (string)$oldVal;
+                                $newStr = $statusMap[$newVal] ?? (string)$newVal;
+                            } else {
+                                $oldStr = is_bool($oldVal) ? ($oldVal ? 'так' : 'ні') : (is_array($oldVal) ? implode(', ', $oldVal) : (string)$oldVal);
+                                $newStr = is_bool($newVal) ? ($newVal ? 'так' : 'ні') : (is_array($newVal) ? implode(', ', $newVal) : (string)$newVal);
+                            }
                         }
                         if ($oldStr === '') $oldStr = '—';
                         if ($newStr === '') $newStr = '—';
@@ -148,9 +168,18 @@
                 '</div>';
         }
 
-        if ($action === 'value.geo_changed' || $action === 'messenger.geo_changed') {
-            $oldGeo = !empty($old['geo_tag_ids']) ? implode(', ', \App\Models\GeoTag::whereIn('id', $old['geo_tag_ids'])->pluck('code')->toArray()) : '—';
-            $newGeo = !empty($new['geo_tag_ids']) ? implode(', ', \App\Models\GeoTag::whereIn('id', $new['geo_tag_ids'])->pluck('code')->toArray()) : '—';
+        if ($action === 'value.geo_changed' || $action === 'messenger.geo_changed' || $action === 'bulk.set_geo') {
+            $getGeoString = function ($data) {
+                if (!empty($data['geo_tag_ids'])) {
+                    return implode(', ', \App\Models\GeoTag::whereIn('id', $data['geo_tag_ids'])->pluck('code')->toArray());
+                }
+                if (!empty($data['geo'])) {
+                    return implode(', ', $data['geo']);
+                }
+                return '—';
+            };
+            $oldGeo = $getGeoString($old);
+            $newGeo = $getGeoString($new);
             return '<div class="inline-flex items-center gap-2 bg-[#f4f5f3] border border-[#e3e5e1] px-2.5 py-1 rounded-md text-xs">' .
                 '<span class="text-mut font-bold uppercase tracking-wider text-[10px]">Гео:</span> ' .
                 '<span class="text-bad-tx bg-bad-bg px-1.5 py-0.5 rounded text-[11px] line-through">' . htmlspecialchars($oldGeo) . '</span>' .
@@ -183,12 +212,32 @@
         if (in_array($action, ['value.created', 'messenger.added', 'messenger.reserve_added'])) {
             if (is_array($new)) {
                 $details = [];
-                if (isset($new['key'])) {
-                    $details[] = '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Ключ:</span> <span class="bg-[#eef8ef] border border-[#cbeed2] text-ok-tx px-1.5 py-0.5 rounded font-mono text-xs">' . htmlspecialchars($new['key']) . '</span></div>';
+                $key = $new['key'] ?? null;
+                if (!$key && $log->subject_type === 'DataValue' && $log->subject_id) {
+                    $key = \App\Models\DataValue::where('id', $log->subject_id)->value('key');
                 }
-                $content = $new['content'] ?? [];
+                if ($key) {
+                    $details[] = '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Ключ:</span> <span class="bg-[#eef8ef] border border-[#cbeed2] text-ok-tx px-1.5 py-0.5 rounded font-mono text-xs">' . htmlspecialchars($key) . '</span></div>';
+                }
+
+                $content = $new['content'] ?? $new;
                 if (isset($content['value'])) {
                     $details[] = '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Значення:</span> <span class="text-ok-tx font-semibold text-xs">«' . htmlspecialchars($content['value']) . '»</span></div>';
+                } elseif (isset($content['url'])) {
+                    $details[] = '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">URL:</span> <span class="text-ok-tx font-semibold text-xs">«' . htmlspecialchars($content['url']) . '»</span></div>';
+                }
+                if (isset($content['prices'])) {
+                    $formatPrices = function($val) {
+                        if (!is_array($val)) return (string)$val;
+                        $parts = [];
+                        foreach ($val as $p) {
+                            $lbl = !empty($p['label']) ? $p['label'] : 'Ціна';
+                            $geo = !empty($p['geo']) ? implode(',', $p['geo']) : 'WORLD';
+                            $parts[] = $lbl . ': ' . ($p['value'] ?? '') . ' [' . $geo . ']';
+                        }
+                        return implode(' | ', $parts);
+                    };
+                    $details[] = '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Ціни:</span> <span class="text-ok-tx font-semibold text-xs">' . htmlspecialchars($formatPrices($content['prices'])) . '</span></div>';
                 }
                 if (isset($new['phone_slot'])) {
                     $nums = collect($new['phone_slot']['entries'])->pluck('e164')->implode(', ');
@@ -226,6 +275,27 @@
                 '<span class="text-bad-tx bg-bad-bg px-1.5 py-0.5 rounded text-[11px] font-mono">' . htmlspecialchars($old['status'] ?? '—') . '</span>' .
                 '<span class="text-mut text-[10px]">➔</span>' .
                 '<span class="text-ok-tx bg-ok-bg px-1.5 py-0.5 rounded font-semibold text-[11px] font-mono">' . htmlspecialchars($new['status'] ?? '—') . '</span>' .
+                '</div>';
+        }
+        if ($action === 'bulk.replace_phone') {
+            return '<div class="inline-flex items-center gap-2 bg-[#f4f5f3] border border-[#e3e5e1] px-2.5 py-1 rounded-md text-xs">' .
+                '<span class="text-mut font-bold uppercase tracking-wider text-[10px]">Номер телефону:</span> ' .
+                '<span class="text-bad-tx bg-bad-bg px-1.5 py-0.5 rounded text-[11px] font-mono line-through">' . htmlspecialchars($old['phone'] ?? '—') . '</span>' .
+                '<span class="text-mut text-[10px]">➔</span>' .
+                '<span class="text-ok-tx bg-ok-bg px-1.5 py-0.5 rounded font-semibold text-[11px] font-mono">' . htmlspecialchars($new['phone'] ?? '—') . '</span>' .
+                '</div>';
+        }
+        if ($action === 'bulk.set_phone_status') {
+            $statusMap = ['active' => 'Активний', 'down' => 'Збій'];
+            $oldSt = $statusMap[$old['phone_status'] ?? ''] ?? ($old['phone_status'] ?? '—');
+            $newSt = $statusMap[$new['phone_status'] ?? ''] ?? ($new['phone_status'] ?? '—');
+            return '<div class="inline-flex items-center gap-2 bg-[#f4f5f3] border border-[#e3e5e1] px-2.5 py-1 rounded-md text-xs">' .
+                '<span class="text-mut font-bold uppercase tracking-wider text-[10px]">Номер:</span> ' .
+                '<span class="font-mono font-semibold text-[11px] text-ink mr-2">' . htmlspecialchars($new['phone'] ?? '—') . '</span>' .
+                '<span class="text-mut font-bold uppercase tracking-wider text-[10px]">Статус:</span> ' .
+                '<span class="text-bad-tx bg-bad-bg px-1.5 py-0.5 rounded text-[11px] line-through">' . htmlspecialchars($oldSt) . '</span>' .
+                '<span class="text-mut text-[10px]">➔</span>' .
+                '<span class="text-ok-tx bg-ok-bg px-1.5 py-0.5 rounded font-semibold text-[11px]">' . htmlspecialchars($newSt) . '</span>' .
                 '</div>';
         }
         if (is_array($old) || is_array($new)) {
@@ -573,7 +643,7 @@
                                     </td>
                                     <td class="p-3.5 text-sm text-ink border-b border-[#edf0ed]">{!! $renderDiff($log) !!}</td>
                                     <td class="p-3.5 text-right whitespace-nowrap border-b border-[#edf0ed]">
-                                        @if(in_array($log->action, ['value.updated', 'value.geo_changed', 'slot.renamed', 'slot.hidden', 'slot.shown', 'messenger.slot_renamed', 'value.deleted', 'slot.removed', 'messenger.removed', 'value.created', 'messenger.added', 'messenger.reserve_added', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'number.added', 'number.removed', 'number.status_changed', 'number.edited']))
+                                        @if(in_array($log->action, ['value.updated', 'value.geo_changed', 'slot.renamed', 'slot.hidden', 'slot.shown', 'messenger.slot_renamed', 'value.deleted', 'slot.removed', 'messenger.removed', 'value.created', 'messenger.added', 'messenger.reserve_added', 'messenger.exhaustion_policy_changed', 'messenger.return_mode_changed', 'messenger.emergency_changed', 'messenger.slot_hidden', 'messenger.slot_shown', 'number.added', 'number.removed', 'number.status_changed', 'number.edited', 'bulk.replace_text', 'bulk.set_value', 'bulk.set_status', 'bulk.set_geo', 'bulk.replace_phone', 'bulk.set_phone_status', 'bulk.set_phone_format']))
                                             <button wire:click="restore({{ $log->id }})"
                                                 wire:confirm="Ви впевнені, що хочете відкатати цю зміну назад?"
                                                 class="rounded-md border border-acc bg-acc-bg px-3 py-1.5 text-xs font-bold text-acc-tx hover:bg-[#e6edf2] transition-colors">
