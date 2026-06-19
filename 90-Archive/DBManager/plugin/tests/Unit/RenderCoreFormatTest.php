@@ -15,6 +15,7 @@ class RenderCoreFormatTest extends TestCase
     {
         return ['values' => [
             ['key' => 'phone_ua_1', 'type' => 'phone', 'state' => 'ok', 'value' => '+380441234567'],
+            ['key' => 'phone_pretty', 'type' => 'phone', 'state' => 'ok', 'value' => '+380441234567', 'display_value' => '+380 (44) 123-45-67'],
             ['key' => 'vb', 'type' => 'messenger', 'state' => 'ok', 'value' => '+380671112233',
              'url' => 'viber://chat?number=%2B380671112233'],
         ]];
@@ -32,5 +33,13 @@ class RenderCoreFormatTest extends TestCase
     {
         $html = dbm_render_from_cache($this->payload(), 'vb', ['format' => 'link']);
         $this->assertStringContainsString('href="viber://chat?number=%2B380671112233"', $html);
+    }
+
+    public function test_display_value_changes_text_but_tel_link_uses_raw_number(): void
+    {
+        $this->assertSame(
+            '<a href="tel:+380441234567">+380 (44) 123-45-67</a>',
+            dbm_render_from_cache($this->payload(), 'phone_pretty', ['format' => 'tel'])
+        );
     }
 }

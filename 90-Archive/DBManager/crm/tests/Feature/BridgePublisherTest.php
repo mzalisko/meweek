@@ -48,7 +48,7 @@ class BridgePublisherTest extends TestCase
                 && $data['push_secret'] === $pushSecret
                 && $data['ping_url'] === 'https://domen.ua/ping'
                 && $data['version'] === $publication->version
-                && $data['payload']['site'] === 'domen.ua';
+                && $data['payload']['site_id'] === $site->id;
         });
     }
 

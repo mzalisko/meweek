@@ -26,13 +26,13 @@ class SlotPanelTest extends TestCase
     public function test_opening_slot_shows_slot_settings_without_number_chain(): void
     {
         $site = Site::factory()->create();
-        [$slot, $entries] = $this->slotWithNumbers(['down', 'active']);
+        [$slot, $entries] = $this->slotWithNumbers(['active', 'active']);
         $slot->dataValue->update(['key' => 'phone_ua_1', 'scope_type' => 'site', 'scope_id' => $site->id]);
 
         Livewire::test(SlotPanel::class)
             ->call('open', $slot->dataValue->id)
             ->assertSee('phone_ua_1')
-            ->assertSee('Гео-мітки')
+            ->assertSee('гео-мітки')
             ->assertSee('Повернення')
             ->assertSee('Якщо всі впали')
             ->assertDontSee($entries[1]->phoneNumber->e164)

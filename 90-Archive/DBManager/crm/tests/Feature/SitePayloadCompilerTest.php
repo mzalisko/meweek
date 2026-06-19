@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteGroup;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Publishing\SitePayloadCompiler;
+use App\Support\PhoneFormatter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\BuildsSlots;
 use Tests\TestCase;
@@ -45,6 +46,28 @@ class SitePayloadCompilerTest extends TestCase
         $this->assertSame(['UA'], $item['geo']);
         $this->assertSame('ok', $item['state']);
         $this->assertSame($entries[0]->phoneNumber->e164, $item['value']);
+    }
+
+    public function test_phone_slot_publishes_display_value_without_changing_raw_number(): void
+    {
+        $site = Site::factory()->create();
+        [$slot, $entries] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update([
+            'key' => 'phone_formatted',
+            'scope_type' => 'site',
+            'scope_id' => $site->id,
+            'content' => ['phone_format' => '+### (##) ###-##-##'],
+        ]);
+
+        $payload = app(SitePayloadCompiler::class)->compile($site);
+        $item = $this->itemByKey($payload, 'phone_formatted');
+
+        $this->assertSame($entries[0]->phoneNumber->e164, $item['value']);
+        $this->assertSame(
+            PhoneFormatter::format($entries[0]->phoneNumber->e164, '+### (##) ###-##-##'),
+            $item['display_value']
+        );
+        $this->assertSame('+### (##) ###-##-##', $item['phone_format']);
     }
 
 
@@ -195,5 +218,35 @@ class SitePayloadCompilerTest extends TestCase
         $this->assertSame(2, $second->version);
         $this->assertSame(2, Publication::where('site_id', $site->id)->count());
         $this->assertSame(2, $second->payload['version']);
+    }
+
+    public function test_payload_values_follow_crm_section_order(): void
+    {
+        $site = Site::factory()->create();
+        DataValue::factory()->ofType('price')->forSite($site)->create([
+            'key' => 'price_ro',
+            'content' => ['prices' => [['label' => 'RO', 'value' => '1200', 'geo' => ['RO']]]],
+        ]);
+        DataValue::factory()->forSite($site)->create(['key' => 'note']);
+        DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_support',
+            'content' => ['value' => 'Telegram', 'network' => 'telegram', 'url' => 'https://t.me/support'],
+        ]);
+
+        [$secondPhone] = $this->slotWithNumbers(['active']);
+        $secondPhone->dataValue->update(['key' => 'phone_b', 'scope_type' => 'site', 'scope_id' => $site->id]);
+
+        [$firstPhone] = $this->slotWithNumbers(['active']);
+        $firstPhone->dataValue->update(['key' => 'phone_a', 'scope_type' => 'site', 'scope_id' => $site->id]);
+
+        $payload = app(SitePayloadCompiler::class)->compile($site);
+
+        $this->assertSame([
+            'phone:phone_a',
+            'phone:phone_b',
+            'messenger:tg_support',
+            'price:price_ro',
+            'text:note',
+        ], array_map(fn (array $item) => $item['type'].':'.$item['key'], $payload['values']));
     }
 }

@@ -56,7 +56,7 @@
             <button data-site-select @click="open = !open" @disabled(!$currentGroupId)
                 class="flex items-center gap-2 bg-[#f4f5f3] hover:bg-[#ebede9] px-3 py-1.5 rounded-lg border border-[#e3e5e1] text-xs font-bold text-ink transition-colors outline-none focus:outline-none disabled:cursor-not-allowed select-none">
                 <span class="text-mut text-[10px] font-bold uppercase tracking-wider">Сайт</span>
-                <span class="text-ink font-mono font-medium">{{ $siteModel?->domain ?? 'Оберіть сайт' }}</span>
+                <span class="text-ink font-mono font-medium">{{ $siteModel ? ($siteModel->domain . ' [ID: ' . $siteModel->id . ']') : 'Оберіть сайт' }}</span>
                 <svg class="w-3.5 h-3.5 text-mut transition-transform duration-200 shrink-0" :class="open ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
@@ -82,7 +82,7 @@
                     @foreach($selectedGroupSites->sortBy('domain') as $s)
                         <a href="{{ route('admin.site', ['group' => $s->site_group_id, 'site' => $s->id]) }}"
                            class="flex items-center justify-between px-3.5 py-2 text-xs text-ink hover:bg-[#eef1ee] hover:text-acc-tx font-mono transition-colors {{ (int) $siteModel?->id === (int) $s->id ? 'bg-[#eef1ee] text-acc-tx font-semibold' : '' }}">
-                            <span>{{ $s->domain }}</span>
+                            <span>{{ $s->domain }} <span class="text-mut text-[10px] font-sans ml-1">ID: {{ $s->id }}</span></span>
                             @if((int) $siteModel?->id === (int) $s->id)
                                 <svg class="w-3.5 h-3.5 text-acc-tx" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                             @endif
@@ -97,7 +97,7 @@
 <x-slot name="context">
     <div class="bg-acc-bg border-b border-acc-bd px-[18px] py-2 text-xs text-acc-tx flex gap-3 items-center">
         @svg('globe')
-        <span>Сайт: <b>{{ $siteModel?->domain ?? '—' }}</b></span>
+        <span>Сайт: <b>{{ $siteModel ? ($siteModel->domain . ' [ID: ' . $siteModel->id . ']') : '—' }}</b></span>
         @if($siteModel?->group)
             <span class="text-mut">·</span>
             <span>Група: {{ $siteModel->group->name }}</span>
@@ -120,7 +120,7 @@
                 </span>
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-[.08em] text-mut">Поточний сайт</div>
-                    <h1 class="truncate font-mono text-[18px] font-semibold leading-6 text-ink" title="{{ $siteModel->domain }}">{{ $siteModel->domain }}</h1>
+                    <h1 class="truncate font-mono text-[18px] font-semibold leading-6 text-ink" title="{{ $siteModel->domain }}">{{ $siteModel->domain }} <span class="text-mut text-[12px] font-normal ml-2">ID: {{ $siteModel->id }}</span></h1>
                     @if($siteModel?->group)
                         <div class="truncate text-[11px] text-mut">Група: {{ $siteModel->group->name }}</div>
                     @endif
@@ -239,7 +239,11 @@
                                     @endphp
                                     <span class="flex min-h-[28px] min-w-0 flex-wrap items-center gap-1 px-2 py-1" title="{{ implode(', ', $priceGeo) }}">
                                         @foreach($priceGeo as $geo)
-                                            <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none">{{ $geo }}</span>
+                                            @if(str_starts_with($geo, '!'))
+                                                <span class="inline-flex max-w-full rounded-md bg-bad-bg text-bad-tx border border-bad-tx/20 px-1.5 py-0.5 leading-none font-semibold text-[10px]">{{ $geo }}</span>
+                                            @else
+                                                <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none text-[10px]">{{ $geo }}</span>
+                                            @endif
                                         @endforeach
                                     </span>
                                 @endforeach
@@ -247,7 +251,11 @@
                         @else
                             <span class="min-w-0 flex flex-wrap gap-1 text-mut text-[11px] pt-1" title="{{ implode(', ', $r['geo']) }}">
                                 @foreach($r['geo'] as $geo)
-                                    <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none">{{ $geo }}</span>
+                                    @if(str_starts_with($geo, '!'))
+                                        <span class="inline-flex max-w-full rounded-md bg-bad-bg text-bad-tx border border-bad-tx/20 px-1.5 py-0.5 leading-none font-semibold text-[10px]">{{ $geo }}</span>
+                                    @else
+                                        <span class="inline-flex max-w-full rounded-md bg-[#eef1ee] px-1.5 py-0.5 leading-none text-[10px]">{{ $geo }}</span>
+                                    @endif
                                 @endforeach
                             </span>
                         @endif
@@ -303,7 +311,9 @@
                                                 <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
                                                     {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
                                                 </span>
-                                                <span class="min-w-0 truncate text-ink">{{ $number['e164'] }}</span>
+                                                <span class="min-w-0 truncate text-ink" title="{{ $number['e164'] }}">
+                                                    {{ $number['display_value'] ?? $number['e164'] }}
+                                                </span>
                                                 <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
                                                     @if($isInactive)
                                                         <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
@@ -334,9 +344,23 @@
                                     @if($r['state'] === 'exhausted' && in_array($r['exhaustion_policy'] ?? null, ['last', 'emergency'], true))
                                         <span class="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[10px] font-semibold {{ $r['exhaustion_policy'] === 'emergency' ? 'bg-bad-bg text-bad-tx' : 'bg-warn-bg text-warn-tx' }}">
                                             {{ $r['exhaustion_policy'] === 'emergency' ? 'аварійний' : 'останній' }}
-                                            <span class="font-mono text-ink">{{ $r['value'] ?? '—' }}</span>
+                                            <span class="font-mono text-ink">{{ $r['display_value'] ?? $r['value'] ?? '—' }}</span>
                                         </span>
                                     @endif
+                                    <label class="mt-1.5 flex max-w-[220px] items-center gap-1.5 rounded-full border border-[#dfe3e0] bg-[#fafbfa] px-2.5 py-0.5 text-[10px] text-mut focus-within:border-acc transition-colors">
+                                        <span class="shrink-0 text-mut font-semibold">формат:</span>
+                                        <input
+                                            type="text"
+                                            value="{{ $r['phone_format'] ?? '' }}"
+                                            wire:change="savePhoneFormat({{ $r['id'] }}, $event.target.value)"
+                                            placeholder="+### ## ### ## ##"
+                                            class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[10px] text-ink placeholder:text-mut/60 focus:outline-none focus:ring-0"
+                                            aria-label="Формат номера"
+                                        >
+                                    </label>
+                                    @error("phoneFormatDraft.{$r['id']}")
+                                        <span class="text-[11px] text-bad-tx">{{ $message }}</span>
+                                    @enderror
                                     @if(!empty($r['messengers']))
                                         <div class="flex flex-wrap gap-1 mt-1.5 pl-2">
                                             @foreach($r['messengers'] as $lm)
@@ -567,7 +591,7 @@
                                 @endif
                             @endif
                             @if($type === 'phone' && isset($r['id']))
-                                <button wire:click="openSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування слота" aria-label="Налаштування слота">@svg('edit')</button>
+                                <button wire:click="openSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування слота і формат номера" aria-label="Налаштування слота і формат номера">@svg('edit')</button>
                             @elseif($type === 'messenger' && isset($r['id']))
                                 <button wire:click="openMessengerSlot({{ $r['id'] }})" class="text-mut hover:text-acc-tx" title="Налаштування месенджера" aria-label="Налаштування месенджера">@svg('edit')</button>
                             @elseif($type !== 'phone' && isset($r['id']))

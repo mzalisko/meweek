@@ -61,11 +61,24 @@ class SiteProvisionerTest extends TestCase
 
         $this->assertSame(1, $payload['v']);
         $this->assertSame('listener', $payload['mode']);
-        $this->assertSame('example.test', $payload['site']);
+        $this->assertSame($site->id, $payload['site_id']);
         $this->assertSame($connection['ping_url'], $payload['ping_url']);
         $this->assertSame(app(SiteProvisioner::class)->activePushSecret($site), $payload['signing_secret']);
         $this->assertArrayNotHasKey('bridge_url', $payload);
         $this->assertArrayNotHasKey('site_token', $payload);
+    }
+
+    public function test_issue_plugin_connection_normalizes_wp_json_ping_url(): void
+    {
+        $site = Site::factory()->create([
+            'domain' => 'domen.ua',
+            'ping_url' => 'https://domen.ua/wp-json/dbm/v1/ping',
+        ]);
+
+        $connection = app(SiteProvisioner::class)->issuePluginConnection($site);
+
+        $this->assertSame('https://domen.ua/?rest_route=/dbm/v1/ping', $connection['ping_url']);
+        $this->assertSame($connection['ping_url'], $site->fresh()->ping_url);
     }
 
     public function test_revoke_token_marks_all_active_tokens_revoked(): void

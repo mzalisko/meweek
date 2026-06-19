@@ -1,26 +1,26 @@
 <?php
 /**
  * Plugin Name: DBManager
- * Description: Read-only клієнт центральних даних (DBManager Core / DataBridge).
+ * Description: Read-only клиент центральных данных (DBManager Core / DataBridge).
  * Version: 0.1.0
  * Requires PHP: 8.2
  */
 
 if (! defined('ABSPATH')) {
-    return; // прямий виклик поза WordPress — нічого не робимо
+    return; // прямой вызов вне WordPress — ничего не делаем
 }
 
 require_once __DIR__ . '/../shared/render-core.php';
 
-// Composer vendor (bundled у дистрибутиві плагіна): MaxMind\Db\Reader для PHP-лукапу
-// країни за IP. Без цього гео падає до CF-заголовок/WORLD. У проді пакувати з --no-dev.
+// Composer vendor (bundled в дистрибутиве плагина): MaxMind\Db\Reader для PHP-лукапа
+// страны по IP. Без этого гео падает до CF-заголовок/WORLD. В проде упаковывать с --no-dev.
 $dbmVendor = __DIR__ . '/vendor/autoload.php';
 if (is_file($dbmVendor)) {
     require_once $dbmVendor;
 }
 
-// prepend=true: ручний DBM\-лоадер має передувати composer-лоадеру з vendor, інакше
-// composer пробує власний (хибний для деплою) baseDir для DBM\ і спамить include-warnings.
+// prepend=true: ручной DBM\-loader должен предшествовать composer-loader из vendor, иначе
+// composer пробует собственный (ложный для деплоя) baseDir для DBM\ и спамит include-warnings.
 spl_autoload_register(function (string $class): void {
     if (! str_starts_with($class, 'DBM\\')) {
         return;

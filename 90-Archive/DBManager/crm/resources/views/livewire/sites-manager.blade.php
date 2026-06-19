@@ -266,7 +266,7 @@
                         <option value="">Без сайта-джерела</option>
                         @foreach($siteOptions as $id => $domain)
                             @if((int) $id !== (int) $editingSiteId)
-                                <option value="{{ $id }}">{{ $domain }}</option>
+                                <option value="{{ $id }}">{{ $domain }} [ID: {{ $id }}]</option>
                             @endif
                         @endforeach
                     </select>

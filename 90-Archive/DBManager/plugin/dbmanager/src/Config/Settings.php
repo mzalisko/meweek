@@ -59,7 +59,7 @@ class Settings
         }
 
         return [
-            'site' => (string) ($payload['site'] ?? ''),
+            'site_id' => (int) ($payload['site_id'] ?? 0),
             'ping_url' => (string) ($payload['ping_url'] ?? ''),
             'signing_secret' => $secret,
             'shortcode' => (string) ($payload['shortcode'] ?? ''),

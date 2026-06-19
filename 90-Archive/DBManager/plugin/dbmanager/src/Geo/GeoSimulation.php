@@ -52,7 +52,7 @@ class GeoSimulation
             }
 
             $code = trim((string) $code);
-            if ($code !== '') {
+            if ($code !== '' && ! str_starts_with($code, '!')) {
                 $countries[] = strtoupper($code);
             }
         }

@@ -12,7 +12,7 @@ class SettingsTest extends TestCase
         $json = json_encode(array_merge([
             'v' => 1,
             'mode' => 'listener',
-            'site' => 'domen.ua',
+            'site_id' => 123,
             'ping_url' => 'https://domen.ua/wp-json/dbm/v1/ping',
             'signing_secret' => 'site-listener-secret-with-enough-length',
             'shortcode' => 'dbm',
@@ -62,5 +62,13 @@ class SettingsTest extends TestCase
 
         $this->assertSame('old-secret', $s->signingSecret);
         $this->assertSame('dbm', $s->shortcode);
+    }
+
+    public function test_decode_connection_key_returns_site_id(): void
+    {
+        $key = $this->connectionKey(['site_id' => 123]);
+        $decoded = Settings::decodeConnectionKey($key);
+        $this->assertNotNull($decoded);
+        $this->assertSame(123, $decoded['site_id']);
     }
 }

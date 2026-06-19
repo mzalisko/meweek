@@ -36,7 +36,7 @@ class SiteProvisioner
     {
         $rawToken = Str::random(48);
         $pushSecret = Str::random(64);
-        $pingUrl = $this->defaultPingUrl($site);
+        $pingUrl = $this->normalizePingUrl($site->ping_url ?: $this->defaultPingUrl($site));
 
         ApiToken::create([
             'site_id' => $site->id,
@@ -50,7 +50,7 @@ class SiteProvisioner
         $payload = [
             'v' => 1,
             'mode' => 'listener',
-            'site' => $site->domain,
+            'site_id' => $site->id,
             'ping_url' => $pingUrl,
             'signing_secret' => $pushSecret,
             'shortcode' => 'dbm',
@@ -92,10 +92,33 @@ class SiteProvisioner
 
     private function defaultPingUrl(Site $site): string
     {
-        $host = trim($site->domain);
+        $host = trim(preg_replace('#^https?://#i', '', trim($site->domain)), '/');
         $scheme = $this->isLocalHost($host) ? 'http' : 'https';
 
         return $scheme.'://'.$host.'/?rest_route=/dbm/v1/ping';
+    }
+
+    private function normalizePingUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return $url;
+        }
+
+        $parts = parse_url($url);
+        $path = $parts['path'] ?? '';
+        if (! str_ends_with($path, '/wp-json/dbm/v1/ping')) {
+            return $url;
+        }
+
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? '';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+        if ($host === '') {
+            return $url;
+        }
+
+        return $scheme.'://'.$host.$port.'/?rest_route=/dbm/v1/ping';
     }
 
     private function isLocalHost(string $host): bool

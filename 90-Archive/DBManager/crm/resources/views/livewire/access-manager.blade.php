@@ -326,7 +326,7 @@
                                 @foreach($group->sites as $site)
                                     <div class="grid gap-2 items-center border-t border-[#edf0ed] px-3 py-2" style="{{ $permissionGridStyle }}">
                                         <div class="min-w-0">
-                                            <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }}</div>
+                                            <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }} <span class="text-mut text-[9px] font-sans">ID: {{ $site->id }}</span></div>
                                             <div class="text-[10px] text-mut truncate">{{ $site->name }}</div>
                                         </div>
                                         @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover', 'can_view_prices'] as $permission)
@@ -355,7 +355,7 @@
                                 @foreach($ungroupedSites as $site)
                                     <div class="grid gap-2 items-center border-t border-[#edf0ed] px-3 py-2" style="{{ $permissionGridStyle }}">
                                         <div class="min-w-0">
-                                            <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }}</div>
+                                            <div class="font-mono text-[11px] text-ink truncate">{{ $site->domain }} <span class="text-mut text-[9px] font-sans">ID: {{ $site->id }}</span></div>
                                             <div class="text-[10px] text-mut truncate">{{ $site->name }}</div>
                                         </div>
                                         @foreach(['can_view', 'can_edit', 'can_delete', 'can_publish', 'can_view_history', 'can_view_failover', 'can_view_prices'] as $permission)

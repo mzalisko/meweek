@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('api_tokens', function (Blueprint $table) {
-            $table->text('push_secret')->nullable()->after('token_hash');
-        });
+        if (!Schema::hasColumn('api_tokens', 'push_secret')) {
+            Schema::table('api_tokens', function (Blueprint $table) {
+                $table->text('push_secret')->nullable()->after('token_hash');
+            });
+        }
     }
 
     public function down(): void

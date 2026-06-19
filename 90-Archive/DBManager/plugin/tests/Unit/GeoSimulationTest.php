@@ -24,4 +24,17 @@ class GeoSimulationTest extends TestCase
         $this->assertContains('PL', $countries);
         $this->assertContains('KZ', $countries);
     }
+
+    public function test_available_countries_ignores_negative_geo_tags(): void
+    {
+        $countries = (new GeoSimulation())->getAvailableCountries([
+            'values' => [
+                ['geo' => ['WORLD', '!RU', '!BY']],
+            ],
+        ]);
+
+        $this->assertContains('WORLD', $countries);
+        $this->assertNotContains('!RU', $countries);
+        $this->assertNotContains('!BY', $countries);
+    }
 }

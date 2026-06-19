@@ -80,18 +80,37 @@
                     </div>
 
                     {{-- Geo tags checkboxes per price entry --}}
-                    <div>
-                        <span class="block text-mut text-[10px] uppercase mb-1">Гео-видимість</span>
-                        <div class="flex flex-wrap gap-1.5">
-                            @foreach($allGeoTags as $gt)
-                                <label class="cursor-pointer" wire:key="price-{{ $index }}-geo-{{ $gt->code }}">
-                                    <input type="checkbox" wire:model="prices.{{ $index }}.geo" value="{{ $gt->code }}" class="peer sr-only">
-                                    <span class="inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[10px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-acc/30 peer-checked:border-acc peer-checked:bg-acc-bg peer-checked:text-acc-tx peer-checked:font-semibold
-                                        {{ in_array($gt->code, $prices[$index]['geo'] ?? []) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
-                                        {{ $gt->code }}
-                                    </span>
-                                </label>
-                            @endforeach
+                    <div class="mt-2">
+                        <span class="block text-mut text-[10px] uppercase mb-1.5 font-semibold">Гео-видимість</span>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <span class="block text-ok-tx text-[9px] uppercase mb-1 font-bold">Дозволити</span>
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($allGeoTags->filter(fn($gt) => !str_starts_with($gt->code, '!')) as $gt)
+                                        <label class="cursor-pointer" wire:key="price-{{ $index }}-geo-{{ $gt->code }}">
+                                            <input type="checkbox" wire:model="prices.{{ $index }}.geo" value="{{ $gt->code }}" class="peer sr-only">
+                                            <span class="inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[10px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-acc/30 peer-checked:border-acc peer-checked:bg-acc-bg peer-checked:text-acc-tx peer-checked:font-semibold
+                                                {{ in_array($gt->code, $prices[$index]['geo'] ?? []) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
+                                                {{ $gt->code }}
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div>
+                                <span class="block text-bad-tx text-[9px] uppercase mb-1 font-bold">Заборонити</span>
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($allGeoTags->filter(fn($gt) => str_starts_with($gt->code, '!')) as $gt)
+                                        <label class="cursor-pointer" wire:key="price-{{ $index }}-geo-{{ $gt->code }}">
+                                            <input type="checkbox" wire:model="prices.{{ $index }}.geo" value="{{ $gt->code }}" class="peer sr-only">
+                                            <span class="inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[10px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-bad-tx/30 peer-checked:border-bad-tx/50 peer-checked:bg-bad-bg peer-checked:text-bad-tx peer-checked:font-semibold
+                                                {{ in_array($gt->code, $prices[$index]['geo'] ?? []) ? 'border-bad-tx/50 bg-bad-bg text-bad-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-bad-tx/50' }}">
+                                                {{ ltrim($gt->code, '!') }}
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -117,15 +136,31 @@
     {{-- Гео-мітки (для цін вони налаштовуються всередині кожної ціни) --}}
     @if($allGeoTags->isNotEmpty() && $type !== 'price')
     <div class="mb-4">
-        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1.5">Гео-мітки</label>
-        <div class="flex flex-wrap gap-1.5">
-            @foreach($allGeoTags as $gt)
-                <label class="flex items-center gap-1.5 cursor-pointer border rounded-[9px] px-2.5 py-1 text-[11px] transition-colors
-                    {{ in_array($gt->id, $geoTagIds) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut' }}">
-                    <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
-                    {{ $gt->code }}
-                </label>
-            @endforeach
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-ok-tx uppercase tracking-[.06em] text-[10px] font-bold mb-1.5">Показувати в (Дозволено)</label>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach($allGeoTags->filter(fn($gt) => !str_starts_with($gt->code, '!')) as $gt)
+                        <label class="flex items-center gap-1.5 cursor-pointer border rounded-[9px] px-2.5 py-1 text-[11px] transition-colors
+                            {{ in_array($gt->id, $geoTagIds) ? 'border-acc bg-acc-bg text-acc-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-acc' }}">
+                            <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
+                            {{ $gt->code }}
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+            <div>
+                <label class="block text-bad-tx uppercase tracking-[.06em] text-[10px] font-bold mb-1.5">Приховати в (Заборонено)</label>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach($allGeoTags->filter(fn($gt) => str_starts_with($gt->code, '!')) as $gt)
+                        <label class="flex items-center gap-1.5 cursor-pointer border rounded-[9px] px-2.5 py-1 text-[11px] transition-colors
+                            {{ in_array($gt->id, $geoTagIds) ? 'border-bad-tx/50 bg-bad-bg text-bad-tx font-semibold' : 'border-[#dfe3e0] text-mut hover:border-bad-tx/50' }}">
+                            <input type="checkbox" wire:model.live="geoTagIds" value="{{ $gt->id }}" class="sr-only">
+                            {{ ltrim($gt->code, '!') }}
+                        </label>
+                    @endforeach
+                </div>
+            </div>
         </div>
     </div>
     @endif

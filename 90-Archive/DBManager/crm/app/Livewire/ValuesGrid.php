@@ -21,6 +21,7 @@ use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Publishing\BridgePublisher;
 use App\Services\Publishing\SitePayloadCompiler;
+use App\Support\PhoneFormatter;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -1134,6 +1135,58 @@ class ValuesGrid extends Component
         $this->publishSlots(collect([$entry->slot->fresh()]));
         $this->dispatch('slot-updated');
         $this->dispatch('toast', message: 'Ручний режим вимкнено → опубліковано');
+    }
+
+    public function savePhoneFormat(int $dataValueId, string $format = ''): void
+    {
+        $field = "phoneFormatDraft.{$dataValueId}";
+        $this->resetErrorBag($field);
+
+        $format = trim($format);
+        if (! PhoneFormatter::isValidPattern($format)) {
+            $this->addError($field, 'Шаблон: #, пробіл, +, -, (), крапка.');
+
+            return;
+        }
+
+        $value = DataValue::with('type')->find($dataValueId);
+        if (! $value || $value->type?->code !== 'phone' || ! $this->valueBelongsToCurrentSite($value) || ! $this->canChangeValue($value)) {
+            return;
+        }
+
+        if (! $this->acquireEditLock($this->editLockKey('data-value', $value->id), $value->key)) {
+            return;
+        }
+
+        try {
+            $content = $value->content ?? [];
+            $oldFormat = (string) ($content['phone_format'] ?? '');
+            if ($oldFormat === $format) {
+                return;
+            }
+
+            if ($format === '') {
+                unset($content['phone_format']);
+            } else {
+                $content['phone_format'] = $format;
+            }
+
+            $value->update(['content' => $content]);
+            AuditLog::create([
+                'actor_type' => 'user',
+                'action' => 'phone.format_changed',
+                'subject_type' => 'DataValue',
+                'subject_id' => $value->id,
+                'old' => ['phone_format' => $oldFormat],
+                'new' => ['phone_format' => $format],
+            ]);
+
+            $this->publishDataValue($value->fresh());
+            $this->dispatch('slot-updated');
+            $this->dispatch('toast', message: 'Формат номера збережено → опубліковано');
+        } finally {
+            $this->releaseEditLock();
+        }
     }
 
     #[On('slot-updated')]
