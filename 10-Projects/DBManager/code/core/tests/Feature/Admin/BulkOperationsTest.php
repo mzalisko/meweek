@@ -289,9 +289,12 @@ class BulkOperationsTest extends TestCase
         $batchId = $lw->get('report.batch');
         $this->assertNotNull($batchId);
 
+        $this->assertTrue($lw->instance()->getRecentBulkSessions()->pluck('batch_id')->contains($batchId));
+
         $lw->call('rollbackBatch', $batchId)
             ->assertHasNoErrors();
 
         $this->assertSame('+380111111111', $entry->fresh('phoneNumber')->phoneNumber->e164);
+        $this->assertFalse($lw->instance()->getRecentBulkSessions()->pluck('batch_id')->contains($batchId));
     }
 }

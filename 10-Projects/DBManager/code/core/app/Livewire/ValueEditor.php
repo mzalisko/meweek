@@ -49,6 +49,20 @@ class ValueEditor extends Component
 
     public array $prices = [];
 
+    // Адреса (структурований тип A+ — поля + похідне value-дзеркало)
+    public ?string $addrCountry = null;
+
+    public ?string $addrRegion = null;
+
+    public ?string $addrCity = null;
+
+    public ?string $addrStreet = null;
+
+    public ?string $addrPostcode = null;
+
+    // Підсвічування single-edit: оригінальне відображуване значення до правки
+    public ?string $originalValue = null;
+
     public function updatedType(string $newType): void
     {
         if ($newType === 'price' && empty($this->prices)) {
@@ -94,6 +108,12 @@ class ValueEditor extends Component
         $this->url = null;
         $this->geoTagIds = [];
         $this->prices = [];
+        $this->addrCountry = null;
+        $this->addrRegion = null;
+        $this->addrCity = null;
+        $this->addrStreet = null;
+        $this->addrPostcode = null;
+        $this->originalValue = null;
         $this->resetValidation();
         $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
@@ -118,6 +138,12 @@ class ValueEditor extends Component
         $this->url       = $dv->content['url'] ?? null;
         $this->geoTagIds = $dv->geoTags->pluck('id')->toArray();
         $this->prices    = $dv->content['prices'] ?? [];
+        $this->addrCountry  = $dv->content['country'] ?? null;
+        $this->addrRegion   = $dv->content['region'] ?? null;
+        $this->addrCity     = $dv->content['city'] ?? null;
+        $this->addrStreet   = $dv->content['street'] ?? null;
+        $this->addrPostcode = $dv->content['postcode'] ?? null;
+        $this->originalValue = $dv->content['value'] ?? ($dv->content['name'] ?? null);
         $this->resetValidation();
         $this->dispatch('close-messenger-panel');
         $this->dispatch('close-slot-panel');
@@ -141,16 +167,28 @@ class ValueEditor extends Component
             return;
         }
 
+        // Дозволені типи беремо з реєстру value_types (єдина точка істини),
+        // тож усі засіяні типи (incl. text/address/social) і створюються, і редагуються.
         $rules = [
             'key'   => ['required', 'regex:/^[a-z0-9_]+$/'],
-            'type'  => ['required', $this->valueId ? 'in:text,price,messenger,address,social,phone' : 'in:phone,messenger,price'],
+            'type'  => ['required', 'in:'.ValueType::pluck('code')->implode(',')],
         ];
 
-        if ($this->type !== 'phone' && $this->type !== 'price') {
+        if (! in_array($this->type, ['phone', 'price', 'address'], true)) {
             $rules['value'] = ['required'];
         }
         if ($this->type === 'messenger') {
             $rules['network'] = ['nullable', 'string', 'max:64'];
+        }
+        if ($this->type === 'social') {
+            $rules['network'] = ['required', 'string', 'max:64'];
+        }
+        if ($this->type === 'address') {
+            $rules['addrCity']     = ['required', 'string', 'max:120'];
+            $rules['addrCountry']  = ['nullable', 'string', 'max:120'];
+            $rules['addrRegion']   = ['nullable', 'string', 'max:120'];
+            $rules['addrStreet']   = ['nullable', 'string', 'max:200'];
+            $rules['addrPostcode'] = ['nullable', 'string', 'max:32'];
         }
         if ($this->type === 'price') {
             $rules['prices'] = ['required', 'array', 'min:1'];
@@ -167,6 +205,16 @@ class ValueEditor extends Component
             if (! $this->valueId) {
                 $content['exhaustion_policy'] = 'hide';
             }
+        }
+        if ($this->type === 'social') {
+            $content = [
+                'value'   => $this->value !== '' ? $this->value : null,
+                'network' => $this->network,
+                'url'     => $this->url ?: $this->messengerUrlFromValue($this->value),
+            ];
+        }
+        if ($this->type === 'address') {
+            $content = $this->buildAddressContent();
         }
         if ($this->type === 'price') {
             $content = [
@@ -348,6 +396,24 @@ class ValueEditor extends Component
     private function messengerUrlFromValue(string $value): ?string
     {
         return preg_match('/^https?:\/\//i', $value) ? $value : null;
+    }
+
+    /** Структурована адреса (A+): структуровані поля + похідне value-дзеркало для generic-механізмів. */
+    private function buildAddressContent(): array
+    {
+        $parts = array_values(array_filter(
+            [$this->addrStreet, $this->addrCity, $this->addrRegion, $this->addrPostcode, $this->addrCountry],
+            fn ($p) => $p !== null && trim((string) $p) !== ''
+        ));
+
+        return [
+            'country'  => $this->addrCountry !== '' ? $this->addrCountry : null,
+            'region'   => $this->addrRegion !== '' ? $this->addrRegion : null,
+            'city'     => $this->addrCity !== '' ? $this->addrCity : null,
+            'street'   => $this->addrStreet !== '' ? $this->addrStreet : null,
+            'postcode' => $this->addrPostcode !== '' ? $this->addrPostcode : null,
+            'value'    => $parts ? implode(', ', $parts) : null,
+        ];
     }
 
     private function canSaveCurrentTarget(): bool

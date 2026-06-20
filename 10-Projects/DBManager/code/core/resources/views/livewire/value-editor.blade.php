@@ -33,14 +33,17 @@
         @error('key')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
     </div>
 
-    {{-- Value (не для телефона — там номери в панелі слота; не для цін — там список) --}}
-    @if($type !== 'phone' && $type !== 'price')
+    {{-- Value (не для телефона — номери в панелі слота; не для цін — список; не для адреси — структуровані поля) --}}
+    @if($type !== 'phone' && $type !== 'price' && $type !== 'address')
     <div class="mb-3">
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">
-            {{ $type === 'messenger' ? 'Значення месенджера' : 'Значення' }}
+            {{ $type === 'messenger' ? 'Значення месенджера' : ($type === 'social' ? 'Нікнейм / handle' : 'Значення') }}
         </label>
         <input wire:model="value" type="text" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc @error('value') border-bad-tx @enderror" />
         @error('value')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
+        @if($valueId && $originalValue !== null && $originalValue !== $value)
+            <p class="text-mut text-[11px] mt-0.5">Було: <span class="line-through text-bad-tx">{{ $originalValue }}</span></p>
+        @endif
     </div>
     @elseif($type === 'phone')
     <p class="mb-3 text-[12px] text-mut bg-[#fafbfa] border border-[#e3e5e1] rounded-lg px-3 py-2">Номери додаються в панелі слота після створення.</p>
@@ -130,6 +133,58 @@
         <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Мережа</label>
         <input wire:model="network" type="text" placeholder="telegram" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
         @error('network')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
+    </div>
+    @endif
+
+    {{-- Social-specific: платформа --}}
+    @if($type === 'social')
+    <div class="mb-3">
+        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Платформа</label>
+        <select wire:model="network" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-acc @error('network') border-bad-tx @enderror">
+            <option value="">— оберіть —</option>
+            <option value="telegram">Telegram</option>
+            <option value="instagram">Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="tiktok">TikTok</option>
+            <option value="youtube">YouTube</option>
+            <option value="x">X / Twitter</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="viber">Viber</option>
+            <option value="whatsapp">WhatsApp</option>
+        </select>
+        @error('network')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
+    </div>
+    @endif
+
+    {{-- Address-specific: структуровані поля (A+) --}}
+    @if($type === 'address')
+    <div class="mb-3 space-y-2">
+        <div>
+            <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Місто *</label>
+            <input wire:model="addrCity" type="text" placeholder="Київ" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc @error('addrCity') border-bad-tx @enderror" />
+            @error('addrCity')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            <div>
+                <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Країна</label>
+                <input wire:model="addrCountry" type="text" placeholder="Україна" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
+            </div>
+            <div>
+                <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Область / Регіон</label>
+                <input wire:model="addrRegion" type="text" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
+            </div>
+        </div>
+        <div>
+            <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Вулиця, будинок</label>
+            <input wire:model="addrStreet" type="text" placeholder="вул. Хрещатик, 1" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
+        </div>
+        <div>
+            <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Індекс</label>
+            <input wire:model="addrPostcode" type="text" placeholder="01001" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
+        </div>
+        @if($valueId && $originalValue !== null)
+            <p class="text-mut text-[11px]">Було: <span class="line-through text-bad-tx">{{ $originalValue }}</span></p>
+        @endif
     </div>
     @endif
 

@@ -88,6 +88,9 @@ class BulkOperations extends Component
                 $this->operation = 'replace_phone';
             }
         }
+        if ($this->targetType === 'address' && ! in_array($this->operation, ['set_geo', 'set_status'], true)) {
+            $this->operation = 'set_geo';
+        }
     }
 
     public function updatedOperation(): void
@@ -152,6 +155,13 @@ class BulkOperations extends Component
 
                 return;
             }
+        }
+
+        // Адреса — структурований тип: текстові масові операції псували б окремі поля.
+        if ($this->targetType === 'address' && in_array($this->operation, ['replace_text', 'set_value'], true)) {
+            $this->addError('operation', 'Для адрес доступні лише зміна стану та гео — структуровані поля редагуються в картці значення.');
+
+            return;
         }
 
         if ($this->isPhoneOperation()) {
@@ -920,8 +930,22 @@ class BulkOperations extends Component
 
     public function getRecentBulkSessions(): Collection
     {
+        $rolledBackLogIds = AuditLog::where('action', 'audit.restored')
+            ->where('subject_type', 'AuditLog')
+            ->pluck('subject_id')
+            ->all();
+
+        $rolledBackBatchIds = AuditLog::whereIn('id', $rolledBackLogIds)
+            ->whereNotNull('batch_id')
+            ->pluck('batch_id')
+            ->unique()
+            ->all();
+
         return AuditLog::where('action', 'like', 'bulk.%')
             ->whereNotNull('batch_id')
+            ->when(!empty($rolledBackBatchIds), function ($query) use ($rolledBackBatchIds) {
+                $query->whereNotIn('batch_id', $rolledBackBatchIds);
+            })
             ->orderBy('created_at', 'desc')
             ->get()
             ->groupBy('batch_id')

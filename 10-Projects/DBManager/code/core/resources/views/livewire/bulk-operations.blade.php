@@ -408,6 +408,9 @@
                     @if($targetType === 'phone_reserve')
                         <option value="replace_phone">Замінити номер</option>
                         <option value="set_phone_status">Стан номера active/down (Збій)</option>
+                    @elseif($targetType === 'address')
+                        <option value="set_geo">Змінити geo-теги</option>
+                        <option value="set_status">Показати / приховати слот</option>
                     @else
                         <option value="replace_text">Знайти й замінити в key/content</option>
                         <option value="set_value">Встановити content.value</option>

@@ -16,6 +16,9 @@ class SitePayloadCompiler
         'phone' => 0,
         'messenger' => 1,
         'price' => 2,
+        'address' => 3,
+        'social' => 4,
+        'text' => 5,
     ];
 
     public function __construct(private SlotResolver $resolver) {}
@@ -118,10 +121,40 @@ class SitePayloadCompiler
         return match ($value->type->code) {
             'phone' => $this->phoneItem($value, $base),
             'messenger' => $this->messengerItem($value, $base, $all),
+            'social' => $this->socialItem($value, $base),
+            'address' => $this->addressItem($value, $base),
             default => $base
                 + ['value' => $value->content['value'] ?? null]
                 + collect($value->content ?? [])->except('value')->all(),
         };
+    }
+
+    private function socialItem(DataValue $value, array $base): array
+    {
+        $content = $value->content ?? [];
+
+        return $base + [
+            'state'   => ($value->status ?? 'active') === 'hidden' ? 'hidden' : 'ok',
+            'network' => $content['network'] ?? null,
+            'value'   => $content['value'] ?? null,
+            'url'     => $content['url'] ?? null,
+        ];
+    }
+
+    /** Структурована адреса: явний allow-list ключів (без витоку службових полів content у payload). */
+    private function addressItem(DataValue $value, array $base): array
+    {
+        $content = $value->content ?? [];
+
+        return $base + [
+            'state'    => ($value->status ?? 'active') === 'hidden' ? 'hidden' : 'ok',
+            'value'    => $content['value'] ?? null,
+            'country'  => $content['country'] ?? null,
+            'region'   => $content['region'] ?? null,
+            'city'     => $content['city'] ?? null,
+            'street'   => $content['street'] ?? null,
+            'postcode' => $content['postcode'] ?? null,
+        ];
     }
 
     private function phoneItem(DataValue $value, array $base): array

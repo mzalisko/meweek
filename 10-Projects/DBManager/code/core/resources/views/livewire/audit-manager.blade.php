@@ -642,6 +642,8 @@
                                             if ($dv?->type?->code === 'phone')     return ['phone',   'Телефон',   'text-[#3a7c4f]'];
                                             if ($dv?->type?->code === 'messenger') return ['msg',     'Месенджер', 'text-[#6b52c8]'];
                                             if ($dv?->type?->code === 'price')     return ['dollar',  'Ціна',      'text-[#b45309]'];
+                                            if ($dv?->type?->code === 'social')    return ['link',    'Соцмережа', 'text-[#2563eb]'];
+                                            if ($dv?->type?->code === 'address')   return ['pin',     'Адреса',    'text-[#0f766e]'];
                                             return ['text', 'Текст', 'text-[#555]'];
                                         })(),
                                         str_starts_with($log->action, 'bulk.') => (function() use ($log) {
@@ -654,6 +656,8 @@
                                             if ($dv?->type?->code === 'phone')     return ['phone',   'Телефон',   'text-[#3a7c4f]'];
                                             if ($dv?->type?->code === 'messenger') return ['msg',     'Месенджер', 'text-[#6b52c8]'];
                                             if ($dv?->type?->code === 'price')     return ['dollar',  'Ціна',      'text-[#b45309]'];
+                                            if ($dv?->type?->code === 'social')    return ['link',    'Соцмережа', 'text-[#2563eb]'];
+                                            if ($dv?->type?->code === 'address')   return ['pin',     'Адреса',    'text-[#0f766e]'];
                                             return ['text', 'Текст', 'text-[#555]'];
                                         })(),
                                         default => [null, '—', 'text-mut'],
