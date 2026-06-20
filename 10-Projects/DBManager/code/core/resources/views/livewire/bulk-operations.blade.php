@@ -215,7 +215,7 @@
             </div>
             <div class="min-w-[980px]">
                 @if($targetType === 'phone_reserve')
-                    <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 1.3fr 2.0fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
+                    <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.5fr 2.0fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
                         <div>Сайт</div>
                         <div>Група</div>
                         <div>Тип</div>
@@ -223,7 +223,7 @@
                         <div>Поточне значення</div>
                     </div>
                 @else
-                    <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
+                    <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.2fr 1.5fr 2.0fr 1.5fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
                         <div>Сайт</div>
                         <div>Група</div>
                         <div>Тип</div>
@@ -237,7 +237,7 @@
                 <div class="max-h-[calc(100vh-245px)] overflow-y-auto">
                     @forelse($previewRows as $row)
                         @if($targetType === 'phone_reserve')
-                            <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 1.3fr 2.0fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                            <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.5fr 2.0fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
                                 <div class="min-w-0 font-mono text-ink text-[13px]">
                                     <span class="block truncate">{{ $row['site'] }}</span>
                                     <span class="text-[11px] text-mut">номер</span>
@@ -285,7 +285,7 @@
                                 </div>
                             </div>
                         @else
-                            <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                            <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.2fr 1.5fr 2.0fr 1.5fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
                                 <div class="min-w-0 font-mono text-ink text-[13px]">
                                     <span class="block truncate">{{ $row['site'] }}</span>
                                     <span class="text-[11px] text-mut">{{ in_array($row['type'], ['phone', 'phone_reserve'], true) ? 'номер' : 'значення' }}</span>
