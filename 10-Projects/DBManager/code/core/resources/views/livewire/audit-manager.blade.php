@@ -105,9 +105,41 @@
         if ($action === 'audit.restored') {
             $origAction = $old['action'] ?? 'невідома дія';
             $origLabel = $actionLabels[$origAction] ?? $origAction;
+            $domains = $log->getAffectedDomains();
+            $domStr = ($domains && $domains !== '—') ? ' (для ' . $domains . ')' : '';
             return '<div class="inline-flex items-center gap-2 bg-acc-bg border border-acc-bd px-2.5 py-1 rounded-md text-xs">' .
                 '<span class="text-acc-tx font-bold uppercase tracking-wider text-[10px]">Відновлено зміну:</span> ' .
-                '<span class="text-acc-tx font-semibold text-xs">«' . htmlspecialchars($origLabel) . '»</span>' .
+                '<span class="text-acc-tx font-semibold text-xs">«' . htmlspecialchars($origLabel) . '»' . htmlspecialchars($domStr) . '</span>' .
+                '</div>';
+        }
+
+        if ($action === 'phone.materialized') {
+            $key = $new['key'] ?? '—';
+            $numsStr = '';
+            if ($log->subject_id) {
+                $dv = \App\Models\DataValue::with('phoneSlot.entries.phoneNumber')->find($log->subject_id);
+                if ($dv && $dv->phoneSlot) {
+                    $numsStr = collect($dv->phoneSlot->entries)->map(fn($e) => $e->phoneNumber?->e164)->filter()->implode(', ');
+                }
+            }
+            return '<div class="inline-flex flex-wrap items-center gap-x-4 gap-y-1.5 bg-[#eef8ef] border border-[#cbeed2] px-3 py-1.5 rounded-lg">' .
+                '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Ключ:</span> <span class="bg-[#eef8ef] border border-[#cbeed2] text-ok-tx px-1.5 py-0.5 rounded font-mono text-xs">' . htmlspecialchars($key) . '</span></div>' .
+                ($numsStr ? '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Телефони:</span> <span class="text-ok-tx font-mono text-xs">' . htmlspecialchars($numsStr) . '</span></div>' : '') .
+                '</div>';
+        }
+
+        if ($action === 'messenger.materialized') {
+            $slotName = $new['messenger_slot'] ?? '—';
+            $valStr = '';
+            if ($log->subject_id) {
+                $dv = \App\Models\DataValue::find($log->subject_id);
+                if ($dv) {
+                    $valStr = $dv->content['value'] ?? ($dv->content['url'] ?? '');
+                }
+            }
+            return '<div class="inline-flex flex-wrap items-center gap-x-4 gap-y-1.5 bg-[#eef8ef] border border-[#cbeed2] px-3 py-1.5 rounded-lg">' .
+                '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Слот:</span> <span class="bg-[#eef8ef] border border-[#cbeed2] text-ok-tx px-1.5 py-0.5 rounded font-semibold text-xs">«' . htmlspecialchars($slotName) . '»</span></div>' .
+                ($valStr ? '<div class="flex items-center gap-1.5"><span class="text-mut font-bold uppercase tracking-wider text-[10px]">Значення:</span> <span class="text-ok-tx font-mono text-xs">«' . htmlspecialchars($valStr) . '»</span></div>' : '') .
                 '</div>';
         }
 
@@ -612,6 +644,18 @@
                                             if ($dv?->type?->code === 'price')     return ['dollar',  'Ціна',      'text-[#b45309]'];
                                             return ['text', 'Текст', 'text-[#555]'];
                                         })(),
+                                        str_starts_with($log->action, 'bulk.') => (function() use ($log) {
+                                            if (in_array($log->action, ['bulk.replace_phone', 'bulk.set_phone_status', 'bulk.set_phone_format'], true)) {
+                                                return ['phone', 'Телефон', 'text-[#3a7c4f]'];
+                                            }
+                                            $payload = $log->old ?? $log->new ?? [];
+                                            if (!empty($payload['phone_slot'])) return ['phone', 'Телефон', 'text-[#3a7c4f]'];
+                                            $dv = \App\Models\DataValue::with('type')->find($log->subject_id);
+                                            if ($dv?->type?->code === 'phone')     return ['phone',   'Телефон',   'text-[#3a7c4f]'];
+                                            if ($dv?->type?->code === 'messenger') return ['msg',     'Месенджер', 'text-[#6b52c8]'];
+                                            if ($dv?->type?->code === 'price')     return ['dollar',  'Ціна',      'text-[#b45309]'];
+                                            return ['text', 'Текст', 'text-[#555]'];
+                                        })(),
                                         default => [null, '—', 'text-mut'],
                                     };
                                 @endphp
@@ -637,9 +681,16 @@
                                     </td>
                                     {{-- Назва дії --}}
                                     <td class="p-3.5 border-b border-[#edf0ed]">
-                                        <span class="text-xs text-mut">
+                                        <div class="text-xs text-mut">
                                             {{ $actionLabels[$log->action] ?? $log->action }}
-                                        </span>
+                                        </div>
+                                        @if($domains = $log->getAffectedDomains())
+                                            @if($domains !== '—')
+                                                <div class="text-[10px] text-[#838a84] mt-0.5 truncate max-w-[180px]" title="{{ $domains }}">
+                                                    {{ $domains }}
+                                                </div>
+                                            @endif
+                                        @endif
                                     </td>
                                     <td class="p-3.5 text-sm text-ink border-b border-[#edf0ed]">{!! $renderDiff($log) !!}</td>
                                     <td class="p-3.5 text-right whitespace-nowrap border-b border-[#edf0ed]">

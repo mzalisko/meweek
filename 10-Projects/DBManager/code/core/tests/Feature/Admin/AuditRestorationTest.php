@@ -226,4 +226,43 @@ class AuditRestorationTest extends TestCase
         $restored = AuditRestorer::restore($log, $this->viewer);
         $this->assertFalse($restored);
     }
+
+    public function test_get_affected_domains(): void
+    {
+        $site = Site::factory()->create(['domain' => 'affected.com']);
+        $type = ValueType::firstOrCreate(['code' => 'text'], ['name' => 'Text']);
+        $dv = DataValue::create([
+            'key' => 't_key',
+            'value_type_id' => $type->id,
+            'scope_type' => 'site',
+            'scope_id' => $site->id,
+            'content' => ['value' => 'Val'],
+            'status' => 'active',
+        ]);
+
+        $log = AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => $this->superAdmin->id,
+            'action' => 'value.updated',
+            'subject_type' => 'DataValue',
+            'subject_id' => $dv->id,
+            'old' => ['value' => 'Old', 'scope_type' => 'site', 'scope_id' => $site->id],
+            'new' => ['value' => 'Val', 'scope_type' => 'site', 'scope_id' => $site->id],
+        ]);
+
+        $this->assertEquals('affected.com', $log->getAffectedDomains());
+
+        // Для відновлення
+        $restoreLog = AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => $this->superAdmin->id,
+            'action' => 'audit.restored',
+            'subject_type' => 'AuditLog',
+            'subject_id' => $log->id,
+            'old' => ['action' => 'value.updated'],
+            'new' => [],
+        ]);
+
+        $this->assertEquals('affected.com', $restoreLog->getAffectedDomains());
+    }
 }
