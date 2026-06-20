@@ -214,130 +214,190 @@
                 </span>
             </div>
             <div class="min-w-[980px]">
-                <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
-                    <div>Сайт</div>
-                    <div>Група</div>
-                    <div>Тип</div>
-                    <div>Гео</div>
-                    <div>Ключ</div>
-                    <div>Поточне значення</div>
-                    <div>Форматування</div>
-                </div>
+                @if($targetType === 'phone_reserve')
+                    <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 1.3fr 2.0fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
+                        <div>Сайт</div>
+                        <div>Група</div>
+                        <div>Тип</div>
+                        <div>Ключ</div>
+                        <div>Поточне значення</div>
+                    </div>
+                @else
+                    <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-mut">
+                        <div>Сайт</div>
+                        <div>Група</div>
+                        <div>Тип</div>
+                        <div>Гео</div>
+                        <div>Ключ</div>
+                        <div>Поточне значення</div>
+                        <div>Форматування</div>
+                    </div>
+                @endif
 
                 <div class="max-h-[calc(100vh-245px)] overflow-y-auto">
                     @forelse($previewRows as $row)
-                        <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
-                            <div class="min-w-0 font-mono text-ink text-[13px]">
-                                <span class="block truncate">{{ $row['site'] }}</span>
-                                <span class="text-[11px] text-mut">{{ in_array($row['type'], ['phone', 'phone_reserve'], true) ? 'номер' : 'значення' }}</span>
-                            </div>
-                            <div class="min-w-0 truncate text-mut text-[13px]">{{ $row['group'] }}</div>
-                            <div>
-                                <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
-                                    @if($row['type'] === 'phone')
+                        @if($targetType === 'phone_reserve')
+                            <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 1.3fr 2.0fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                                <div class="min-w-0 font-mono text-ink text-[13px]">
+                                    <span class="block truncate">{{ $row['site'] }}</span>
+                                    <span class="text-[11px] text-mut">номер</span>
+                                </div>
+                                <div class="min-w-0 truncate text-mut text-[13px]">{{ $row['group'] }}</div>
+                                <div>
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
                                         @svg('phone', 10)
-                                    @elseif($row['type'] === 'phone_reserve')
-                                        @svg('phone', 10)
-                                    @elseif($row['type'] === 'messenger')
-                                        @svg('msg', 10)
-                                    @elseif($row['type'] === 'price')
-                                        @svg('tag', 10)
-                                    @elseif($row['type'] === 'text')
-                                        @svg('text', 10)
-                                    @elseif($row['type'] === 'address')
-                                        @svg('pin', 10)
-                                    @elseif($row['type'] === 'social')
-                                        @svg('link', 10)
+                                        резерв
+                                    </span>
+                                    @if($row['changed'] && $row['state'] !== $row['new_state'])
+                                        <span class="mt-1 block text-[10px] leading-tight font-semibold">
+                                            <span class="line-through text-bad-tx">{{ $row['state'] }}</span>
+                                            <span class="text-mut">→</span>
+                                            <span class="text-ok-tx">{{ $row['new_state'] }}</span>
+                                        </span>
                                     @else
-                                        @svg('alert', 10)
+                                        <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
                                     @endif
-                                    {{ $row['type'] === 'phone_reserve' ? 'резерв' : $row['type'] }}
-                                </span>
-                                
-                                @if($row['changed'] && $row['state'] !== $row['new_state'])
-                                    <span class="mt-1 block text-[10px] leading-tight font-semibold">
-                                        <span class="line-through text-bad-tx">{{ $row['state'] }}</span>
-                                        <span class="text-mut">→</span>
-                                        <span class="text-ok-tx">{{ $row['new_state'] }}</span>
-                                    </span>
-                                @else
-                                    <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
-                                @endif
+                                </div>
+                                <div class="min-w-0 font-mono text-[#3c5a42] text-[13px]" title="{{ $row['key'] }}">
+                                    @if($row['changed'] && isset($row['new_key']) && $row['key'] !== $row['new_key'])
+                                        <span class="line-through text-bad-tx block truncate">{{ $row['key'] }}</span>
+                                        <span class="text-mut block text-[10px] leading-none my-0.5">▼</span>
+                                        <span class="text-ok-tx font-bold bg-ok-bg/50 px-1 rounded block truncate text-[13px]">{{ $row['new_key'] }}</span>
+                                    @else
+                                        <span class="block truncate">{{ $row['key'] }}</span>
+                                    @endif
+                                </div>
+                                <div class="min-w-0 text-ink text-[13px]" title="{{ $row['value'] }}">
+                                    @php
+                                        $showChangedLayout = $row['changed'] && $row['value'] !== $row['new_value'];
+                                    @endphp
+                                    @if($showChangedLayout)
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="line-through text-bad-tx opacity-70 text-[13px]">{{ $row['value'] }}</span>
+                                        </div>
+                                        <span class="text-mut text-[10px] block leading-none my-0.5">▼</span>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-[13px] rounded px-1.5 py-0.5 text-ok-tx font-semibold bg-ok-bg/60">{{ $row['new_value'] }}</span>
+                                        </div>
+                                    @else
+                                        <span class="text-[13px]">{{ $row['value'] }}</span>
+                                    @endif
+                                </div>
                             </div>
-                            <div class="flex min-w-0 flex-wrap gap-[3px] items-center">
-                                @if($row['type'] === 'phone_reserve')
-                                    <span class="text-mut">—</span>
-                                @elseif($row['changed'] && $row['geo'] !== $row['new_geo'])
-                                    <span class="text-mut line-through flex flex-wrap gap-[2px] opacity-60">
-                                        @foreach($row['geo'] as $geo)
-                                            <span class="text-[8px]">{{ $geo }}</span>
-                                        @endforeach
+                        @else
+                            <div style="display: grid; grid-template-columns: 1.2fr 1.0fr 80px 90px 1.3fr 2.0fr 1.3fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                                <div class="min-w-0 font-mono text-ink text-[13px]">
+                                    <span class="block truncate">{{ $row['site'] }}</span>
+                                    <span class="text-[11px] text-mut">{{ in_array($row['type'], ['phone', 'phone_reserve'], true) ? 'номер' : 'значення' }}</span>
+                                </div>
+                                <div class="min-w-0 truncate text-mut text-[13px]">{{ $row['group'] }}</div>
+                                <div>
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[10px] font-semibold text-acc-tx">
+                                        @if($row['type'] === 'phone')
+                                            @svg('phone', 10)
+                                        @elseif($row['type'] === 'phone_reserve')
+                                            @svg('phone', 10)
+                                        @elseif($row['type'] === 'messenger')
+                                            @svg('msg', 10)
+                                        @elseif($row['type'] === 'price')
+                                            @svg('tag', 10)
+                                        @elseif($row['type'] === 'text')
+                                            @svg('text', 10)
+                                        @elseif($row['type'] === 'address')
+                                            @svg('pin', 10)
+                                        @elseif($row['type'] === 'social')
+                                            @svg('link', 10)
+                                        @else
+                                            @svg('alert', 10)
+                                        @endif
+                                        {{ $row['type'] === 'phone_reserve' ? 'резерв' : $row['type'] }}
                                     </span>
-                                    <span class="text-mut text-[8px] select-none">→</span>
-                                    <span class="flex flex-wrap gap-[2px]">
-                                        @foreach($row['new_geo'] as $geo)
+                                    
+                                    @if($row['changed'] && $row['state'] !== $row['new_state'])
+                                        <span class="mt-1 block text-[10px] leading-tight font-semibold">
+                                            <span class="line-through text-bad-tx">{{ $row['state'] }}</span>
+                                            <span class="text-mut">→</span>
+                                            <span class="text-ok-tx">{{ $row['new_state'] }}</span>
+                                        </span>
+                                    @else
+                                        <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
+                                    @endif
+                                </div>
+                                <div class="flex min-w-0 flex-wrap gap-[3px] items-center">
+                                    @if($row['type'] === 'phone_reserve')
+                                        <span class="text-mut">—</span>
+                                    @elseif($row['changed'] && $row['geo'] !== $row['new_geo'])
+                                        <span class="text-mut line-through flex flex-wrap gap-[2px] opacity-60">
+                                            @foreach($row['geo'] as $geo)
+                                                <span class="text-[8px]">{{ $geo }}</span>
+                                            @endforeach
+                                        </span>
+                                        <span class="text-mut text-[8px] select-none">→</span>
+                                        <span class="flex flex-wrap gap-[2px]">
+                                            @foreach($row['new_geo'] as $geo)
+                                                <span @class([
+                                                    'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
+                                                    'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
+                                                    'bg-ok-bg text-ok-tx font-bold' => !in_array($geo, $row['geo'], true),
+                                                    'bg-[#eef1ee] text-mut' => in_array($geo, $row['geo'], true) && !str_starts_with($geo, '!'),
+                                                ])>{{ $geo }}</span>
+                                            @endforeach
+                                        </span>
+                                    @else
+                                        @foreach($row['geo'] as $geo)
                                             <span @class([
                                                 'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
                                                 'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
-                                                'bg-ok-bg text-ok-tx font-bold' => !in_array($geo, $row['geo'], true),
-                                                'bg-[#eef1ee] text-mut' => in_array($geo, $row['geo'], true) && !str_starts_with($geo, '!'),
+                                                'bg-[#eef1ee] text-mut' => !str_starts_with($geo, '!'),
                                             ])>{{ $geo }}</span>
                                         @endforeach
-                                    </span>
-                                @else
-                                    @foreach($row['geo'] as $geo)
-                                        <span @class([
-                                            'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
-                                            'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
-                                            'bg-[#eef1ee] text-mut' => !str_starts_with($geo, '!'),
-                                        ])>{{ $geo }}</span>
-                                    @endforeach
-                                @endif
-                            </div>
-                            <div class="min-w-0 font-mono text-[#3c5a42] text-[13px]" title="{{ $row['key'] }}">
-                                @if($row['changed'] && isset($row['new_key']) && $row['key'] !== $row['new_key'])
-                                    <span class="line-through text-bad-tx block truncate">{{ $row['key'] }}</span>
-                                    <span class="text-mut block text-[10px] leading-none my-0.5">▼</span>
-                                    <span class="text-ok-tx font-bold bg-ok-bg/50 px-1 rounded block truncate text-[13px]">{{ $row['new_key'] }}</span>
-                                @else
-                                    <span class="block truncate">{{ $row['key'] }}</span>
-                                @endif
-                            </div>
-                            <div class="min-w-0 text-ink text-[13px]" title="{{ $row['value'] }}">
-                                @php
-                                    $showChangedLayout = $row['changed'] && $row['value'] !== $row['new_value'];
-                                @endphp
-                                @if($showChangedLayout)
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="line-through text-bad-tx opacity-70 text-[13px]">{{ $row['value'] }}</span>
-                                    </div>
-                                    <span class="text-mut text-[10px] block leading-none my-0.5">▼</span>
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="text-[13px] rounded px-1.5 py-0.5 text-ok-tx font-semibold bg-ok-bg/60">{{ $row['new_value'] }}</span>
-                                    </div>
-                                @else
-                                    <span class="text-[13px]">{{ $row['value'] }}</span>
-                                @endif
-                            </div>
-                            <div class="min-w-0 text-ink text-[13px]">
-                                @if($row['type'] === 'phone')
+                                    @endif
+                                </div>
+                                <div class="min-w-0 font-mono text-[#3c5a42] text-[13px]" title="{{ $row['key'] }}">
+                                    @if($row['changed'] && isset($row['new_key']) && $row['key'] !== $row['new_key'])
+                                        <span class="line-through text-bad-tx block truncate">{{ $row['key'] }}</span>
+                                        <span class="text-mut block text-[10px] leading-none my-0.5">▼</span>
+                                        <span class="text-ok-tx font-bold bg-ok-bg/50 px-1 rounded block truncate text-[13px]">{{ $row['new_key'] }}</span>
+                                    @else
+                                        <span class="block truncate">{{ $row['key'] }}</span>
+                                    @endif
+                                </div>
+                                <div class="min-w-0 text-ink text-[13px]" title="{{ $row['value'] }}">
                                     @php
-                                        $hasFormatChange = ($row['format'] ?? '') !== ($row['new_format'] ?? '');
+                                        $showChangedLayout = $row['changed'] && $row['value'] !== $row['new_value'];
                                     @endphp
-                                    @if($hasFormatChange)
+                                    @if($showChangedLayout)
                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="line-through text-bad-tx opacity-70 font-mono text-[11px]">{{ $row['format'] ?: '—' }}</span>
-                                            <span class="text-mut text-[10px] select-none">▼</span>
-                                            <span class="text-ok-tx font-semibold bg-ok-bg/60 font-mono text-[11px] px-1.5 py-[0.5px] rounded">{{ $row['new_format'] ?: '—' }}</span>
+                                            <span class="line-through text-bad-tx opacity-70 text-[13px]">{{ $row['value'] }}</span>
+                                        </div>
+                                        <span class="text-mut text-[10px] block leading-none my-0.5">▼</span>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-[13px] rounded px-1.5 py-0.5 text-ok-tx font-semibold bg-ok-bg/60">{{ $row['new_value'] }}</span>
                                         </div>
                                     @else
-                                        <span class="text-[11px] text-mut bg-acc-bg border border-acc-bd px-1.5 py-[0.5px] rounded font-mono select-none">{{ $row['format'] ?: '—' }}</span>
+                                        <span class="text-[13px]">{{ $row['value'] }}</span>
                                     @endif
-                                @else
-                                    <span class="text-mut">—</span>
-                                @endif
+                                </div>
+                                <div class="min-w-0 text-ink text-[13px]">
+                                    @if($row['type'] === 'phone')
+                                        @php
+                                            $hasFormatChange = ($row['format'] ?? '') !== ($row['new_format'] ?? '');
+                                        @endphp
+                                        @if($hasFormatChange)
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="line-through text-bad-tx opacity-70 font-mono text-[11px]">{{ $row['format'] ?: '—' }}</span>
+                                                <span class="text-mut text-[10px] select-none">▼</span>
+                                                <span class="text-ok-tx font-semibold bg-ok-bg/60 font-mono text-[11px] px-1.5 py-[0.5px] rounded">{{ $row['new_format'] ?: '—' }}</span>
+                                            </div>
+                                        @else
+                                            <span class="text-[11px] text-mut bg-acc-bg border border-acc-bd px-1.5 py-[0.5px] rounded font-mono select-none">{{ $row['format'] ?: '—' }}</span>
+                                        @endif
+                                    @else
+                                        <span class="text-mut">—</span>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
+                        @endif
                     @empty
                         <div class="px-4 py-12 text-center">
                             <div class="text-sm font-semibold text-ink">Немає цілей для зміни</div>

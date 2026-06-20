@@ -4,6 +4,7 @@ namespace App\Services\Audit;
 
 use App\Admin\AccessControl;
 use App\Admin\AffectedSites;
+use App\Admin\PhoneNumberAssignment;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\GeoTag;

@@ -267,4 +267,31 @@ class BulkOperationsTest extends TestCase
         $this->assertSame('+380111111111', $primaryEntry->fresh('phoneNumber')->phoneNumber->e164);
         $this->assertSame('+380999999999', $reserveEntry->fresh('phoneNumber')->phoneNumber->e164);
     }
+
+    public function test_bulk_phone_rollback_reverts_assignment(): void
+    {
+        $site = Site::factory()->create(['domain' => 'rollback.test']);
+        $entry = $this->phoneEntry($site, 'sales_phone', '+380111111111');
+
+        $lw = Livewire::test(BulkOperations::class)
+            ->set('scope', 'all')
+            ->set('targetType', 'phone')
+            ->set('phoneFilter', '+380111')
+            ->set('operation', 'replace_phone')
+            ->set('phoneReplacement', '+380999999999')
+            ->set('publishAfterApply', false)
+            ->call('apply')
+            ->assertHasNoErrors()
+            ->assertSet('report.changed', 1);
+
+        $this->assertSame('+380999999999', $entry->fresh('phoneNumber')->phoneNumber->e164);
+
+        $batchId = $lw->get('report.batch');
+        $this->assertNotNull($batchId);
+
+        $lw->call('rollbackBatch', $batchId)
+            ->assertHasNoErrors();
+
+        $this->assertSame('+380111111111', $entry->fresh('phoneNumber')->phoneNumber->e164);
+    }
 }
