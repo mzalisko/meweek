@@ -111,31 +111,33 @@
                     placeholder="domain або назва">
             </div>
 
-            <div class="max-h-[32vh] overflow-y-auto rounded-lg border border-[#dfe3e0] relative">
+            <div class="relative rounded-lg border border-[#dfe3e0] overflow-hidden">
                 <div wire:loading.delay wire:target="scope, groupId, rootSiteId, siteSearch, toggleSite, selectFilteredSites, clearSiteSelection" 
                     class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                    <span class="text-xs text-mut animate-pulse font-semibold flex items-center gap-1.5">
-                        <span class="h-2 w-2 animate-spin rounded-full border border-mut border-t-transparent"></span>
+                    <span class="text-[11px] text-mut animate-pulse font-semibold flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-full border shadow-sm">
+                        <span class="h-2.5 w-2.5 animate-spin rounded-full border border-mut border-t-transparent"></span>
                         Оновлення...
                     </span>
                 </div>
-                @forelse($siteOptions as $site)
-                    @php $checked = in_array((int) $site->id, array_map('intval', $selectedSiteIds), true); @endphp
-                    <button type="button" wire:click="toggleSite({{ $site->id }})"
-                        class="flex w-full items-center gap-2 border-b border-[#edf0ed] px-2.5 py-2 text-left text-[11px] last:border-b-0 hover:bg-[#f6f8f6]">
-                        <span @class([
-                            'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                            'border-acc bg-acc text-white' => $checked,
-                            'border-[#c8cec9] bg-white' => !$checked,
-                        ])>@if($checked) @svg('check', 12) @endif</span>
-                        <span class="min-w-0">
-                            <span class="block truncate font-mono text-ink">{{ $site->domain }}</span>
-                            <span class="block truncate text-mut">{{ $site->group?->name ?? 'Без групи' }} · ID {{ $site->id }}</span>
-                        </span>
-                    </button>
-                @empty
-                    <div class="px-3 py-4 text-center text-xs text-mut">Немає доступних сайтів.</div>
-                @endforelse
+                <div class="max-h-[32vh] overflow-y-auto">
+                    @forelse($siteOptions as $site)
+                        @php $checked = in_array((int) $site->id, array_map('intval', $selectedSiteIds), true); @endphp
+                        <button type="button" wire:click="toggleSite({{ $site->id }})"
+                            class="flex w-full items-center gap-2 border-b border-[#edf0ed] px-2.5 py-2 text-left text-[11px] last:border-b-0 hover:bg-[#f6f8f6]">
+                            <span @class([
+                                'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                'border-acc bg-acc text-white' => $checked,
+                                'border-[#c8cec9] bg-white' => !$checked,
+                            ])>@if($checked) @svg('check', 12) @endif</span>
+                            <span class="min-w-0">
+                                <span class="block truncate font-mono text-ink">{{ $site->domain }}</span>
+                                <span class="block truncate text-mut">{{ $site->group?->name ?? 'Без групи' }} · ID {{ $site->id }}</span>
+                            </span>
+                        </button>
+                    @empty
+                        <div class="px-3 py-4 text-center text-xs text-mut">Немає доступних сайтів.</div>
+                    @endforelse
+                </div>
             </div>
 
             <button type="button" wire:click="clearSiteSelection"
@@ -237,7 +239,7 @@
                 <div class="max-h-[calc(100vh-245px)] overflow-y-auto">
                     @forelse($previewRows as $row)
                         @if($targetType === 'phone_reserve')
-                            <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.5fr 2.0fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                            <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.5fr 2.0fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-3 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
                                 <div class="min-w-0 font-mono text-ink text-[13px]">
                                     <span class="block truncate">{{ $row['site'] }}</span>
                                     <span class="text-[11px] text-mut">номер</span>
@@ -285,7 +287,7 @@
                                 </div>
                             </div>
                         @else
-                            <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.2fr 1.5fr 2.0fr 1.5fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
+                            <div style="display: grid; grid-template-columns: 1.5fr 1.2fr 1.2fr 1.2fr 1.5fr 2.0fr 1.5fr; gap: 0.5rem;" class="border-b border-[#edf0ed] px-3 py-3 text-[13px] last:border-b-0 hover:bg-[#fafbfa]">
                                 <div class="min-w-0 font-mono text-ink text-[13px]">
                                     <span class="block truncate">{{ $row['site'] }}</span>
                                     <span class="text-[11px] text-mut">{{ in_array($row['type'], ['phone', 'phone_reserve'], true) ? 'номер' : 'значення' }}</span>
@@ -323,20 +325,20 @@
                                         <span class="mt-1 block text-[10px] text-mut">{{ $row['state'] }}</span>
                                     @endif
                                 </div>
-                                <div class="flex min-w-0 flex-wrap gap-[3px] items-center">
+                                <div class="flex min-w-0 flex-wrap gap-1 items-center">
                                     @if($row['type'] === 'phone_reserve')
                                         <span class="text-mut">—</span>
                                     @elseif($row['changed'] && $row['geo'] !== $row['new_geo'])
-                                        <span class="text-mut line-through flex flex-wrap gap-[2px] opacity-60">
+                                        <span class="text-mut line-through flex flex-wrap gap-1 opacity-60">
                                             @foreach($row['geo'] as $geo)
                                                 <span class="text-[8px]">{{ $geo }}</span>
                                             @endforeach
                                         </span>
                                         <span class="text-mut text-[8px] select-none">→</span>
-                                        <span class="flex flex-wrap gap-[2px]">
+                                        <span class="flex flex-wrap gap-1">
                                             @foreach($row['new_geo'] as $geo)
                                                 <span @class([
-                                                    'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
+                                                    'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none whitespace-nowrap',
                                                     'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
                                                     'bg-ok-bg text-ok-tx font-bold' => !in_array($geo, $row['geo'], true),
                                                     'bg-[#eef1ee] text-mut' => in_array($geo, $row['geo'], true) && !str_starts_with($geo, '!'),
@@ -346,7 +348,7 @@
                                     @else
                                         @foreach($row['geo'] as $geo)
                                             <span @class([
-                                                'rounded px-1.5 py-[1.5px] text-[9px] font-semibold leading-none whitespace-nowrap',
+                                                'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none whitespace-nowrap',
                                                 'bg-bad-bg text-bad-tx' => str_starts_with($geo, '!'),
                                                 'bg-[#eef1ee] text-mut' => !str_starts_with($geo, '!'),
                                             ])>{{ $geo }}</span>
