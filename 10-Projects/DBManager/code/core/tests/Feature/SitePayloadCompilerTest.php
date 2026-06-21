@@ -157,7 +157,7 @@ class SitePayloadCompilerTest extends TestCase
         $this->assertTrue($backup['is_current']);
     }
 
-    public function test_hidden_phone_slot_is_omitted_from_payload(): void
+    public function test_hidden_phone_slot_is_published_with_hidden_state(): void
     {
         $site = Site::factory()->create();
         [$slot] = $this->slotWithNumbers(['active']);
@@ -169,8 +169,29 @@ class SitePayloadCompilerTest extends TestCase
         ]);
 
         $payload = app(SitePayloadCompiler::class)->compile($site);
+        $item = $this->itemByKey($payload, 'phone_hidden');
 
-        $this->assertNull($this->itemByKey($payload, 'phone_hidden'));
+        // Приховані значення публікуються зі state='hidden' (плагін показує «скрыто»
+        // в адмінці й ховає від відвідувачів), а не зникають із payload.
+        $this->assertNotNull($item);
+        $this->assertSame('hidden', $item['state']);
+        $this->assertNull($item['value']);
+    }
+
+    public function test_hidden_price_is_published_with_hidden_state(): void
+    {
+        $site = Site::factory()->create();
+        DataValue::factory()->forSite($site)->ofType('price')->create([
+            'key' => 'price_hidden',
+            'status' => 'hidden',
+            'content' => ['prices' => [['label' => 'UA', 'value' => '1200', 'geo' => ['UA']]]],
+        ]);
+
+        $payload = app(SitePayloadCompiler::class)->compile($site);
+        $item = $this->itemByKey($payload, 'price_hidden');
+
+        $this->assertNotNull($item);
+        $this->assertSame('hidden', $item['state']);
     }
 
     public function test_linked_slot_is_visual_only(): void

@@ -75,4 +75,32 @@ class PingControllerTest extends TestCase
         $this->assertSame(200, $controller->handle($signed['body'], $signed['signature'], $signed['timestamp']));
         $this->assertSame('keep', $cache->get()['values'][0]['key']);
     }
+
+    public function test_different_site_accepts_lower_version(): void
+    {
+        // Перепідключення до іншого сайту: новий site_id з меншою версією має прийнятись —
+        // монотонність версії діє ЛИШЕ в межах одного site_id. Так зміна токена перекидає
+        // дані на інший сайт, навіть якщо в нового сайту менша версія.
+        $cache = new InMemoryCacheStore();
+        $cache->put(['site_id' => 2, 'version' => 67, 'values' => [['key' => 'old_site']]]);
+        $controller = new PingController(new PayloadVerifier(), $cache, 'signing-secret');
+        $signed = $this->signed(['site_id' => 1, 'version' => 4, 'values' => [['key' => 'new_site']]]);
+
+        $this->assertSame(200, $controller->handle($signed['body'], $signed['signature'], $signed['timestamp']));
+        $this->assertSame(4, $cache->version());
+        $this->assertSame('new_site', $cache->get()['values'][0]['key']);
+        $this->assertSame(1, (int) $cache->get()['site_id']);
+    }
+
+    public function test_same_site_lower_version_still_rejected(): void
+    {
+        // У межах одного site_id монотонність зберігається — захист від повтору старих даних.
+        $cache = new InMemoryCacheStore();
+        $cache->put(['site_id' => 1, 'version' => 6, 'values' => [['key' => 'keep']]]);
+        $controller = new PingController(new PayloadVerifier(), $cache, 'signing-secret');
+        $signed = $this->signed(['site_id' => 1, 'version' => 5, 'values' => [['key' => 'old']]]);
+
+        $this->assertSame(409, $controller->handle($signed['body'], $signed['signature'], $signed['timestamp']));
+        $this->assertSame(6, $cache->version());
+    }
 }

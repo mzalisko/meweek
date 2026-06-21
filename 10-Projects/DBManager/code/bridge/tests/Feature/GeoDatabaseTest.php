@@ -10,6 +10,8 @@ class GeoDatabaseTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const PUSH = 'push-secret-at-least-thirty-two-chars-xx';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -38,7 +40,7 @@ class GeoDatabaseTest extends TestCase
         $bytes = random_bytes(32);
         $this->ingest($bytes)->assertOk();
 
-        PublishedSite::factory()->create(['token_hash' => hash('sha256', 'tok')]);
+        PublishedSite::factory()->create(['token_hash' => hash('sha256', 'tok'), 'push_secret' => self::PUSH]);
 
         $response = $this->call('GET', '/api/v1/geodb', [], [], [], [
             'HTTP_X_SITE_TOKEN' => 'tok',
@@ -47,7 +49,8 @@ class GeoDatabaseTest extends TestCase
         $response->assertOk();
         $this->assertSame($bytes, $response->getContent());
         $response->assertHeader('ETag', '"' . hash('sha256', $bytes) . '"');
-        $response->assertHeader('X-Signature', hash_hmac('sha256', $bytes, 'sign'));
+        // Geo підпис — per-site push_secret сайта (саме його перевіряє плагін).
+        $response->assertHeader('X-Signature', hash_hmac('sha256', $bytes, self::PUSH));
     }
 
     public function test_serve_returns_304_when_sha_matches(): void

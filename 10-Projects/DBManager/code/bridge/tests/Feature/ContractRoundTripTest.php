@@ -63,8 +63,9 @@ class ContractRoundTripTest extends TestCase
         $this->assertEquals($payload, $served);
         $this->assertSame('+380671112233', $served['values'][1]['value']);
 
-        // 4. Підпис відповіді валідний
+        // 4. Підпис відповіді валідний — рахується per-site push_secret сайта (саме його
+        //    плагін отримує в конект-блобі як signing_secret і ним перевіряє дані).
         $body = $response->getContent();
-        $response->assertHeader('X-Signature', hash_hmac('sha256', $body, 'sign'));
+        $response->assertHeader('X-Signature', hash_hmac('sha256', $body, 'site-listener-secret-with-enough-length'));
     }
 }

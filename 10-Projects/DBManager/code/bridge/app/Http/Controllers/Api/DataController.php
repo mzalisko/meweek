@@ -23,12 +23,17 @@ class DataController extends Controller
             return response('', 304)->header('ETag', $etag);
         }
 
-        // Без секрета підпису serve не віддає дані (інакше підпис порожнім ключем).
-        // Generic 500 без тексту — публічний ендпоінт не світить стан конфігу.
-        abort_if(! config('services.data.signing_secret'), 500);
+        // Дані підписуємо per-site push_secret — тим самим секретом, що бридж
+        // використовує для ping (DeliverPingJob) і що DBManager віддає плагіну в
+        // конект-блобі як signing_secret. Глобальний services.data.signing_secret тут
+        // НЕ підходив: плагін перевіряє підпис per-site секретом, тож глобальний підпис
+        // ніколи не збігся б (і порожній секрет повертав 500 — дані не доходили).
+        // Без секрета serve не віддає дані (fail-closed); generic 500 без тексту.
+        $signingSecret = (string) $site->push_secret;
+        abort_if($signingSecret === '', 500);
 
         $body = json_encode($site->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $signature = hash_hmac('sha256', $body, (string) config('services.data.signing_secret'));
+        $signature = hash_hmac('sha256', $body, $signingSecret);
 
         return response($body, 200)
             ->header('Content-Type', 'application/json')

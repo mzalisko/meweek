@@ -14,11 +14,8 @@ class GeoServeController extends Controller
     {
         $rawToken = (string) $request->header('X-Site-Token');
         abort_if($rawToken === '', 401, 'Missing token');
-        abort_unless(
-            PublishedSite::where('token_hash', hash('sha256', $rawToken))->exists(),
-            401,
-            'Unknown token'
-        );
+        $site = PublishedSite::where('token_hash', hash('sha256', $rawToken))->first();
+        abort_unless($site, 401, 'Unknown token');
 
         $db = GeoDatabase::latest('id')->first();
         abort_unless($db, 404, 'No geo database');
@@ -28,10 +25,12 @@ class GeoServeController extends Controller
             return response('', 304)->header('ETag', $etag);
         }
 
-        abort_if(! config('services.data.signing_secret'), 500);
+        // Geo підписуємо тим самим per-site push_secret, що й дані (плагін перевіряє ним).
+        $signingSecret = (string) $site->push_secret;
+        abort_if($signingSecret === '', 500);
 
         $bytes = base64_decode($db->bytes);
-        $signature = hash_hmac('sha256', $bytes, (string) config('services.data.signing_secret'));
+        $signature = hash_hmac('sha256', $bytes, $signingSecret);
 
         return response($bytes, 200)
             ->header('Content-Type', 'application/octet-stream')

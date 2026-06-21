@@ -99,7 +99,10 @@ class SitePayloadCompiler
         $with = ['type', 'geoTags', 'phoneSlot.entries.phoneNumber'];
 
         return DataValue::with($with)
-            ->where('status', 'active')
+            // Приховані значення (status='hidden') теж публікуємо — зі state='hidden',
+            // щоб плагін показав їх як «скрыто» (адмінка) і сховав від відвідувачів (фронт),
+            // а не щоб вони зникали з payload.
+            ->whereIn('status', ['active', 'hidden'])
             ->where('scope_type', 'site')
             ->where('scope_id', $site->id)
             ->get()
@@ -124,6 +127,7 @@ class SitePayloadCompiler
             'social' => $this->socialItem($value, $base),
             'address' => $this->addressItem($value, $base),
             default => $base
+                + ['state' => ($value->status ?? 'active') === 'hidden' ? 'hidden' : 'ok']
                 + ['value' => $value->content['value'] ?? null]
                 + collect($value->content ?? [])->except('value')->all(),
         };
@@ -159,6 +163,10 @@ class SitePayloadCompiler
 
     private function phoneItem(DataValue $value, array $base): array
     {
+        if (($value->status ?? 'active') === 'hidden') {
+            return $base + ['state' => 'hidden', 'value' => null, 'display_value' => null, 'phone_format' => null];
+        }
+
         $slot = $value->phoneSlot;
         if (! $slot) {
             return $base + ['state' => 'hidden', 'value' => null];
