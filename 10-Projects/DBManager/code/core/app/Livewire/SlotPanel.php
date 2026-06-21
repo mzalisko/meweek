@@ -148,7 +148,7 @@ class SlotPanel extends Component
         }
 
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Ключ слота змінено → опубліковано');
+        $this->dispatch('toast', message: 'Ключ слота змінено');
     }
 
     #[On('open-number-editor')]
@@ -221,7 +221,7 @@ class SlotPanel extends Component
         $this->newNumber = '';
         $this->publishSlotSites($slot->fresh());
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Резерв додано → опубліковано');
+        $this->dispatch('toast', message: 'Резерв додано');
     }
 
     public function startEditNumber(int $entryId): void
@@ -811,8 +811,7 @@ class SlotPanel extends Component
     {
         app(FailoverEngine::class)->sitesFor($slot)
             ->each(function ($site) {
-                $pub = app(SitePayloadCompiler::class)->publish($site);
-                app(BridgePublisher::class)->push($pub);
+                app(SitePayloadCompiler::class)->publish($site);
             });
     }
 

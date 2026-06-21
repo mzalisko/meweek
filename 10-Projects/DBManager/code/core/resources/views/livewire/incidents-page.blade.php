@@ -59,7 +59,7 @@
                         $isOnline = \Illuminate\Support\Carbon::parse($lastSeen)->gt(now()->subMinutes(15));
                     }
                 @endphp
-                <div class="aspect-square bg-white border {{ $siteData['hasReserve'] ? 'border-yellow-300 shadow-yellow-50/50' : 'border-[#dfe3e0]' }} hover:border-acc hover:shadow-md transition-all rounded-lg p-4 flex flex-col justify-between shadow-sm relative group">
+                <div class="bg-white border {{ $siteData['hasReserve'] ? 'border-yellow-300 shadow-yellow-50/50' : 'border-[#dfe3e0]' }} hover:border-acc hover:shadow-md transition-all rounded-lg p-3 flex flex-col justify-between shadow-sm relative group h-[170px]">
                     
                     {{-- Шапка картки --}}
                     <div>
@@ -75,16 +75,16 @@
                                 <span class="h-2 w-2 rounded-full bg-bad-tx animate-pulse shrink-0 mt-1" title="Поза мережею"></span>
                             @endif
                         </div>
-                        <div class="text-[10px] text-mut truncate mt-0.5">
+                        <div class="text-[10px] text-mut truncate">
                             {{ $site->group?->name ?? 'Без групи' }}
                         </div>
                     </div>
 
                     {{-- Вміст: список слотів та їхні статуси --}}
-                    <div class="my-2 flex-1 flex flex-col justify-start overflow-y-auto max-h-[110px] space-y-1.5 custom-scrollbar pr-0.5">
+                    <div class="my-1.5 flex-1 flex flex-col justify-start overflow-y-auto max-h-[85px] space-y-1 custom-scrollbar pr-0.5">
                         @forelse($slots as $slot)
                             <div class="flex items-center justify-between text-[9px] bg-[#fafbfa] border border-[#f1f3f1] px-1.5 py-0.5 rounded">
-                                <span class="text-ink truncate max-w-[80px]" title="{{ $slot['key'] }}">
+                                <span class="text-ink truncate max-w-[90px]" title="{{ $slot['key'] }}">
                                     #{{ $slot['key'] }}
                                 </span>
                                 @if($slot['state'] === 'on_reserve')
@@ -96,12 +96,12 @@
                                 @endif
                             </div>
                         @empty
-                            <div class="text-[10px] text-mut/50 text-center italic mt-4">Немає слотів</div>
+                            <div class="text-[10px] text-mut/50 text-center italic mt-2">Немає слотів</div>
                         @endforelse
                     </div>
 
                     {{-- Підвал картки --}}
-                    <div class="border-t border-[#edf0ed] pt-2 flex items-center justify-between mt-auto shrink-0">
+                    <div class="border-t border-[#edf0ed] pt-1.5 flex items-center justify-between mt-auto shrink-0">
                         <a href="{{ route('admin.site', ['site' => $site->id]) }}" wire:navigate
                             class="text-[10px] font-semibold text-acc-tx hover:underline inline-flex items-center gap-1">
                             @svg('grid', 12) Керувати

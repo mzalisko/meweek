@@ -32,7 +32,25 @@ class AuthenticationTest extends TestCase
 
         $component
             ->assertHasNoErrors()
-            ->assertRedirect(route('dashboard', absolute: false));
+            ->assertRedirect(route('admin.dashboard', absolute: false));
+
+        $this->assertAuthenticated();
+    }
+
+    public function test_login_always_opens_dashboard_even_with_intended_url(): void
+    {
+        $user = User::factory()->create();
+        session(['url.intended' => '/admin/sites']);
+
+        $component = Volt::test('pages.auth.login')
+            ->set('form.email', $user->email)
+            ->set('form.password', 'password');
+
+        $component->call('login');
+
+        $component
+            ->assertHasNoErrors()
+            ->assertRedirect(route('admin.dashboard', absolute: false));
 
         $this->assertAuthenticated();
     }

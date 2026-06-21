@@ -366,31 +366,19 @@ class ValueEditor extends Component
         $this->releaseEditLock();
         $this->dispatch('value-saved');
 
-        $published = 0;
-        $affectedSites->each(function ($site) use (&$published) {
-            $publication = app(SitePayloadCompiler::class)->publish($site);
-            if (app(BridgePublisher::class)->push($publication)) {
-                $published++;
-            }
+        $affectedSites->each(function ($site) {
+            app(SitePayloadCompiler::class)->publish($site);
         });
-        if ($published > 0) {
-            $this->dispatch('toast', message: "Видалено → опубліковано {$published} сайтів");
-        }
+        $this->dispatch('toast', message: "Видалено значення");
     }
 
-    /** Публікує уражені сайти в DataBridge; невдалий push не валить операцію. */
+    /** Публікує уражені сайти локально; синхронізація робиться вручну. */
     private function publishAffected(DataValue $dv): void
     {
-        $published = 0;
-        app(AffectedSites::class)->for($dv)->each(function ($site) use (&$published) {
-            $publication = app(SitePayloadCompiler::class)->publish($site);
-            if (app(BridgePublisher::class)->push($publication)) {
-                $published++;
-            }
+        app(AffectedSites::class)->for($dv)->each(function ($site) {
+            app(SitePayloadCompiler::class)->publish($site);
         });
-        if ($published > 0) {
-            $this->dispatch('toast', message: "Збережено → опубліковано {$published} сайтів");
-        }
+        $this->dispatch('toast', message: "Збережено зміни");
     }
 
     private function messengerUrlFromValue(string $value): ?string

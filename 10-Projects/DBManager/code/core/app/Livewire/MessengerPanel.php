@@ -126,7 +126,7 @@ class MessengerPanel extends Component
         $this->slotName = $newName;
         $this->publishDataValue($primary->fresh());
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Імʼя слота месенджера змінено → опубліковано');
+        $this->dispatch('toast', message: 'Імʼя слота месенджера змінено');
     }
 
     public function addReserve(): void
@@ -185,7 +185,7 @@ class MessengerPanel extends Component
         $this->newValue = '';
         $this->publishDataValue($reserve);
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Резерв месенджера додано → опубліковано');
+        $this->dispatch('toast', message: 'Резерв месенджера додано');
     }
 
     public function setExhaustionPolicy(string $policy): void
@@ -496,8 +496,7 @@ class MessengerPanel extends Component
     private function publishSites($sites): void
     {
         $sites->unique('id')->each(function (Site $site) {
-            $publication = app(SitePayloadCompiler::class)->publish($site);
-            app(BridgePublisher::class)->push($publication);
+            app(SitePayloadCompiler::class)->publish($site);
         });
     }
 }

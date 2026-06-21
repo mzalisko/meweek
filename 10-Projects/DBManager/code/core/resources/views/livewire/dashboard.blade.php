@@ -48,42 +48,26 @@
         </div>
 
         {{-- Втрачено зв'язок --}}
-        <div @class([
-            'border rounded-lg p-4 shadow-sm hover:shadow transition-shadow flex items-center gap-3.5',
-            'bg-white border-[#dfe3e0]' => $totalOfflineSites === 0,
-            'bg-bad-bg/30 border-bad-tx/20 text-bad-tx' => $totalOfflineSites > 0
-        ])>
-            <span @class([
-                'inline-flex h-10 w-10 items-center justify-center rounded-lg border shrink-0',
-                'border-acc-bd bg-acc-bg text-acc-tx' => $totalOfflineSites === 0,
-                'border-bad-tx/30 bg-bad-bg text-bad-tx' => $totalOfflineSites > 0
-            ])>
+        <div class="bg-white border border-[#dfe3e0] rounded-lg p-4 shadow-sm hover:shadow transition-shadow flex items-center gap-3.5">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-acc-bd bg-acc-bg text-acc-tx shrink-0">
                 @svg('globe', 20)
             </span>
             <div>
                 <div class="text-[10px] uppercase tracking-wider text-mut font-medium">Втрачено зв'язок</div>
-                <div class="text-[20px] font-bold leading-none mt-1 @if($totalOfflineSites > 0) text-bad-tx @else text-ink @endif">
+                <div class="text-[20px] font-bold leading-none mt-1 {{ $totalOfflineSites > 0 ? 'text-bad-tx' : 'text-ink' }}">
                     {{ $totalOfflineSites }}
                 </div>
             </div>
         </div>
 
         {{-- Active Incidents --}}
-        <div @class([
-            'border rounded-lg p-4 shadow-sm hover:shadow transition-shadow flex items-center gap-3.5',
-            'bg-white border-[#dfe3e0]' => $activeIncidentsCount === 0,
-            'bg-warn-bg/30 border-warn-tx/20 text-warn-tx' => $activeIncidentsCount > 0
-        ])>
-            <span @class([
-                'inline-flex h-10 w-10 items-center justify-center rounded-lg border shrink-0',
-                'border-acc-bd bg-acc-bg text-acc-tx' => $activeIncidentsCount === 0,
-                'border-warn-tx/30 bg-warn-bg text-warn-tx' => $activeIncidentsCount > 0
-            ])>
+        <div class="bg-white border border-[#dfe3e0] rounded-lg p-4 shadow-sm hover:shadow transition-shadow flex items-center gap-3.5">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-acc-bd bg-acc-bg text-acc-tx shrink-0">
                 @svg('alert', 20)
             </span>
             <div>
                 <div class="text-[10px] uppercase tracking-wider text-mut font-medium">Активні інциденти</div>
-                <div class="text-[20px] font-bold leading-none mt-1 @if($activeIncidentsCount > 0) text-warn-tx @else text-ink @endif">
+                <div class="text-[20px] font-bold leading-none mt-1 {{ $activeIncidentsCount > 0 ? 'text-warn-tx' : 'text-ink' }}">
                     {{ $activeIncidentsCount }}
                 </div>
             </div>
@@ -108,7 +92,9 @@
                 <div class="p-4 space-y-4">
                     @if($favoriteGroups->isEmpty() && $favoriteSites->isEmpty())
                         <div class="text-center py-8 text-mut">
-                            <span class="text-[32px] block mb-2 opacity-50">⭐</span>
+                            <div class="flex justify-center text-mut/50 mb-2">
+                                @svg('sites', 32)
+                            </div>
                             <p class="text-xs">У вас немає вибраних сайтів чи груп.</p>
                             <p class="text-[11px] text-mut/70 mt-1">Додайте їх на сторінці керування сайтами.</p>
                         </div>
@@ -220,7 +206,7 @@
             <div id="incidents-section" class="bg-white border border-[#dfe3e0] rounded-lg shadow-sm overflow-hidden">
                 <div class="px-4 py-3 bg-[#f6f8f6] border-b border-[#dfe3e0] flex items-center justify-between">
                     <h2 class="text-xs uppercase tracking-wider text-ink font-bold flex items-center gap-1.5">
-                        ⚠️ Потребує уваги
+                        @svg('alert', 14) <span class="ml-1.5">Потребує уваги</span>
                     </h2>
                     <span class="bg-warn-bg text-warn-tx text-[10px] px-2 py-0.5 rounded-full font-bold">
                         {{ $incidents->count() }} нових
@@ -257,7 +243,9 @@
                         </div>
                     @empty
                         <div class="text-center py-8 text-mut">
-                            <span class="text-[28px] block mb-2">✅</span>
+                            <div class="flex justify-center text-ok-tx mb-2">
+                                @svg('check-circle', 28)
+                            </div>
                             <p class="text-xs font-semibold text-ok-tx">Всі системи в штатному режимі</p>
                             <p class="text-[11px] text-mut/70 mt-0.5">Немає непідтверджених інцидентів.</p>
                         </div>
@@ -269,7 +257,7 @@
             <div class="bg-white border border-[#dfe3e0] rounded-lg shadow-sm overflow-hidden">
                 <div class="px-4 py-3 bg-[#f6f8f6] border-b border-[#dfe3e0] flex items-center justify-between">
                     <h2 class="text-xs uppercase tracking-wider text-ink font-bold flex items-center gap-1.5">
-                        📡 Втрачено зв'язок (Offline)
+                        @svg('globe', 14) <span class="ml-1.5">Втрачено зв'язок (Offline)</span>
                     </h2>
                 </div>
 
@@ -278,15 +266,15 @@
                         @php
                             $lastSeen = $site->tokens()->whereNull('revoked_at')->max('last_seen_at');
                         @endphp
-                        <div class="flex items-center justify-between border border-bad-tx/10 bg-bad-bg/5 rounded-lg p-3 hover:bg-bad-bg/10 transition-colors">
+                        <div class="flex items-center justify-between border border-[#dfe3e0] bg-[#fafbfa] rounded-lg p-3 hover:bg-[#ebede9] hover:border-acc-bd transition-colors">
                             <div class="min-w-0">
                                 <a href="{{ route('admin.site', ['group' => $site->site_group_id, 'site' => $site->id]) }}" 
-                                    class="font-mono font-bold text-bad-tx hover:underline block truncate">{{ $site->domain }}</a>
+                                    class="font-mono font-bold text-acc-tx hover:underline block truncate">{{ $site->domain }}</a>
                                 <div class="text-[10px] text-mut truncate mt-0.5">Група: {{ $site->group?->name ?? '—' }}</div>
                             </div>
                             
                             <div class="text-right shrink-0">
-                                <span class="text-[11px] font-semibold text-bad-tx block">Офлайн</span>
+                                <span class="text-[11px] font-semibold text-mut block">Офлайн</span>
                                 <span class="text-[10px] text-mut">
                                     {{ $lastSeen ? Carbon\Carbon::parse($lastSeen)->diffForHumans() : 'ніколи не виходив' }}
                                 </span>
@@ -294,7 +282,9 @@
                         </div>
                     @empty
                         <div class="text-center py-8 text-mut">
-                            <span class="text-[28px] block mb-2">🟢</span>
+                            <div class="flex justify-center text-ok-tx mb-2">
+                                @svg('check-circle', 28)
+                            </div>
                             <p class="text-xs font-semibold text-ok-tx">Усі сайти підключені</p>
                             <p class="text-[11px] text-mut/70 mt-0.5">Всі сайти успішно передають дані.</p>
                         </div>
