@@ -8,11 +8,12 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\BuildsSlots;
 use Tests\TestCase;
 
 class ValuesGridTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, BuildsSlots;
 
     protected function setUp(): void
     {
@@ -60,5 +61,51 @@ class ValuesGridTest extends TestCase
         Livewire::test(ValuesGrid::class)
             ->assertSee('domen.ua')
             ->assertSee('k1');
+    }
+
+    public function test_inline_add_phone_reserve(): void
+    {
+        $site = Site::factory()->create();
+        [$slot] = $this->slotWithNumbers(['active']); // priority 0
+        $slot->dataValue->update(['scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->set('newPhoneValue.' . $slot->data_value_id, '+380441112233')
+            ->call('addPhoneReserve', $slot->data_value_id);
+
+        $slot->refresh();
+        $this->assertSame(2, $slot->entries()->count());
+        $entry = $slot->entries()->orderByDesc('priority')->first();
+        $this->assertSame(1, $entry->priority);
+        $this->assertSame('+380441112233', $entry->phoneNumber->e164);
+    }
+
+    public function test_phone_exhaustion_policy_can_be_changed_from_grid(): void
+    {
+        $site = Site::factory()->create();
+        [$slot] = $this->slotWithNumbers(['active']);
+        $slot->dataValue->update(['scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->assertSee('Якщо всі впали')
+            ->call('setPhoneExhaustionPolicy', $slot->data_value_id, 'emergency')
+            ->call('savePhoneEmergencyNumber', $slot->data_value_id, '+380991112233');
+
+        $slot->refresh();
+        $this->assertSame('emergency', $slot->exhaustion_policy);
+        $this->assertSame('+380991112233', $slot->emergency_number);
+    }
+
+    public function test_inline_reorder_phone_reserves(): void
+    {
+        $site = Site::factory()->create();
+        [$slot, $entries] = $this->slotWithNumbers(['active', 'active', 'active']);
+        $slot->dataValue->update(['scope_type' => 'site', 'scope_id' => $site->id]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('movePhoneUp', $entries[1]->id);
+
+        $this->assertSame(0, $entries[1]->fresh()->priority);
+        $this->assertSame(1, $entries[0]->fresh()->priority);
     }
 }

@@ -128,6 +128,7 @@ class SiteGridReader
                 'entry_id' => $resolved->entryId,
                 'reserves' => max(0, $slot->entries->count() - 1),
                 'exhaustion_policy' => $slot->exhaustion_policy,
+                'emergency_number' => $slot->emergency_number,
             ]);
         }
 
@@ -139,6 +140,7 @@ class SiteGridReader
             'phone_format' => $phoneFormat,
             'entry_id' => $resolved->entryId,
             'exhaustion_policy' => $slot->exhaustion_policy,
+            'emergency_number' => $slot->emergency_number,
             'numbers' => $numbers,
         ]);
     }

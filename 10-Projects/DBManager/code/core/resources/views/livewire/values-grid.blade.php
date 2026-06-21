@@ -185,6 +185,9 @@
                 toggle(type) { this.collapsed[type] = !this.isCollapsed(type) },
                 expandAll() { this.sectionTypes.forEach(type => this.collapsed[type] = false) },
                 collapseAll() { this.sectionTypes.forEach(type => this.collapsed[type] = true) },
+                collapsedReserves: { phone: true, messenger: true },
+                isReservesCollapsed(type) { return this.collapsedReserves[type] === true },
+                toggleReserves(type) { this.collapsedReserves[type] = !this.isReservesCollapsed(type) },
             }"
             class="space-y-3"
         >
@@ -203,10 +206,12 @@
 
             @foreach($orderedRows as $type => $items)
                 <div class="border border-[#dfe3e0] bg-white rounded-lg">
-                    <button type="button"
+                    <div role="button" tabindex="0"
                         @click="toggle('{{ $type }}')"
+                        @keydown.enter.prevent="toggle('{{ $type }}')"
+                        @keydown.space.prevent="toggle('{{ $type }}')"
                         :aria-expanded="(!isCollapsed('{{ $type }}')).toString()"
-                        class="grid w-full gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-[#dfe3e0] rounded-t-lg text-left text-[10px] uppercase tracking-wide text-mut hover:bg-[#eef1ee] transition-colors"
+                        class="grid w-full gap-2 items-center px-2.5 py-2 bg-[#f6f8f6] border-[#dfe3e0] rounded-t-lg text-left text-[10px] uppercase tracking-wide text-mut hover:bg-[#eef1ee] transition-colors cursor-pointer select-none"
                         style="grid-template-columns: minmax(130px, 1fr) minmax(150px, 1fr) 92px minmax(280px, 1.8fr) 140px 68px;"
                         :class="isCollapsed('{{ $type }}') ? 'rounded-b-lg border-b-0' : 'border-b'">
                         <div class="flex gap-1.5 items-center min-w-0">
@@ -218,19 +223,39 @@
                         <div>Гео</div>
                         <div>Стан</div>
                         <div>Значення</div>
-                        <div>Форматування</div>
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span>Форматування</span>
+                            @if($type === 'phone' || $type === 'messenger')
+                                <button type="button" @click.stop="toggleReserves('{{ $type }}')"
+                                    class="inline-flex items-center gap-1 rounded-md border border-[#dfe3e0] bg-white px-1.5 py-0.5 leading-none text-mut hover:border-acc hover:text-acc-tx transition-colors"
+                                    :title="isReservesCollapsed('{{ $type }}') ? 'Показати резерви' : 'Сховати резерви'"
+                                    aria-label="Показати або сховати резерви">
+                                    <span class="normal-case">резерви</span>
+                                    <span class="inline-flex transition-transform duration-150" :class="isReservesCollapsed('{{ $type }}') ? '-rotate-90' : ''">@svg('chevron-down')</span>
+                                </button>
+                            @endif
+                        </div>
                         <div></div>
-                    </button>
+                    </div>
 
-                    <div x-show="!isCollapsed('{{ $type }}')">
+                    <div x-show="!isCollapsed('{{ $type }}')" class="bg-[#f4f5f3]/20 p-2.5 space-y-2.5 rounded-b-lg">
                     @foreach($items as $r)
                     @php
                         $st = $stateMap[$r['state']] ?? 'ok';
+                        $borderColors = [
+                            'ok'   => 'border-l-[#52705f]',
+                            'warn' => 'border-l-[#96752f]',
+                            'bad'  => 'border-l-[#96514a]',
+                        ];
+                        $borderColor = $borderColors[$st] ?? 'border-l-mut';
                     @endphp
-                    <div class="grid gap-2 items-start px-2.5 py-2.5 border-b border-[#edf0ed] last:border-b-0 last:rounded-b-lg hover:bg-[#fafbfa] transition-colors"
+                    <div class="grid gap-2 items-start px-3.5 py-3 bg-white border border-[#dfe3e0] border-l-4 {{ $borderColor }} rounded-r-lg shadow-sm hover:shadow hover:bg-[#fafbfa] transition-all duration-150"
                         style="grid-template-columns: minmax(130px, 1fr) minmax(150px, 1fr) 92px minmax(280px, 1.8fr) 140px 68px;">
                         {{-- Key --}}
-                        <span class="font-mono text-[11px] text-[#3c5a42] bg-[#eef5ee] border border-[#c4d6c6] rounded-md px-1.5 py-0.5 truncate inline-block w-fit mt-0.5" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
+                        <div class="flex items-center gap-1 mt-0.5 min-w-0 select-none">
+                            <span class="text-slate-400 font-semibold text-[13px] shrink-0">#</span>
+                            <span class="font-mono text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 select-all shadow-sm hover:bg-slate-100 transition-colors truncate" title="{{ $r['key'] }}">{{ $r['key'] }}</span>
+                        </div>
 
                         {{-- Geo --}}
                         @if($type === 'price' && !empty($r['prices']))
@@ -273,9 +298,9 @@
                         </span>
 
                         {{-- Value / inline phone edit --}}
-                        <span class="min-w-0">
+                        <div class="min-w-0">
                             @if($type === 'phone' && !empty($r['numbers']))
-                                <span class="flex flex-col gap-1">
+                                <div class="flex flex-col gap-1">
                                     @foreach($r['numbers'] as $number)
                                         @php
                                             $isEditingNumber = $editingPhoneEntryId === $number['entry_id'];
@@ -292,7 +317,8 @@
                                                         $wire.cancelInlinePhoneEdit();
                                                     }
                                                 "
-                                                class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
+                                                class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
+                                                @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone')" @endif
                                             >
                                                 <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
                                                     {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
@@ -305,21 +331,23 @@
                                                     class="flex-1 min-w-0 border border-acc rounded-md px-2 py-1 text-xs text-ink focus:outline-none"
                                                     aria-label="Редагувати номер"
                                                 >
-                                                <span class="shrink-0 flex items-center gap-1">
+                                                <span class="dbm-action-grid ml-auto shrink-0 grid grid-cols-[92px_24px_24px_24px_24px] items-center justify-items-center gap-1">
                                                     <button wire:click.stop="saveInlinePhoneNumber" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
                                                     <button wire:click.stop="cancelInlinePhoneEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
                                                     <button wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})" wire:confirm="Видалити цей номер із ланцюга?" class="text-mut hover:text-bad-tx px-1 py-0.5" title="Видалити" aria-label="Видалити">@svg('trash')</button>
                                                 </span>
                                             </span>
                                         @else
-                                            <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}">
+                                            <span class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
+                                                @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone')" @endif
+                                            >
                                                 <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
                                                     {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
                                                 </span>
-                                                <span class="min-w-0 truncate text-ink" title="{{ $number['e164'] }}">
-                                                    {{ $number['display_value'] ?? $number['e164'] }}
+                                                <span class="min-w-0 flex-1 truncate text-ink font-mono text-[12px]" title="{{ $number['e164'] }}">
+                                                    {{ $number['e164'] }}
                                                 </span>
-                                                <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                                <span class="dbm-action-grid ml-auto shrink-0 grid grid-cols-[92px_24px_24px_24px_24px] items-center justify-items-center gap-1">
                                                     @if($isInactive)
                                                         <span class="inline-flex items-center gap-1 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">● неактивний</span>
                                                         <button wire:click.stop="restorePhoneNumber({{ $number['entry_id'] }})" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Повернути" aria-label="Повернути">@svg('eye')</button>
@@ -342,14 +370,51 @@
                                         @endif
                                         @if($isEditingNumber)
                                             @error('editingPhoneNumber')
-                                                <span class="ml-[5.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
+                                                <span class="ml-[5.5rem] text-[11px] text-bad-tx" @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone')" @endif>{{ $message }}</span>
                                             @enderror
                                         @endif
                                     @endforeach
+                                    
+                                    {{-- Inline add phone reserve input --}}
+                                    <div class="mt-1.5 flex items-center gap-2 pl-2" x-show="!isReservesCollapsed('phone')">
+                                        <input
+                                            wire:model.defer="newPhoneValue.{{ $r['id'] }}"
+                                            wire:keydown.enter="addPhoneReserve({{ $r['id'] }})"
+                                            type="text"
+                                            placeholder="+380... (додати резерв)"
+                                            class="flex-1 min-w-0 border border-[#dfe3e0] rounded-md px-2 py-1 text-xs text-ink focus:outline-none focus:border-acc"
+                                            aria-label="Додати резервний номер"
+                                        >
+                                        <button type="button" wire:click.stop="addPhoneReserve({{ $r['id'] }})"
+                                            class="shrink-0 text-mut hover:text-acc-tx px-1 py-0.5" title="Додати резерв">@svg('plus')</button>
+                                    </div>
+                                    @error("newPhoneValue.{$r['id']}")
+                                        <span class="text-[11px] text-bad-tx pl-2 mt-0.5 block" x-show="!isReservesCollapsed('phone')">{{ $message }}</span>
+                                    @enderror
+
+                                    <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-mut pl-2" x-show="!isReservesCollapsed('phone')">
+                                        <span>Якщо всі впали:</span>
+                                        <button wire:click.stop="setPhoneExhaustionPolicy({{ $r['id'] }}, 'hide')"
+                                            class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'hide' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">прибрати</button>
+                                        <button wire:click.stop="setPhoneExhaustionPolicy({{ $r['id'] }}, 'last')"
+                                            class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'last' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">останній</button>
+                                        <button wire:click.stop="setPhoneExhaustionPolicy({{ $r['id'] }}, 'emergency')"
+                                            class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'emergency' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">аварійний</button>
+                                        @if(($r['exhaustion_policy'] ?? 'hide') === 'emergency')
+                                            <input
+                                                type="text"
+                                                value="{{ $r['emergency_number'] ?? '' }}"
+                                                wire:change="savePhoneEmergencyNumber({{ $r['id'] }}, $event.target.value)"
+                                                placeholder="аварійний номер"
+                                                class="flex-1 min-w-[140px] border border-[#dfe3e0] rounded-md px-2 py-0.5 text-[11px] text-ink focus:outline-none focus:border-acc"
+                                                aria-label="Аварійний номер">
+                                        @endif
+                                    </div>
+
                                     @if($r['state'] === 'exhausted' && in_array($r['exhaustion_policy'] ?? null, ['last', 'emergency'], true))
                                         <span class="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[10px] font-semibold {{ $r['exhaustion_policy'] === 'emergency' ? 'bg-bad-bg text-bad-tx' : 'bg-warn-bg text-warn-tx' }}">
                                             {{ $r['exhaustion_policy'] === 'emergency' ? 'аварійний' : 'останній' }}
-                                            <span class="font-mono text-ink">{{ $r['display_value'] ?? $r['value'] ?? '—' }}</span>
+                                            <span class="font-mono text-ink">{{ $r['value'] ?? '—' }}</span>
                                         </span>
                                     @endif
                                     @if(!empty($r['messengers']))
@@ -363,9 +428,9 @@
                                             @endforeach
                                         </div>
                                     @endif
-                                </span>
+                                </div>
                             @else
-                                <span class="flex flex-col gap-1 min-w-0">
+                                <div class="flex flex-col gap-1 min-w-0">
                                     @if($r['state'] === 'exhausted' && in_array($r['exhaustion_policy'] ?? null, ['last', 'emergency'], true))
                                         <span class="shrink-0 rounded-md bg-bad-bg px-1.5 py-0.5 text-[10px] font-semibold text-bad-tx">
                                             {{ $r['exhaustion_policy'] === 'emergency' ? 'аварійний' : 'останній' }}
@@ -376,7 +441,7 @@
                                             $isEditingMessenger = $editingMessengerId === $r['id'];
                                             $isInactiveMessenger = !($r['enabled'] ?? true);
                                         @endphp
-                                        <span class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveMessenger ? 'opacity-70' : '' }}">
+                                        <div class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveMessenger ? 'opacity-70' : '' }}">
                                             <span class="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">#1 {{ $r['network'] ?? 'msg' }}</span>
                                             @if($isEditingMessenger)
                                                 <div x-data="{ initial: '{{ addslashes($r['value'] ?? '') }}' }"
@@ -387,6 +452,15 @@
                                                         }
                                                      "
                                                      class="contents"
+                                                >
+                                                <input
+                                                    wire:model.defer="editingMessengerNetwork"
+                                                    wire:keydown.enter="saveInlineMessengerValue"
+                                                    wire:keydown.escape="cancelInlineMessengerEdit"
+                                                    type="text"
+                                                    placeholder="мережа"
+                                                    class="w-24 shrink-0 border border-acc rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none"
+                                                    aria-label="Редагувати мережу месенджера"
                                                 >
                                                 <input
                                                     wire:model.defer="editingMessengerValue"
@@ -404,7 +478,7 @@
                                                     <span class="text-mut">—</span>
                                                 @endif
                                             @endif
-                                            <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                            <span class="dbm-action-grid ml-auto shrink-0 grid grid-cols-[92px_24px_24px_24px_24px] items-center justify-items-center gap-1">
                                                 @if($isEditingMessenger)
                                                     <button wire:click.stop="saveInlineMessengerValue" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
                                                     <button wire:click.stop="cancelInlineMessengerEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
@@ -462,8 +536,11 @@
                                                     <button wire:click.stop="startInlineMessengerEdit({{ $r['id'] }})" class="text-mut hover:text-acc-tx px-1 py-0.5" title="Редагувати" aria-label="Редагувати">@svg('edit')</button>
                                                 @endif
                                             </span>
-                                        </span>
+                                        </div>
                                         @if($isEditingMessenger)
+                                            @error('editingMessengerNetwork')
+                                                <span class="ml-[6.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
+                                            @enderror
                                             @error('editingMessengerValue')
                                                 <span class="ml-[6.5rem] text-[11px] text-bad-tx">{{ $message }}</span>
                                             @enderror
@@ -471,7 +548,7 @@
                                     @elseif($type === 'price' && !empty($r['prices']))
                                         <span class="flex flex-col gap-1 min-w-0">
                                             @foreach($r['prices'] as $index => $price)
-                                                <span class="flex min-h-[28px] items-start gap-2 min-w-0 rounded-md px-2 py-1 bg-[#f7f8f7]">
+                                                <span class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 bg-[#f7f8f7]">
                                                     <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide text-mut font-medium">
                                                         {{ $price['label'] ?: ('Ціна ' . ($index + 1)) }}
                                                     </span>
@@ -495,9 +572,20 @@
                                                     $isEditingReserve = $editingMessengerId === $reserve['id'];
                                                     $isInactiveReserve = $reserve['state'] === 'hidden';
                                                 @endphp
-                                                <div class="flex items-start gap-2 min-w-0 rounded-md px-2 py-1 {{ ($reserve['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveReserve ? 'opacity-70' : '' }}">
+                                                <div class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ ($reserve['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveReserve ? 'opacity-70' : '' }}"
+                                                    x-show="!isReservesCollapsed('messenger')"
+                                                >
                                                     <span class="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ $reserve['label'] }} {{ $reserve['network'] }}</span>
                                                     @if($isEditingReserve)
+                                                        <input
+                                                            wire:model.defer="editingMessengerNetwork"
+                                                            wire:keydown.enter="saveInlineMessengerValue"
+                                                            wire:keydown.escape="cancelInlineMessengerEdit"
+                                                            type="text"
+                                                            placeholder="мережа"
+                                                            class="w-24 shrink-0 border border-acc rounded-md px-2 py-1 text-[11px] text-ink focus:outline-none"
+                                                            aria-label="Редагувати мережу месенджера"
+                                                        >
                                                         <input
                                                             wire:model.defer="editingMessengerValue"
                                                             wire:keydown.enter="saveInlineMessengerValue"
@@ -509,7 +597,7 @@
                                                     @else
                                                         <span class="min-w-0 truncate text-ink">{{ $reserve['value'] ?? '—' }}</span>
                                                     @endif
-                                                    <span class="ml-auto shrink-0 flex flex-wrap justify-end gap-1">
+                                                    <span class="dbm-action-grid ml-auto shrink-0 grid grid-cols-[92px_24px_24px_24px_24px] items-center justify-items-center gap-1">
                                                         @if($isEditingReserve)
                                                             <button wire:click.stop="saveInlineMessengerValue" class="text-ok-tx hover:opacity-80 px-1 py-0.5" title="Зберегти" aria-label="Зберегти">@svg('check')</button>
                                                             <button wire:click.stop="cancelInlineMessengerEdit" class="text-mut hover:text-ink px-1 py-0.5" title="Скасувати" aria-label="Скасувати">@svg('x')</button>
@@ -535,19 +623,154 @@
                                                         @endif
                                                     </span>
                                                 </div>
+                                                @if($isEditingReserve)
+                                                    @error('editingMessengerNetwork')
+                                                        <span class="ml-[6.5rem] text-[11px] text-bad-tx" x-show="!isReservesCollapsed('messenger')">{{ $message }}</span>
+                                                    @enderror
+                                                    @error('editingMessengerValue')
+                                                        <span class="ml-[6.5rem] text-[11px] text-bad-tx" x-show="!isReservesCollapsed('messenger')">{{ $message }}</span>
+                                                    @enderror
+                                                @endif
                                             @endforeach
                                         </div>
                                     @endif
-                                    @if(false && $type === 'messenger')
-                                        <div class="mt-1.5 flex items-center gap-2">
-                                            <select wire:model="newMessengerNetwork.{{ $r['id'] }}"
-                                                class="w-24 shrink-0 border border-[#dfe3e0] rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-acc">
-                                                <option value="">мережа</option>
-                                                <option value="telegram">Telegram</option>
-                                                <option value="viber">Viber</option>
-                                                <option value="whatsapp">WhatsApp</option>
-                                                <option value="messenger">Messenger</option>
-                                            </select>
+                                    @if($type === 'messenger')
+                                        <div class="mt-1.5 flex items-center gap-2 pl-2" x-show="!isReservesCollapsed('messenger')">
+                                            <div
+                                                x-data="{
+                                                    open: false,
+                                                    draft: @js((string) ($newMessengerNetwork[$r['id']] ?? '')),
+                                                    wirePath: 'newMessengerNetwork.{{ $r['id'] }}',
+                                                    storageKey: 'dbmanager.messenger.networks',
+                                                    defaults: [
+                                                        { value: 'telegram', label: 'Telegram' },
+                                                        { value: 'viber', label: 'Viber' },
+                                                        { value: 'whatsapp', label: 'WhatsApp' },
+                                                        { value: 'messenger', label: 'Messenger' },
+                                                        { value: 'signal', label: 'Signal' },
+                                                        { value: 'max', label: 'MAX' },
+                                                        { value: 'line', label: 'Line' },
+                                                        { value: 'wechat', label: 'WeChat' },
+                                                    ],
+                                                    custom: [],
+                                                    init() {
+                                                        try {
+                                                            const saved = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+                                                            this.custom = Array.isArray(saved) ? saved.filter(item => item && item.value && item.label) : [];
+                                                        } catch (e) {
+                                                            this.custom = [];
+                                                        }
+                                                        this.draft = this.draft || '';
+                                                    },
+                                                    normalize(value) {
+                                                        return (value || '').trim().toLowerCase().replace(/[^a-z0-9_ -]+/g, '').replace(/\s+/g, '_').slice(0, 32);
+                                                    },
+                                                    labelFor(value) {
+                                                        return (value || '').trim().slice(0, 32);
+                                                    },
+                                                    persist() {
+                                                        localStorage.setItem(this.storageKey, JSON.stringify(this.custom));
+                                                    },
+                                                    sync() {
+                                                        this.$wire.set(this.wirePath, this.draft || '');
+                                                    },
+                                                    allOptions() {
+                                                        const seen = new Set();
+                                                        return [...this.defaults, ...this.custom].filter(option => {
+                                                            const value = this.normalize(option.value);
+                                                            if (!value || seen.has(value)) return false;
+                                                            seen.add(value);
+                                                            option.value = value;
+                                                            option.label = option.label || value;
+                                                            return true;
+                                                        });
+                                                    },
+                                                    isCustom(option) {
+                                                        return this.custom.some(item => this.normalize(item.value) === option.value);
+                                                    },
+                                                    get options() {
+                                                        const query = this.normalize(this.draft);
+                                                        return this.allOptions().filter(option => !query || option.value.includes(query) || option.label.toLowerCase().includes(query));
+                                                    },
+                                                    hasExactDraft() {
+                                                        const value = this.normalize(this.draft);
+                                                        return value !== '' && this.allOptions().some(option => option.value === value);
+                                                    },
+                                                    choose(option) {
+                                                        this.draft = option.value;
+                                                        this.sync();
+                                                        this.open = false;
+                                                    },
+                                                    addCurrent() {
+                                                        const value = this.normalize(this.draft);
+                                                        if (!value) return;
+                                                        if (!this.hasExactDraft()) {
+                                                            this.custom.push({ value, label: this.labelFor(this.draft) || value });
+                                                            this.persist();
+                                                        }
+                                                        this.draft = value;
+                                                        this.sync();
+                                                        this.open = false;
+                                                    },
+                                                    remove(option) {
+                                                        this.custom = this.custom.filter(item => this.normalize(item.value) !== option.value);
+                                                        if (this.normalize(this.draft) === option.value) this.draft = '';
+                                                        this.sync();
+                                                        this.persist();
+                                                    },
+                                                }"
+                                                @click.outside="open = false"
+                                                class="relative w-32 shrink-0"
+                                            >
+                                                <div class="flex min-h-8 items-center rounded-md border border-[#dfe3e0] bg-white focus-within:border-acc">
+                                                    <input
+                                                        x-model="draft"
+                                                        @input="sync()"
+                                                        @focus="open = true"
+                                                        @input="open = true"
+                                                        @keydown.enter.prevent="addCurrent()"
+                                                        type="text"
+                                                        placeholder="мережа"
+                                                        class="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-[11px] text-ink placeholder:text-mut/60 focus:outline-none focus:ring-0"
+                                                        aria-label="Мережа месенджера"
+                                                    >
+                                                    <button type="button" @click="open = !open" class="shrink-0 px-1.5 text-mut hover:text-acc-tx" title="Вибрати мережу" aria-label="Вибрати мережу">
+                                                        @svg('chevron-down')
+                                                    </button>
+                                                </div>
+                                                <div
+                                                    x-cloak
+                                                    x-show="open"
+                                                    class="absolute left-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-lg border border-[#dfe3e0] bg-white shadow-lg"
+                                                >
+                                                    <div class="max-h-52 overflow-y-auto py-1">
+                                                        <template x-for="option in options" :key="option.value">
+                                                            <div class="flex items-center gap-1 px-1">
+                                                                <button type="button" @click="choose(option)" class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-[11px] text-ink hover:bg-acc-bg hover:text-acc-tx">
+                                                                    <span class="block truncate" x-text="option.label"></span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    x-show="isCustom(option)"
+                                                                    @click.stop="remove(option)"
+                                                                    class="shrink-0 rounded-md px-1.5 py-1 text-mut hover:bg-bad-bg hover:text-bad-tx"
+                                                                    title="Видалити зі списку"
+                                                                    aria-label="Видалити зі списку"
+                                                                >@svg('trash')</button>
+                                                            </div>
+                                                        </template>
+                                                        <button
+                                                            type="button"
+                                                            x-show="normalize(draft) && !hasExactDraft()"
+                                                            @click="addCurrent()"
+                                                            class="mt-1 flex w-full items-center gap-1 border-t border-[#edf0ed] px-3 py-2 text-left text-[11px] font-semibold text-acc-tx hover:bg-acc-bg"
+                                                        >
+                                                            <span>+ додати</span>
+                                                            <span class="font-mono" x-text="normalize(draft)"></span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <input
                                                 wire:model.defer="newMessengerValue.{{ $r['id'] }}"
                                                 type="text"
@@ -558,36 +781,91 @@
                                                 class="shrink-0 text-mut hover:text-acc-tx px-1 py-0.5" title="Додати резерв" aria-label="Додати резерв">@svg('plus')</button>
                                         </div>
                                         @error('newMessengerValue.' . $r['id'])
-                                            <span class="text-[11px] text-bad-tx">{{ $message }}</span>
+                                            <span class="text-[11px] text-bad-tx pl-2 mt-0.5 block" x-show="!isReservesCollapsed('messenger')">{{ $message }}</span>
                                         @enderror
-                                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-mut">
+                                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-mut pl-2" x-show="!isReservesCollapsed('messenger')">
                                             <span>Якщо всі впали:</span>
                                             <button wire:click.stop="setMessengerExhaustionPolicy({{ $r['id'] }}, 'hide')"
                                                 class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'hide' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">прибрати</button>
                                             <button wire:click.stop="setMessengerExhaustionPolicy({{ $r['id'] }}, 'last')"
                                                 class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'last' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">останній</button>
+                                            <button wire:click.stop="setMessengerExhaustionPolicy({{ $r['id'] }}, 'emergency')"
+                                                class="rounded-md px-1.5 py-0.5 border {{ ($r['exhaustion_policy'] ?? 'hide') === 'emergency' ? 'bg-acc text-white border-acc' : 'border-[#dfe3e0] hover:border-acc' }}">аварійний</button>
+                                            @if(($r['exhaustion_policy'] ?? 'hide') === 'emergency')
+                                                <input
+                                                    type="text"
+                                                    value="{{ $r['emergency_value'] ?? '' }}"
+                                                    wire:change="saveMessengerEmergencyValue({{ $r['id'] }}, $event.target.value)"
+                                                    placeholder="аварійний номер / посилання"
+                                                    class="flex-1 min-w-[160px] border border-[#dfe3e0] rounded-md px-2 py-0.5 text-[11px] text-ink focus:outline-none focus:border-acc"
+                                                    aria-label="Аварійний номер">
+                                            @endif
                                         </div>
                                     @endif
-                                </span>
+                                </div>
                             @endif
-                        </span>
+                        </div>
 
                         {{-- Formatting Column --}}
-                        <div class="min-w-0 mt-0.5 w-full">
-                            @if($type === 'phone')
-                                <label class="flex items-center gap-1.5 rounded-md border border-[#dfe3e0] bg-[#fafbfa] px-2 py-0.5 text-[11px] text-mut focus-within:border-acc transition-colors">
-                                    <input
-                                        type="text"
-                                        value="{{ $r['phone_format'] ?? '' }}"
-                                        wire:change="savePhoneFormat({{ $r['id'] }}, $event.target.value)"
-                                        placeholder="без формату"
-                                        class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[11px] text-ink placeholder:text-mut/50 focus:outline-none focus:ring-0"
-                                        aria-label="Формат номера"
-                                    >
-                                </label>
-                                @error("phoneFormatDraft.{$r['id']}")
-                                    <span class="text-[10px] text-bad-tx block mt-0.5">{{ $message }}</span>
-                                @enderror
+                        <div class="min-w-0 w-full mt-0.5">
+                            @if($type === 'phone' && !empty($r['numbers']))
+                                <div class="flex flex-col gap-1">
+                                    @foreach($r['numbers'] as $number)
+                                        @if($number['priority'] === 0)
+                                            <div class="flex min-h-8 items-center">
+                                                <label class="flex w-full items-center gap-1.5 rounded-md border border-[#dfe3e0] bg-[#fafbfa] px-2 py-0.5 text-[11px] text-mut focus-within:border-acc transition-colors">
+                                                    <input
+                                                        type="text"
+                                                        value="{{ $r['phone_format'] ?? '' }}"
+                                                        wire:change="savePhoneFormat({{ $r['id'] }}, $event.target.value)"
+                                                        placeholder="без формату"
+                                                        class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[11px] text-ink placeholder:text-mut/50 focus:outline-none focus:ring-0"
+                                                        aria-label="Формат номера"
+                                                    >
+                                                </label>
+                                            </div>
+                                            @error("phoneFormatDraft.{$r['id']}")
+                                                <span class="text-[10px] text-bad-tx block mt-0.5">{{ $message }}</span>
+                                            @enderror
+                                        @else
+                                            <div class="flex min-h-8 items-center gap-1.5 justify-start pl-2"
+                                                x-show="!isReservesCollapsed('phone')"
+                                            >
+                                                <button type="button" wire:click.stop="movePhoneUp({{ $number['entry_id'] }})"
+                                                    class="text-mut hover:text-acc-tx p-0.5 font-bold text-xs"
+                                                    title="Вгору">▲</button>
+                                                <button type="button" wire:click.stop="movePhoneDown({{ $number['entry_id'] }})"
+                                                    class="text-mut hover:text-acc-tx p-0.5 font-bold text-xs disabled:opacity-30"
+                                                    @if($loop->last) disabled @endif
+                                                    title="Вниз">▼</button>
+                                                <button type="button" wire:click.stop="removeInlinePhoneNumber({{ $number['entry_id'] }})"
+                                                    wire:confirm="Видалити цей номер із ланцюга?"
+                                                    class="text-mut hover:text-bad-tx p-0.5 ml-2"
+                                                    title="Видалити">@svg('trash')</button>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @elseif($type === 'messenger')
+                                <div class="flex flex-col gap-1">
+                                    {{-- Main messenger row formatting placeholder --}}
+                                    <div class="flex min-h-8 items-center">
+                                        <span class="text-mut text-[11px]">—</span>
+                                    </div>
+                                    {{-- Reserve messenger rows --}}
+                                    @if(!empty($r['reserve_rows']))
+                                        @foreach($r['reserve_rows'] as $reserve)
+                                            <div class="flex min-h-8 items-center justify-start pl-2"
+                                                x-show="!isReservesCollapsed('messenger')"
+                                            >
+                                                <button type="button" wire:click.stop="removeMessenger({{ $reserve['id'] }})"
+                                                    wire:confirm="Видалити цей резерв месенджера?"
+                                                    class="text-mut hover:text-bad-tx p-0.5"
+                                                    title="Видалити">@svg('trash')</button>
+                                            </div>
+                                        @endforeach
+                                    @endif
+                                </div>
                             @else
                                 <span class="text-mut text-[11px]">—</span>
                             @endif

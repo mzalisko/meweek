@@ -14,6 +14,7 @@ use App\Livewire\Concerns\UsesEditLock;
 use App\Models\AuditLog;
 use App\Models\DataValue;
 use App\Models\NumberEntry;
+use App\Models\PhoneNumber;
 use App\Models\PhoneSlot;
 use App\Models\Site;
 use App\Models\SiteGroup;
@@ -50,9 +51,13 @@ class ValuesGrid extends Component
 
     public string $editingMessengerValue = '';
 
+    public string $editingMessengerNetwork = '';
+
     public array $newMessengerNetwork = [];
 
     public array $newMessengerValue = [];
+
+    public array $newPhoneValue = [];
 
     public bool $bulkReplaceOpen = false;
 
@@ -390,12 +395,14 @@ class ValuesGrid extends Component
 
         $this->editingMessengerId = $messenger->id;
         $this->editingMessengerValue = (string) ($messenger->content['value'] ?? ($messenger->content['url'] ?? ''));
+        $this->editingMessengerNetwork = (string) ($messenger->content['network'] ?? 'telegram');
     }
 
     public function cancelInlineMessengerEdit(): void
     {
         $this->editingMessengerId = null;
         $this->editingMessengerValue = '';
+        $this->editingMessengerNetwork = '';
         $this->releaseEditLock();
     }
 
@@ -405,6 +412,7 @@ class ValuesGrid extends Component
         $this->editingPhoneNumber = '';
         $this->editingMessengerId = null;
         $this->editingMessengerValue = '';
+        $this->editingMessengerNetwork = '';
         $this->releaseEditLock();
     }
 
@@ -517,12 +525,20 @@ class ValuesGrid extends Component
             return;
         }
 
+        $network = $this->normalizedMessengerNetwork($this->editingMessengerNetwork);
+        if ($network === '') {
+            $this->addError('editingMessengerNetwork', 'Виберіть або введіть мережу месенджера.');
+
+            return;
+        }
+
         if ($this->deferForScope('saveInlineMessengerValue', [], $messenger)) {
             return;
         }
 
         $content = $messenger->content ?? [];
         $old = $content;
+        $content['network'] = $network;
         $content['value'] = $value;
         $content['url'] = $this->messengerUrlFromValue($value);
 
@@ -566,7 +582,7 @@ class ValuesGrid extends Component
             return;
         }
 
-        $network = trim((string) ($this->newMessengerNetwork[$dataValueId] ?? ($primary->content['network'] ?? 'telegram'))) ?: 'telegram';
+        $network = $this->normalizedMessengerNetwork((string) ($this->newMessengerNetwork[$dataValueId] ?? ($primary->content['network'] ?? 'telegram'))) ?: 'telegram';
         $groupKey = $this->messengerGroupKey($primary);
         $messengerType = ValueType::firstOrCreate(['code' => 'messenger'], ['name' => 'messenger']);
         $content = [
@@ -925,7 +941,7 @@ class ValuesGrid extends Component
 
     public function setMessengerExhaustionPolicy(int $dataValueId, string $policy): void
     {
-        if (! in_array($policy, ['hide', 'last'], true)) {
+        if (! in_array($policy, ['hide', 'last', 'emergency'], true)) {
             return;
         }
 
@@ -952,6 +968,39 @@ class ValuesGrid extends Component
             'subject_type' => 'DataValue',
             'subject_id' => $messenger->id,
             'new' => ['exhaustion_policy' => $policy],
+        ]);
+
+        $this->publishDataValue($messenger->fresh());
+    }
+
+    public function saveMessengerEmergencyValue(int $dataValueId, string $value = ''): void
+    {
+        $messenger = DataValue::with('type')->find($dataValueId);
+        $messenger = $this->materializeMessengerForCurrentSite($messenger);
+
+        if (! $messenger) {
+            return;
+        }
+
+        if ($this->deferForScope('saveMessengerEmergencyValue', [$dataValueId, $value], $messenger)) {
+            return;
+        }
+
+        $value = trim($value);
+
+        foreach ($this->messengerGroup($messenger) as $item) {
+            $content = $item->content ?? [];
+            $content['emergency_value'] = $value !== '' ? $value : null;
+            $content['emergency_url'] = $value !== '' ? $this->messengerUrlFromValue($value) : null;
+            $item->update(['content' => $content]);
+        }
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'action' => 'messenger.emergency_value_changed',
+            'subject_type' => 'DataValue',
+            'subject_id' => $messenger->id,
+            'new' => ['emergency_value' => $value !== '' ? $value : null],
         ]);
 
         $this->publishDataValue($messenger->fresh());
@@ -1053,6 +1102,246 @@ class ValuesGrid extends Component
         $this->cancelInlinePhoneEdit();
         $this->dispatch('slot-updated');
         $this->dispatch('toast', message: 'Номер видалено → опубліковано');
+    }
+
+    public function addPhoneReserve(int $dataValueId): void
+    {
+        $field = "newPhoneValue.{$dataValueId}";
+        $this->resetErrorBag($field);
+
+        $valueStr = trim((string) ($this->newPhoneValue[$dataValueId] ?? ''));
+        $e164 = $this->normalizedPhoneInput($field, $valueStr);
+
+        if (! $e164) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot.entries')->find($dataValueId);
+        if (! $value || ! $value->phoneSlot || ! $this->valueBelongsToCurrentSite($value) || ! $this->canChangeValue($value)) {
+            return;
+        }
+
+        if (! $this->acquireEditLock($this->editLockKey('data-value', $value->id), $value->key)) {
+            return;
+        }
+
+        try {
+            if ($this->deferForScope('addPhoneReserve', [$dataValueId], $value)) {
+                return;
+            }
+
+            $slot = $value->phoneSlot;
+            $next = $slot->entries()->count()
+                ? ((int) $slot->entries()->max('priority') + 1)
+                : 0;
+
+            $pn = PhoneNumber::firstOrCreate(
+                ['e164' => $e164],
+                ['status' => 'active'],
+            );
+
+            if ($slot->entries()->where('phone_number_id', $pn->id)->exists()) {
+                $this->addError($field, 'Цей номер уже є у слоті.');
+                return;
+            }
+
+            NumberEntry::create([
+                'phone_slot_id'   => $slot->id,
+                'phone_number_id' => $pn->id,
+                'priority'        => $next,
+            ]);
+
+            app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'number.added',
+                'subject_type' => 'phone_slot',
+                'subject_id'   => $slot->id,
+                'new'          => ['e164' => $e164, 'priority' => $next],
+            ]);
+
+            $this->newPhoneValue[$dataValueId] = '';
+            $this->publishSlots(collect([$slot->fresh()]));
+            $this->dispatch('slot-updated');
+            $this->dispatch('toast', message: 'Резерв додано → опубліковано');
+        } finally {
+            $this->releaseEditLock();
+        }
+    }
+
+    public function setPhoneExhaustionPolicy(int $dataValueId, string $policy): void
+    {
+        if (! in_array($policy, ['hide', 'last', 'emergency'], true)) {
+            return;
+        }
+
+        $value = DataValue::with('phoneSlot')->find($dataValueId);
+        if (! $value || ! $value->phoneSlot || ! $this->canChangeValue($value)) {
+            return;
+        }
+
+        if ($this->deferForScope('setPhoneExhaustionPolicy', [$dataValueId, $policy], $value)) {
+            return;
+        }
+
+        $slot = $value->phoneSlot;
+        $oldPolicy = $slot->exhaustion_policy;
+        if ($oldPolicy === $policy) {
+            return;
+        }
+
+        $slot->update(['exhaustion_policy' => $policy]);
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'action' => 'slot.exhaustion_policy_changed',
+            'subject_type' => 'phone_slot',
+            'subject_id' => $slot->id,
+            'old' => ['exhaustion_policy' => $oldPolicy],
+            'new' => ['exhaustion_policy' => $policy],
+        ]);
+
+        $this->publishSlots(collect([$slot->fresh()]));
+        $this->dispatch('slot-updated');
+        $this->dispatch('toast', message: 'Політику слота оновлено → опубліковано');
+    }
+
+    public function savePhoneEmergencyNumber(int $dataValueId, string $value = ''): void
+    {
+        $phone = DataValue::with('phoneSlot')->find($dataValueId);
+        if (! $phone || ! $phone->phoneSlot || ! $this->canChangeValue($phone)) {
+            return;
+        }
+
+        if ($this->deferForScope('savePhoneEmergencyNumber', [$dataValueId, $value], $phone)) {
+            return;
+        }
+
+        $slot = $phone->phoneSlot;
+        $newNumber = trim($value) !== '' ? trim($value) : null;
+        $oldNumber = $slot->emergency_number;
+        if ($oldNumber === $newNumber) {
+            return;
+        }
+
+        $slot->update(['emergency_number' => $newNumber]);
+        app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'action' => 'slot.emergency_number_changed',
+            'subject_type' => 'phone_slot',
+            'subject_id' => $slot->id,
+            'old' => ['emergency_number' => $oldNumber],
+            'new' => ['emergency_number' => $newNumber],
+        ]);
+
+        $this->publishSlots(collect([$slot->fresh()]));
+        $this->dispatch('slot-updated');
+        $this->dispatch('toast', message: 'Аварійний номер оновлено → опубліковано');
+    }
+
+    public function movePhoneUp(int $entryId): void
+    {
+        $entry = NumberEntry::with('slot.dataValue')->find($entryId);
+        if (! $entry || ! $entry->slot || ! $entry->slot->dataValue || ! $this->valueBelongsToCurrentSite($entry->slot->dataValue) || ! $this->canChangeValue($entry->slot->dataValue)) {
+            return;
+        }
+
+        if ($this->deferForScope('movePhoneUp', [$entryId], $entry->slot->dataValue)) {
+            return;
+        }
+
+        if (! $this->acquireEditLock($this->editLockKey('data-value', $entry->slot->data_value_id), $entry->slot->dataValue->key)) {
+            return;
+        }
+
+        try {
+            $slot = $entry->slot;
+            $entries = $slot->entries()->orderBy('priority')->get();
+            $index = $entries->search(fn ($e) => $e->id === $entry->id);
+            $neighbour = $entries->get($index - 1);
+
+            if ($index === 0 || ! $neighbour) {
+                return;
+            }
+
+            $this->swapEntryPriorities($entry, $neighbour);
+            app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'slot.reordered',
+                'subject_type' => 'phone_slot',
+                'subject_id'   => $slot->id,
+                'new'          => ['moved' => $entryId, 'direction' => 'up'],
+            ]);
+
+            $this->publishSlots(collect([$slot->fresh()]));
+            $this->dispatch('slot-updated');
+        } finally {
+            $this->releaseEditLock();
+        }
+    }
+
+    public function movePhoneDown(int $entryId): void
+    {
+        $entry = NumberEntry::with('slot.dataValue')->find($entryId);
+        if (! $entry || ! $entry->slot || ! $entry->slot->dataValue || ! $this->valueBelongsToCurrentSite($entry->slot->dataValue) || ! $this->canChangeValue($entry->slot->dataValue)) {
+            return;
+        }
+
+        if ($this->deferForScope('movePhoneDown', [$entryId], $entry->slot->dataValue)) {
+            return;
+        }
+
+        if (! $this->acquireEditLock($this->editLockKey('data-value', $entry->slot->data_value_id), $entry->slot->dataValue->key)) {
+            return;
+        }
+
+        try {
+            $slot = $entry->slot;
+            $entries = $slot->entries()->orderBy('priority')->get();
+            $index = $entries->search(fn ($e) => $e->id === $entry->id);
+            $neighbour = $entries->get($index + 1);
+
+            if (! $neighbour) {
+                return;
+            }
+
+            $this->swapEntryPriorities($entry, $neighbour);
+            app(FailoverEngine::class)->recompute($slot->fresh(), 'user');
+
+            AuditLog::create([
+                'actor_type'   => 'user',
+                'action'       => 'slot.reordered',
+                'subject_type' => 'phone_slot',
+                'subject_id'   => $slot->id,
+                'new'          => ['moved' => $entryId, 'direction' => 'down'],
+            ]);
+
+            $this->publishSlots(collect([$slot->fresh()]));
+            $this->dispatch('slot-updated');
+        } finally {
+            $this->releaseEditLock();
+        }
+    }
+
+    private function swapEntryPriorities(NumberEntry $a, NumberEntry $b): void
+    {
+        $pA = $a->priority;
+        $pB = $b->priority;
+
+        $maxPriority = \DB::table('number_entries')
+            ->where('phone_slot_id', $a->phone_slot_id)
+            ->max('priority');
+        $temp = (int) $maxPriority + 1;
+
+        \DB::table('number_entries')->where('id', $a->id)->update(['priority' => $temp]);
+        \DB::table('number_entries')->where('id', $b->id)->update(['priority' => $pA]);
+        \DB::table('number_entries')->where('id', $a->id)->update(['priority' => $pB]);
     }
 
     public function deactivatePhoneNumber(int $entryId): void
@@ -1791,6 +2080,15 @@ class ValuesGrid extends Component
     private function messengerUrlFromValue(string $value): ?string
     {
         return preg_match('/^https?:\/\//i', $value) ? $value : null;
+    }
+
+    private function normalizedMessengerNetwork(string $network): string
+    {
+        $network = trim(mb_strtolower($network));
+        $network = preg_replace('/[^a-z0-9_ -]+/i', '', $network) ?? '';
+        $network = preg_replace('/\s+/', '_', $network) ?? '';
+
+        return substr(trim($network, '_- '), 0, 32);
     }
 
     private function uniqueMessengerKey(DataValue $primary, string $network): string

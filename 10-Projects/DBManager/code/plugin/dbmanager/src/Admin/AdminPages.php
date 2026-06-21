@@ -79,6 +79,8 @@ class AdminPages
                 ? (string) current_time('mysql')
                 : gmdate('Y-m-d H:i:s');
 
+            delete_option('dbm_cache');
+
             add_settings_error(
                 'dbm_settings',
                 'dbm_connection_saved',

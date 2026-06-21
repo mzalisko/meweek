@@ -43,6 +43,36 @@ class ValueEditFromGridTest extends TestCase
             ->assertDispatched('open-value-editor', siteId: $site->id);
     }
 
+    public function test_inline_messenger_edit_updates_network_and_value(): void
+    {
+        $site = Site::factory()->create();
+        $messenger = DataValue::factory()->forSite($site)->ofType('messenger')->create([
+            'key' => 'msg_main',
+            'content' => [
+                'value' => 'https://old.example',
+                'network' => 'telegram',
+                'url' => 'https://old.example',
+                'enabled' => true,
+            ],
+        ]);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('startInlineMessengerEdit', $messenger->id)
+            ->assertSet('editingMessengerId', $messenger->id)
+            ->assertSet('editingMessengerNetwork', 'telegram')
+            ->set('editingMessengerNetwork', 'max')
+            ->set('editingMessengerValue', 'https://max.example')
+            ->call('saveInlineMessengerValue')
+            ->assertSet('editingMessengerId', null)
+            ->assertDispatched('toast');
+
+        $content = $messenger->fresh()->content;
+        $this->assertSame('max', $content['network']);
+        $this->assertSame('https://max.example', $content['value']);
+        $this->assertSame('https://max.example', $content['url']);
+        $this->assertTrue(AuditLog::where('action', 'messenger.value_changed')->exists());
+    }
+
     public function test_phone_rows_still_use_openSlot(): void
     {
         // Phone rows keep openSlot — no regression
@@ -117,7 +147,7 @@ class ValueEditFromGridTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'number.removed')->exists());
     }
 
-    public function test_phone_chain_does_not_show_reserves_in_grid(): void
+    public function test_phone_chain_shows_reserves_in_grid(): void
     {
         $site = Site::factory()->create();
         [$slot] = $this->slotWithNumbers(['active', 'active']);
@@ -125,7 +155,7 @@ class ValueEditFromGridTest extends TestCase
 
         Livewire::test(ValuesGrid::class, ['site' => $site->id])
             ->assertSee('#1 основний')
-            ->assertDontSee('#1.1 резерв');
+            ->assertSee('#1.1 резерв');
     }
 
     public function test_down_phone_status_is_rendered_in_ukrainian(): void

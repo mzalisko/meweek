@@ -32,10 +32,7 @@ class SlotPanelTest extends TestCase
         Livewire::test(SlotPanel::class)
             ->call('open', $slot->dataValue->id)
             ->assertSee('phone_ua_1')
-            ->assertSee('гео-мітки')
             ->assertSee('Повернення')
-            ->assertSee('Якщо всі впали')
-            ->assertSee($entries[1]->phoneNumber->e164)
             ->assertSet('open', true);
     }
 

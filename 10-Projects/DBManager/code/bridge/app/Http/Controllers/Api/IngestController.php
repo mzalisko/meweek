@@ -39,11 +39,14 @@ class IngestController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if ($existing && $data['version'] < $existing->version) {
+            $newConnection = $existing
+                && ! hash_equals((string) $existing->token_hash, (string) $data['token_hash']);
+
+            if ($existing && ! $newConnection && $data['version'] < $existing->version) {
                 return ['stale' => true];
             }
 
-            if ($existing && $data['version'] === $existing->version && $existing->payload !== $data['payload']) {
+            if ($existing && ! $newConnection && $data['version'] === $existing->version && $existing->payload !== $data['payload']) {
                 return ['stale' => true];
             }
 
