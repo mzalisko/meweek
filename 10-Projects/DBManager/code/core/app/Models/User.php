@@ -43,4 +43,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserSiteGroupAccess::class);
     }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(UserFavorite::class);
+    }
 }

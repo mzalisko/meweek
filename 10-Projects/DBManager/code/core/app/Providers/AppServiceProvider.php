@@ -29,6 +29,11 @@ class AppServiceProvider extends ServiceProvider
             app(LocalDataRestorer::class)->restore();
         }
 
+        // Автоматично передавати кількість активних інцидентів у шапку всіх адмін-сторінок
+        \Illuminate\Support\Facades\View::composer('components.layouts.admin', function ($view) {
+            $view->with('incidents', \App\Models\Incident::where('status', 'new')->count());
+        });
+
         // Логування подій авторизації користувачів
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, function ($event) {
             \App\Models\AuditLog::create([

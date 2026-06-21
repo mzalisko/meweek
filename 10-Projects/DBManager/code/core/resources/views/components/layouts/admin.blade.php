@@ -45,11 +45,11 @@
             @php
                 $canManageAccess = app(\App\Admin\AccessControl::class)->canManageAccess(auth()->user());
                 $nav = [
-                    ['Дашборд',          'grid',  null],
+                    ['Дашборд',          'grid',  route('admin.dashboard')],
                     ['Сайт',             'grid',  route('admin.site')],
                     ['Масові операції',  'search', route('admin.bulk')],
                     ['Сайти і групи',    'sites', route('admin.sites')],
-                    ['Інциденти',        'alert', null],
+                    ['Інциденти',        'alert', route('admin.incidents')],
                     ['Аудит',            'audit', route('admin.audit')],
                 ];
                 if ($canManageAccess) {

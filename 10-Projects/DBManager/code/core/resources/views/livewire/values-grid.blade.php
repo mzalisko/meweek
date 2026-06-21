@@ -300,6 +300,9 @@
                         {{-- Value / inline phone edit --}}
                         <div class="min-w-0">
                             @if($type === 'phone' && !empty($r['numbers']))
+                                @php
+                                    $hasActivePhoneReserve = collect($r['numbers'])->contains(fn ($n) => $n['priority'] > 0 && ($n['is_current'] ?? false));
+                                @endphp
                                 <div class="flex flex-col gap-1">
                                     @foreach($r['numbers'] as $number)
                                         @php
@@ -307,6 +310,7 @@
                                             $numberStatus = $number['status'] ?? 'active';
                                             $isInactive = $numberStatus !== 'active';
                                             $isPinned = $number['is_pinned'] ?? false;
+                                            $phoneRowVisible = $number['is_current'] ? 'true' : 'false';
                                         @endphp
                                         @if($isEditingNumber)
                                             <span
@@ -318,7 +322,13 @@
                                                     }
                                                 "
                                                 class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
-                                                @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone')" @endif
+                                                @if($number['priority'] > 0)
+                                                    x-show="!isReservesCollapsed('phone') || {{ $phoneRowVisible }}"
+                                                    x-cloak
+                                                @elseif($hasActivePhoneReserve)
+                                                    x-show="!isReservesCollapsed('phone')"
+                                                    x-cloak
+                                                @endif
                                             >
                                                 <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
                                                     {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
@@ -339,7 +349,13 @@
                                             </span>
                                         @else
                                             <span class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ $number['is_current'] ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactive ? 'opacity-70' : '' }}"
-                                                @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone')" @endif
+                                                @if($number['priority'] > 0)
+                                                    x-show="!isReservesCollapsed('phone') || {{ $phoneRowVisible }}"
+                                                    x-cloak
+                                                @elseif($hasActivePhoneReserve)
+                                                    x-show="!isReservesCollapsed('phone')"
+                                                    x-cloak
+                                                @endif
                                             >
                                                 <span class="w-24 shrink-0 text-[10px] uppercase tracking-wide {{ $number['is_current'] ? 'text-acc-tx font-semibold' : 'text-mut' }}">
                                                     {{ $number['priority'] === 0 ? '#1 основний' : '#1.' . $number['priority'] . ' резерв' }}
@@ -370,7 +386,7 @@
                                         @endif
                                         @if($isEditingNumber)
                                             @error('editingPhoneNumber')
-                                                <span class="ml-[5.5rem] text-[11px] text-bad-tx" @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone')" @endif>{{ $message }}</span>
+                                                <span class="ml-[5.5rem] text-[11px] text-bad-tx" @if($number['priority'] > 0) x-show="!isReservesCollapsed('phone') || {{ $phoneRowVisible }}" x-cloak @elseif($hasActivePhoneReserve) x-show="!isReservesCollapsed('phone')" x-cloak @endif>{{ $message }}</span>
                                             @enderror
                                         @endif
                                     @endforeach
@@ -440,8 +456,14 @@
                                         @php
                                             $isEditingMessenger = $editingMessengerId === $r['id'];
                                             $isInactiveMessenger = !($r['enabled'] ?? true);
+                                            $hasActiveMessengerReserve = collect($r['reserve_rows'] ?? [])->contains(fn ($res) => ($res['is_current'] ?? false));
                                         @endphp
-                                        <div class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveMessenger ? 'opacity-70' : '' }}">
+                                        <div class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ ($r['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveMessenger ? 'opacity-70' : '' }}"
+                                            @if($hasActiveMessengerReserve)
+                                                x-show="!isReservesCollapsed('messenger')"
+                                                data-primary-row data-has-active-reserve
+                                            @endif
+                                        >
                                             <span class="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide {{ ($r['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">#1 {{ $r['network'] ?? 'msg' }}</span>
                                             @if($isEditingMessenger)
                                                 <div x-data="{ initial: '{{ addslashes($r['value'] ?? '') }}' }"
@@ -571,9 +593,11 @@
                                                 @php
                                                     $isEditingReserve = $editingMessengerId === $reserve['id'];
                                                     $isInactiveReserve = $reserve['state'] === 'hidden';
+                                                    $messengerReserveVisible = ($reserve['is_current'] ?? false) ? 'true' : 'false';
                                                 @endphp
                                                 <div class="flex min-h-8 items-center gap-2 min-w-0 rounded-md px-2 py-1 {{ ($reserve['is_current'] ?? false) ? 'bg-acc-bg' : 'bg-[#f7f8f7]' }} {{ $isInactiveReserve ? 'opacity-70' : '' }}"
-                                                    x-show="!isReservesCollapsed('messenger')"
+                                                    x-show="!isReservesCollapsed('messenger') || {{ $messengerReserveVisible }}"
+                                                    x-cloak
                                                 >
                                                     <span class="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide {{ ($reserve['is_current'] ?? false) ? 'text-acc-tx font-semibold' : 'text-mut' }}">{{ $reserve['label'] }} {{ $reserve['network'] }}</span>
                                                     @if($isEditingReserve)
@@ -625,10 +649,10 @@
                                                 </div>
                                                 @if($isEditingReserve)
                                                     @error('editingMessengerNetwork')
-                                                        <span class="ml-[6.5rem] text-[11px] text-bad-tx" x-show="!isReservesCollapsed('messenger')">{{ $message }}</span>
+                                                        <span class="ml-[6.5rem] text-[11px] text-bad-tx" x-show="!isReservesCollapsed('messenger') || {{ $messengerReserveVisible }}" x-cloak>{{ $message }}</span>
                                                     @enderror
                                                     @error('editingMessengerValue')
-                                                        <span class="ml-[6.5rem] text-[11px] text-bad-tx" x-show="!isReservesCollapsed('messenger')">{{ $message }}</span>
+                                                        <span class="ml-[6.5rem] text-[11px] text-bad-tx" x-show="!isReservesCollapsed('messenger') || {{ $messengerReserveVisible }}" x-cloak>{{ $message }}</span>
                                                     @enderror
                                                 @endif
                                             @endforeach
@@ -812,7 +836,13 @@
                                 <div class="flex flex-col gap-1">
                                     @foreach($r['numbers'] as $number)
                                         @if($number['priority'] === 0)
-                                            <div class="flex min-h-8 items-center">
+                                            @php $fmtPhoneRowVisible = $number['is_current'] ? 'true' : 'false'; @endphp
+                                            <div class="flex min-h-8 items-center"
+                                                @if($hasActivePhoneReserve)
+                                                    x-show="!isReservesCollapsed('phone')"
+                                                    x-cloak
+                                                @endif
+                                            >
                                                 <label class="flex w-full items-center gap-1.5 rounded-md border border-[#dfe3e0] bg-[#fafbfa] px-2 py-0.5 text-[11px] text-mut focus-within:border-acc transition-colors">
                                                     <input
                                                         type="text"
@@ -828,8 +858,10 @@
                                                 <span class="text-[10px] text-bad-tx block mt-0.5">{{ $message }}</span>
                                             @enderror
                                         @else
+                                            @php $fmtPhoneRowVisible = $number['is_current'] ? 'true' : 'false'; @endphp
                                             <div class="flex min-h-8 items-center gap-1.5 justify-start pl-2"
-                                                x-show="!isReservesCollapsed('phone')"
+                                                x-show="!isReservesCollapsed('phone') || {{ $fmtPhoneRowVisible }}"
+                                                x-cloak
                                             >
                                                 <button type="button" wire:click.stop="movePhoneUp({{ $number['entry_id'] }})"
                                                     class="text-mut hover:text-acc-tx p-0.5 font-bold text-xs"
@@ -849,14 +881,21 @@
                             @elseif($type === 'messenger')
                                 <div class="flex flex-col gap-1">
                                     {{-- Main messenger row formatting placeholder --}}
-                                    <div class="flex min-h-8 items-center">
+                                    <div class="flex min-h-8 items-center"
+                                        @if($hasActiveMessengerReserve)
+                                            x-show="!isReservesCollapsed('messenger')"
+                                            x-cloak
+                                        @endif
+                                    >
                                         <span class="text-mut text-[11px]">—</span>
                                     </div>
                                     {{-- Reserve messenger rows --}}
                                     @if(!empty($r['reserve_rows']))
                                         @foreach($r['reserve_rows'] as $reserve)
+                                            @php $fmtMsgRowVisible = ($reserve['is_current'] ?? false) ? 'true' : 'false'; @endphp
                                             <div class="flex min-h-8 items-center justify-start pl-2"
-                                                x-show="!isReservesCollapsed('messenger')"
+                                                x-show="!isReservesCollapsed('messenger') || {{ $fmtMsgRowVisible }}"
+                                                x-cloak
                                             >
                                                 <button type="button" wire:click.stop="removeMessenger({{ $reserve['id'] }})"
                                                     wire:confirm="Видалити цей резерв месенджера?"

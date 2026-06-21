@@ -10,6 +10,13 @@
         <div class="min-w-0">
             <div class="flex items-center gap-2">
                 <span class="font-medium text-ink truncate">{{ $site->domain }} <small class="text-mut text-[10px] ml-1">ID: {{ $site->id }}</small></span>
+                @if(!$site->trashed())
+                    <button type="button" wire:click="toggleFavorite('site', {{ $site->id }})" 
+                        class="{{ in_array($site->id, $favSiteIds) ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500' }} text-[14px] shrink-0 focus:outline-none transition-colors" 
+                        title="{{ in_array($site->id, $favSiteIds) ? 'Вилучити з улюблених' : 'Додати до улюблених' }}">
+                        {{ in_array($site->id, $favSiteIds) ? '★' : '☆' }}
+                    </button>
+                @endif
                 @if($site->country_hint)
                     <span class="rounded bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut">{{ $site->country_hint }}</span>
                 @endif

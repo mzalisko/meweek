@@ -98,6 +98,13 @@
                             <span class="inline-flex transition-transform duration-150" :class="isOpen('group-{{ $group->id }}') || {{ $siteSearch !== '' ? 'true' : 'false' }} ? '' : '-rotate-90'">@svg('chevron-down')</span>
                         </button>
                         <span class="font-semibold text-ink truncate">{{ $group->name }}</span>
+                        @if(!$group->trashed())
+                            <button type="button" wire:click="toggleFavorite('group', {{ $group->id }})" 
+                                class="{{ in_array($group->id, $favGroupIds) ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500' }} text-[15px] shrink-0 focus:outline-none transition-colors ml-0.5" 
+                                title="{{ in_array($group->id, $favGroupIds) ? 'Вилучити з улюблених' : 'Додати до улюблених' }}">
+                                {{ in_array($group->id, $favGroupIds) ? '★' : '☆' }}
+                            </button>
+                        @endif
                         @if($group->trashed())
                             <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52]">архів</span>
                         @endif

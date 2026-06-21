@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Запобігання миготливості Alpine.js (layout shift) */
+[x-cloak] {
+    display: none !important;
+}
+
+
 @layer components {
     .dbm-action-grid:not(:has(> span.bg-ok-bg)):not(:has(> span.bg-bad-bg)) > button:first-of-type {
         grid-column-start: 2;

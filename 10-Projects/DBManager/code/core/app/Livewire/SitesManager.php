@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use App\Models\UserFavorite;
 
 class SitesManager extends Component
 {
@@ -517,6 +518,29 @@ class SitesManager extends Component
         $this->dispatch('toast', message: 'Дані успішно клоновано з сайту-джерела.');
     }
 
+    public function toggleFavorite(string $type, int $id): void
+    {
+        $userId = auth()->id();
+        $favorableType = $type === 'group' ? SiteGroup::class : Site::class;
+
+        $favorite = UserFavorite::where('user_id', $userId)
+            ->where('favorable_type', $favorableType)
+            ->where('favorable_id', $id)
+            ->first();
+
+        if ($favorite) {
+            $favorite->delete();
+            $this->dispatch('toast', message: 'Вилучено з улюблених');
+        } else {
+            UserFavorite::create([
+                'user_id' => $userId,
+                'favorable_type' => $favorableType,
+                'favorable_id' => $id,
+            ]);
+            $this->dispatch('toast', message: 'Додано до улюблених');
+        }
+    }
+
     public function closePanel(): void
     {
         $this->panelMode = null;
@@ -614,6 +638,11 @@ class SitesManager extends Component
         $visibleGroups = $this->filterGroups($this->filterGroupsByAccess($groups, $accessibleSiteIds));
         $visibleUngrouped = $this->filterSitesTree($this->filterSitesTreeByAccess($ungroupedSites, $accessibleSiteIds));
 
+        $userId = auth()->id();
+        $favoritesCollection = UserFavorite::where('user_id', $userId)->get();
+        $favGroupIds = $favoritesCollection->where('favorable_type', SiteGroup::class)->pluck('favorable_id')->all();
+        $favSiteIds = $favoritesCollection->where('favorable_type', Site::class)->pluck('favorable_id')->all();
+
         return view('livewire.sites-manager', [
             'groups' => $visibleGroups,
             'ungroupedSites' => $visibleUngrouped,
@@ -628,6 +657,8 @@ class SitesManager extends Component
                 : collect(),
             'tokenStatus' => $editingSite ? $this->connectionStatus($editingSite) : null,
             'canManageSites' => $canManageSites,
+            'favGroupIds' => $favGroupIds,
+            'favSiteIds' => $favSiteIds,
         ])->layout('components.layouts.admin');
     }
 

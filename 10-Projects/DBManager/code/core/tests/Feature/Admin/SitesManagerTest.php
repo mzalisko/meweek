@@ -272,4 +272,55 @@ class SitesManagerTest extends TestCase
             ->assertSeeHtml("x-show=\"isOpen('group-{$group->id}')")             // тіло групи згортається
             ->assertSee('live.test');                   // сайт лишається в DOM
     }
+
+    public function test_toggle_favorites_for_groups_and_sites(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $group = SiteGroup::factory()->create(['name' => 'Улюблена група']);
+        $site = Site::factory()->create(['domain' => 'fav.test']);
+
+        // Спочатку зірочки пусті (немає в улюблених)
+        Livewire::test(SitesManager::class)
+            ->assertDontSee('★')
+            ->assertSee('☆');
+
+        // Додаємо групу до улюблених
+        Livewire::test(SitesManager::class)
+            ->call('toggleFavorite', 'group', $group->id)
+            ->assertDispatched('toast', message: 'Додано до улюблених');
+
+        $this->assertDatabaseHas('user_favorites', [
+            'user_id' => $user->id,
+            'favorable_type' => SiteGroup::class,
+            'favorable_id' => $group->id,
+        ]);
+
+        // Додаємо сайт до улюблених
+        Livewire::test(SitesManager::class)
+            ->call('toggleFavorite', 'site', $site->id)
+            ->assertDispatched('toast', message: 'Додано до улюблених');
+
+        $this->assertDatabaseHas('user_favorites', [
+            'user_id' => $user->id,
+            'favorable_type' => Site::class,
+            'favorable_id' => $site->id,
+        ]);
+
+        // Перевіряємо відображення зафарбованих зірочок
+        Livewire::test(SitesManager::class)
+            ->assertSee('★');
+
+        // Видаляємо з улюблених
+        Livewire::test(SitesManager::class)
+            ->call('toggleFavorite', 'group', $group->id)
+            ->assertDispatched('toast', message: 'Вилучено з улюблених');
+
+        $this->assertDatabaseMissing('user_favorites', [
+            'user_id' => $user->id,
+            'favorable_type' => SiteGroup::class,
+            'favorable_id' => $group->id,
+        ]);
+    }
 }
