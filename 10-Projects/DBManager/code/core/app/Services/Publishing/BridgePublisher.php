@@ -61,6 +61,10 @@ class BridgePublisher
             return false;
         }
 
+        // Успішна доставка в бридж = з'єднання живе. Позначаємо сайт «онлайн»
+        // для дашборду «втрачено зв'язок» (інакше last_seen_at ніхто не пише).
+        $site->tokens()->whereNull('revoked_at')->update(['last_seen_at' => now()]);
+
         return true;
     }
 }

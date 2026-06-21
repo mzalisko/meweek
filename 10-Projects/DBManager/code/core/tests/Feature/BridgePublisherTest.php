@@ -75,4 +75,34 @@ class BridgePublisherTest extends TestCase
 
         $this->assertFalse($ok);
     }
+
+    public function test_successful_push_marks_site_online_via_last_seen_at(): void
+    {
+        Http::fake(['*' => Http::response(['stored_version' => 1], 200)]);
+
+        $site = Site::factory()->create();
+        app(SiteProvisioner::class)->issueToken($site);
+        $publication = app(SitePayloadCompiler::class)->publish($site);
+
+        $this->assertNull($site->tokens()->whereNull('revoked_at')->max('last_seen_at'));
+
+        $ok = app(BridgePublisher::class)->push($publication);
+
+        $this->assertTrue($ok);
+        // Успішний push = з'єднання живе → сайт онлайн на дашборді.
+        $this->assertNotNull($site->fresh()->tokens()->whereNull('revoked_at')->max('last_seen_at'));
+    }
+
+    public function test_failed_push_does_not_mark_site_online(): void
+    {
+        Http::fake(['*' => Http::response('', 500)]);
+
+        $site = Site::factory()->create();
+        app(SiteProvisioner::class)->issueToken($site);
+        $publication = app(SitePayloadCompiler::class)->publish($site);
+
+        app(BridgePublisher::class)->push($publication);
+
+        $this->assertNull($site->fresh()->tokens()->whereNull('revoked_at')->max('last_seen_at'));
+    }
 }
