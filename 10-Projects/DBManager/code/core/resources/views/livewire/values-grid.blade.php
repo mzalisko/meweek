@@ -126,11 +126,27 @@
                     @endif
                 </div>
             </div>
-            @if($canEditCurrentSite)
-                <button wire:click="addValue"
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-acc px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-acc/90">
-                    + Додати значення
-                </button>
+            @if($canEditCurrentSite || $canManageSites)
+                <div class="flex items-center gap-2">
+                    @if($canManageSites)
+                        <button wire:click="editSite"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#c4c7c3] bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-acc-bg">
+                            @svg('edit', 13)
+                            Редагувати сайт
+                        </button>
+                    @endif
+                    @if($canEditCurrentSite)
+                        <button wire:click="syncCurrentSite" wire:loading.attr="disabled"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#c4c7c3] bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-acc-bg disabled:opacity-50">
+                            @svg('refresh', 13)
+                            Синхронізувати
+                        </button>
+                        <button wire:click="addValue"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-acc px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-acc/90">
+                            + Додати значення
+                        </button>
+                    @endif
+                </div>
             @endif
         </div>
     @endif
@@ -1028,6 +1044,159 @@
                 Скасувати
             </button>
         </div>
+    </aside>
+@endif
+
+@if($canManageSites && $showEditSiteModal)
+    <div class="fixed inset-0 z-20 bg-[rgba(20,26,22,0.28)]" wire:click="closeEditSite"></div>
+    <aside wire:click.stop
+        class="fixed right-0 top-0 bottom-0 z-30 w-[460px] max-w-[calc(100vw-24px)] overflow-y-auto border-l border-[#dfe3e0] bg-white text-[13px] shadow-[-18px_0_40px_rgba(28,34,30,0.12)]">
+        <div class="flex items-center justify-between border-b border-[#edf0ed] px-4 py-3">
+            <h2 class="text-[15px] font-semibold text-acc-tx">
+                {{ $editingSiteId ? 'Редагувати сайт' : 'Новий сайт' }}
+            </h2>
+            <button type="button" wire:click="closeEditSite" class="text-mut hover:text-ink shrink-0" aria-label="Закрити">@svg('x')</button>
+        </div>
+
+        <form wire:submit="saveSite" class="space-y-4 px-4 py-4">
+            <div>
+                <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Назва</label>
+                <input wire:model="siteName" type="text"
+                    class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                @error('siteName')
+                    <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Домен</label>
+                <input wire:model="siteDomain" type="text" placeholder="example.com"
+                    class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                @error('siteDomain')
+                    <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Код країни (необов’язково)</label>
+                <input wire:model="siteCountryHint" type="text" maxlength="8" placeholder="UA"
+                    class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                @error('siteCountryHint')
+                    <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Група</label>
+                <select wire:model="siteGroupId"
+                    class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                    <option value="">Без групи</option>
+                    @foreach($groupOptions as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+                @error('siteGroupId')
+                    <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label class="mb-1 block text-[11px] uppercase tracking-wide text-mut">Сайт-джерело</label>
+                <select wire:model="parentSiteId"
+                    class="w-full rounded-lg border border-[#dfe3e0] px-3 py-2 focus:border-acc focus:outline-none">
+                    <option value="">Без сайта-джерела</option>
+                    @foreach($siteOptions as $id => $domain)
+                        @if((int) $id !== (int) $editingSiteId)
+                            <option value="{{ $id }}">{{ $domain }} [ID: {{ $id }}]</option>
+                        @endif
+                    @endforeach
+                </select>
+                @error('parentSiteId')
+                    <p class="mt-1 text-[12px] text-bad-tx">{{ $message }}</p>
+                @enderror
+            </div>
+
+            @if($editingSiteId && $parentSiteId && $this->hasNoData())
+                <div class="mt-2 bg-[#f0f4f1] border border-acc-bg rounded-lg p-2.5">
+                    <button type="button" 
+                        wire:click="cloneParentData" 
+                        wire:confirm="Скопіювати всі дані з сайту-джерела на цей сайт? Це створить локальні копії для всіх значень."
+                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-acc text-acc-tx bg-white hover:bg-acc-bg px-3 py-2 text-xs font-semibold">
+                        Клонувати дані з джерела
+                    </button>
+                </div>
+            @endif
+
+            <div class="flex gap-2 pt-1">
+                <button type="submit"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                    Зберегти
+                </button>
+                <button type="button" wire:click="closeEditSite"
+                    class="rounded-lg border border-[#dfe3e0] px-3 py-2 text-xs font-semibold text-mut hover:border-acc hover:text-acc-tx">
+                    Скасувати
+                </button>
+            </div>
+        </form>
+
+        @if($editingSiteId && $tokenStatus)
+            <div class="space-y-3 border-t border-[#edf0ed] px-4 py-4">
+                <div class="text-[11px] uppercase tracking-wide text-mut">Токен і зв’язок</div>
+
+                <div class="space-y-1 rounded-lg border border-[#dfe3e0] bg-[#f6f8f6] px-3 py-2 text-[12px] text-mut">
+                    <div>
+                        Стан:
+                        @if($tokenStatus['hasActiveToken'])
+                            <span class="font-semibold text-ok-tx">чинний токен</span>
+                        @else
+                            <span class="font-semibold text-bad-tx">токена немає</span>
+                        @endif
+                    </div>
+                    <div>
+                        Остання активність:
+                        {{ $tokenStatus['lastSeenAt'] ? \Illuminate\Support\Carbon::parse($tokenStatus['lastSeenAt'])->diffForHumans() : '—' }}
+                    </div>
+                    <div>
+                        Публікація:
+                        {{ $tokenStatus['lastVersion'] ? 'Версія '.$tokenStatus['lastVersion'] : 'ще не публікувалось' }}
+                    </div>
+                    @if($tokenStatus['pingUrl'])
+                        <div class="break-all">
+                            Listener:
+                            <code>{{ $tokenStatus['pingUrl'] }}</code>
+                        </div>
+                    @endif
+                </div>
+
+                @if($visibleToken)
+                    <div class="rounded-lg border border-acc-bd bg-acc-bg px-3 py-2">
+                        <div class="mb-1 text-[11px] font-semibold text-acc-tx">Ключ підключення плагіна (показуємо один раз):</div>
+                        <textarea readonly rows="5"
+                            class="block w-full resize-y select-all rounded-md border border-acc-bd bg-white px-2 py-1 font-mono text-[11px] leading-4 text-ink">{{ $visibleToken }}</textarea>
+                        <p class="mt-1 text-[11px] text-mut">Вставте цей ключ у WordPress: DBManager → Налаштування. Сирий API token плагіну не передається.</p>
+                    </div>
+                @endif
+
+                <div class="flex gap-2">
+                    @if($tokenStatus['hasActiveToken'])
+                        <button type="button" wire:click="rotateToken"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                            @svg('key') Ротувати
+                        </button>
+                        <button type="button" wire:click="revokeToken"
+                            wire:confirm="Відкликати всі чинні токени сайта? Публікація зупиниться, доки не видасте новий."
+                            class="rounded-lg border border-[#cdb9b4] px-3 py-2 text-xs font-semibold text-[#a85c52] hover:bg-[#f3e7e4]">
+                            Відкликати
+                        </button>
+                    @else
+                        <button type="button" wire:click="issueToken"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                            @svg('key') Видати токен
+                        </button>
+                    @endif
+                </div>
+            </div>
+        @endif
     </aside>
 @endif
 </div>

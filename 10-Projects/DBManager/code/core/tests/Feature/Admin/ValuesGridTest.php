@@ -108,4 +108,54 @@ class ValuesGridTest extends TestCase
         $this->assertSame(0, $entries[1]->fresh()->priority);
         $this->assertSame(1, $entries[0]->fresh()->priority);
     }
+
+    public function test_manual_sync_current_site_calls_bridge_publisher(): void
+    {
+        $site = Site::factory()->create();
+
+        $this->mock(\App\Services\Publishing\BridgePublisher::class, function ($mock) {
+            $mock->shouldReceive('push')->once()->andReturn(true);
+        });
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->call('syncCurrentSite')
+            ->assertDispatched('toast', message: 'Дані сайту успішно синхронізовано з плагіном');
+    }
+
+    public function test_manager_can_edit_site_details_directly_from_grid(): void
+    {
+        $site = Site::factory()->create([
+            'name' => 'Old Name',
+            'domain' => 'old-domain.com',
+            'country_hint' => 'US',
+        ]);
+
+        // 1. A user without manage access (role 'viewer') cannot see the button or edit the site
+        $viewer = User::factory()->create(['role' => \App\Admin\AccessControl::ROLE_VIEWER]);
+        $this->actingAs($viewer);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->assertDontSee('Редагувати сайт');
+
+        // 2. A user with manage access (role 'superadmin') can see the button and edit the site
+        $admin = User::factory()->create(['role' => \App\Admin\AccessControl::ROLE_SUPERADMIN]);
+        $this->actingAs($admin);
+
+        Livewire::test(ValuesGrid::class, ['site' => $site->id])
+            ->assertSee('Редагувати сайт')
+            ->call('editSite')
+            ->assertSet('siteName', 'Old Name')
+            ->assertSet('siteDomain', 'old-domain.com')
+            ->assertSet('siteCountryHint', 'US')
+            ->set('siteName', 'New Name')
+            ->set('siteDomain', 'new-domain.com')
+            ->set('siteCountryHint', 'UA')
+            ->call('saveSite')
+            ->assertDispatched('toast', message: 'Сайт збережено');
+
+        $site->refresh();
+        $this->assertSame('New Name', $site->name);
+        $this->assertSame('new-domain.com', $site->domain);
+        $this->assertSame('UA', $site->country_hint);
+    }
 }

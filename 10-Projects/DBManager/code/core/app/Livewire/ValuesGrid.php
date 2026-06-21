@@ -18,6 +18,9 @@ use App\Models\PhoneNumber;
 use App\Models\PhoneSlot;
 use App\Models\Site;
 use App\Models\SiteGroup;
+use App\Models\Publication;
+use App\Services\Provisioning\SiteProvisioner;
+use Illuminate\Validation\Rule;
 use App\Models\ValueType;
 use App\Services\Failover\FailoverEngine;
 use App\Services\Publishing\BridgePublisher;
@@ -70,6 +73,15 @@ class ValuesGrid extends Component
     public array $bulkPreview = [];
 
     public ?array $bulkReport = null;
+
+    public bool $showEditSiteModal = false;
+    public ?int $editingSiteId = null;
+    public string $siteName = '';
+    public string $siteDomain = '';
+    public string $siteCountryHint = '';
+    public ?int $siteGroupId = null;
+    public ?int $parentSiteId = null;
+    public ?string $visibleToken = null;
 
 
     public function toggleSelect(int $id): void
@@ -281,7 +293,7 @@ class ValuesGrid extends Component
         });
 
         if ($changedSiteIds !== []) {
-            $this->publishSites(Site::whereIn('id', $changedSiteIds)->get());
+            $this->publishSitesAndPush(Site::whereIn('id', $changedSiteIds)->get());
         }
 
         $this->bulkReport = $report;
@@ -556,7 +568,7 @@ class ValuesGrid extends Component
         }
 
         $this->cancelInlineMessengerEdit();
-        $this->dispatch('toast', message: 'Месенджер збережено → опубліковано');
+        $this->dispatch('toast', message: 'Месенджер збережено');
     }
 
     public function addMessengerReserve(int $dataValueId): void
@@ -614,7 +626,7 @@ class ValuesGrid extends Component
 
         $this->newMessengerValue[$dataValueId] = '';
         $this->publishDataValue($reserve);
-        $this->dispatch('toast', message: 'Резерв месенджера додано → опубліковано');
+        $this->dispatch('toast', message: 'Резерв месенджера додано');
     }
 
     public function deactivateMessenger(int $dataValueId): void
@@ -805,7 +817,7 @@ class ValuesGrid extends Component
         $this->publishSites($affectedSites);
         $this->cancelInlineMessengerEdit();
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Месенджер видалено і опубліковано');
+        $this->dispatch('toast', message: 'Месенджер видалено');
     }
 
     /**
@@ -853,7 +865,7 @@ class ValuesGrid extends Component
         }
 
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Слот прибрано з цього сайту → опубліковано');
+        $this->dispatch('toast', message: 'Слот прибрано з цього сайту');
     }
 
     public function toggleSlotVisibility(int $dataValueId): void
@@ -1066,7 +1078,7 @@ class ValuesGrid extends Component
         }
 
         $this->cancelInlinePhoneEdit();
-        $this->dispatch('toast', message: 'Номер збережено → опубліковано');
+        $this->dispatch('toast', message: 'Номер збережено');
     }
 
     public function removeInlinePhoneNumber(int $entryId): void
@@ -1101,7 +1113,7 @@ class ValuesGrid extends Component
         $this->publishSlots(collect([$slot->fresh()]));
         $this->cancelInlinePhoneEdit();
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Номер видалено → опубліковано');
+        $this->dispatch('toast', message: 'Номер видалено');
     }
 
     public function addPhoneReserve(int $dataValueId): void
@@ -1164,7 +1176,7 @@ class ValuesGrid extends Component
             $this->newPhoneValue[$dataValueId] = '';
             $this->publishSlots(collect([$slot->fresh()]));
             $this->dispatch('slot-updated');
-            $this->dispatch('toast', message: 'Резерв додано → опубліковано');
+            $this->dispatch('toast', message: 'Резерв додано');
         } finally {
             $this->releaseEditLock();
         }
@@ -1205,7 +1217,7 @@ class ValuesGrid extends Component
 
         $this->publishSlots(collect([$slot->fresh()]));
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Політику слота оновлено → опубліковано');
+        $this->dispatch('toast', message: 'Політику слота оновлено');
     }
 
     public function savePhoneEmergencyNumber(int $dataValueId, string $value = ''): void
@@ -1240,7 +1252,7 @@ class ValuesGrid extends Component
 
         $this->publishSlots(collect([$slot->fresh()]));
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Аварійний номер оновлено → опубліковано');
+        $this->dispatch('toast', message: 'Аварійний номер оновлено');
     }
 
     public function movePhoneUp(int $entryId): void
@@ -1264,7 +1276,9 @@ class ValuesGrid extends Component
             $index = $entries->search(fn ($e) => $e->id === $entry->id);
             $neighbour = $entries->get($index - 1);
 
-            if ($index === 0 || ! $neighbour) {
+            // Резерв не займає місце основного (priority 0): основний незмінний.
+            // Блокуємо рух угору для самого основного (0) і першого резерву (1).
+            if ($index <= 1 || ! $neighbour) {
                 return;
             }
 
@@ -1360,7 +1374,7 @@ class ValuesGrid extends Component
         $affectedSlots = app(FailoverEngine::class)->markNumberDown($entry->phoneNumber, 'user');
         $this->publishSlots($affectedSlots->push($entry->slot->fresh()));
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Номер приховано → опубліковано');
+        $this->dispatch('toast', message: 'Номер приховано');
     }
 
     public function restorePhoneNumber(int $entryId): void
@@ -1379,7 +1393,7 @@ class ValuesGrid extends Component
         $affectedSlots = app(FailoverEngine::class)->markNumberActive($entry->phoneNumber, 'user');
         $this->publishSlots($affectedSlots->push($entry->slot->fresh()));
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Номер повернуто → опубліковано');
+        $this->dispatch('toast', message: 'Номер повернуто');
     }
 
     public function pinPhoneNumber(int $entryId): void
@@ -1404,7 +1418,7 @@ class ValuesGrid extends Component
         app(FailoverEngine::class)->pin($entry->slot, $entry, 'user');
         $this->publishSlots(collect([$entry->slot->fresh()]));
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Номер закріплено → опубліковано');
+        $this->dispatch('toast', message: 'Номер закріплено');
     }
 
     public function unpinPhoneSlot(int $entryId): void
@@ -1423,7 +1437,7 @@ class ValuesGrid extends Component
         app(FailoverEngine::class)->unpin($entry->slot, 'user');
         $this->publishSlots(collect([$entry->slot->fresh()]));
         $this->dispatch('slot-updated');
-        $this->dispatch('toast', message: 'Ручний режим вимкнено → опубліковано');
+        $this->dispatch('toast', message: 'Ручний режим вимкнено');
     }
 
     public function savePhoneFormat(int $dataValueId, string $format = ''): void
@@ -1472,7 +1486,7 @@ class ValuesGrid extends Component
 
             $this->publishDataValue($value->fresh());
             $this->dispatch('slot-updated');
-            $this->dispatch('toast', message: 'Формат номера збережено → опубліковано');
+            $this->dispatch('toast', message: 'Формат номера збережено');
         } finally {
             $this->releaseEditLock();
         }
@@ -1548,6 +1562,11 @@ class ValuesGrid extends Component
         $selectedGroupSites = $selectedGroup?->sites ?? collect();
         $ungroupedSites = $accessibleSites->whereNull('site_group_id')->sortBy('domain')->values();
 
+        $canManageSites = app(AccessControl::class)->canManageAccess(auth()->user());
+        $editingSite = $canManageSites && $this->editingSiteId
+            ? Site::withTrashed()->find($this->editingSiteId)
+            : null;
+
         return view('livewire.values-grid', [
             'siteModel'       => $siteModel,
             'rows'            => $rows,
@@ -1560,6 +1579,10 @@ class ValuesGrid extends Component
                 ? app(AccessControl::class)->canEditSite(auth()->user(), $siteModel)
                     && app(AccessControl::class)->canPublishSite(auth()->user(), $siteModel)
                 : false,
+            'groupOptions' => $canManageSites ? SiteGroup::orderBy('name')->pluck('name', 'id') : collect(),
+            'siteOptions' => $canManageSites ? Site::orderBy('domain')->pluck('domain', 'id') : collect(),
+            'tokenStatus' => $editingSite ? $this->connectionStatus($editingSite) : null,
+            'canManageSites' => $canManageSites,
         ])->layout('components.layouts.admin');
     }
 
@@ -2139,8 +2162,7 @@ class ValuesGrid extends Component
             ->flatMap(fn ($slot) => app(FailoverEngine::class)->sitesFor($slot->fresh()))
             ->unique('id')
             ->each(function (Site $site) {
-                $publication = app(SitePayloadCompiler::class)->publish($site);
-                app(BridgePublisher::class)->push($publication);
+                app(SitePayloadCompiler::class)->publish($site);
             });
     }
 
@@ -2152,9 +2174,42 @@ class ValuesGrid extends Component
     private function publishSites($sites): void
     {
         $sites->unique('id')->each(function (Site $site) {
+            app(SitePayloadCompiler::class)->publish($site);
+        });
+    }
+
+    private function publishSitesAndPush($sites): void
+    {
+        $sites->unique('id')->each(function (Site $site) {
             $publication = app(SitePayloadCompiler::class)->publish($site);
             app(BridgePublisher::class)->push($publication);
         });
+    }
+
+    public function syncCurrentSite(): void
+    {
+        if (! $this->site) {
+            return;
+        }
+
+        $site = Site::find($this->site);
+        if (! $site) {
+            return;
+        }
+
+        if (! app(AccessControl::class)->canPublishSite(auth()->user(), $this->site)) {
+            $this->dispatch('toast', message: 'Немає прав для синхронізації');
+            return;
+        }
+
+        $publication = app(SitePayloadCompiler::class)->publish($site);
+        $success = app(BridgePublisher::class)->push($publication);
+
+        if ($success) {
+            $this->dispatch('toast', message: 'Дані сайту успішно синхронізовано з плагіном');
+        } else {
+            $this->dispatch('toast', message: 'Помилка синхронізації (відсутній токен або плагін офлайн)');
+        }
     }
 
     private function bulkTargetSites()
@@ -2228,5 +2283,211 @@ class ValuesGrid extends Component
         }
 
         return $total;
+    }
+
+    public function editSite(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::withTrashed()->findOrFail($this->site);
+        $this->showEditSiteModal = true;
+        $this->editingSiteId = $site->id;
+        $this->siteName = $site->name;
+        $this->siteDomain = $site->domain;
+        $this->siteCountryHint = $site->country_hint ?? '';
+        $this->siteGroupId = $site->site_group_id;
+        $this->parentSiteId = $site->parent_site_id;
+        $this->visibleToken = null;
+        $this->resetValidation();
+    }
+
+    public function saveSite(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $validated = $this->validate([
+            'siteName' => ['required', 'string', 'max:255'],
+            'siteDomain' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('sites', 'domain')->ignore($this->editingSiteId),
+            ],
+            'siteCountryHint' => ['nullable', 'string', 'max:8'],
+            'siteGroupId' => ['nullable', 'integer', 'exists:site_groups,id'],
+            'parentSiteId' => ['nullable', 'integer', 'exists:sites,id'],
+        ]);
+
+        $site = $this->editingSiteId
+            ? Site::withTrashed()->findOrFail($this->editingSiteId)
+            : new Site();
+
+        $old = $site->exists
+            ? $site->only(['name', 'domain', 'country_hint', 'site_group_id'])
+            : null;
+
+        $site->name = $validated['siteName'];
+        $site->domain = $validated['siteDomain'];
+        $site->country_hint = $validated['siteCountryHint'] !== '' ? $validated['siteCountryHint'] : null;
+        $site->parent_site_id = $validated['parentSiteId'];
+
+        if ($site->parent_site_id) {
+            $parent = Site::withTrashed()->find($site->parent_site_id);
+            if ($parent && $site->exists && in_array($parent->id, app(SiteHierarchy::class)->descendantIds($site), true)) {
+                $this->addError('parentSiteId', 'Сайт-джерело не може бути сателітом цього сайта.');
+
+                return;
+            }
+            if ($parent) {
+                $site->site_group_id = $parent->site_group_id;
+            }
+        } else {
+            $site->site_group_id = $validated['siteGroupId'];
+        }
+        $site->save();
+
+        $this->editingSiteId = $site->id;
+        $this->group = $site->site_group_id ? (int) $site->site_group_id : null;
+
+        AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => auth()->id(),
+            'action' => $old ? 'site.updated' : 'site.created',
+            'subject_type' => 'Site',
+            'subject_id' => $site->id,
+            'old' => $old,
+            'new' => $site->only(['name', 'domain', 'country_hint', 'site_group_id']),
+        ]);
+
+        $this->dispatch('toast', message: 'Сайт збережено');
+    }
+
+    public function closeEditSite(): void
+    {
+        $this->showEditSiteModal = false;
+        $this->editingSiteId = null;
+        $this->siteName = '';
+        $this->siteDomain = '';
+        $this->siteCountryHint = '';
+        $this->siteGroupId = null;
+        $this->parentSiteId = null;
+        $this->visibleToken = null;
+        $this->resetValidation();
+    }
+
+    public function issueToken(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        $connection = app(SiteProvisioner::class)->issuePluginConnection($site);
+        $this->visibleToken = $connection['connection_key'];
+        $this->auditToken('token.issued', $site->id);
+        $this->publishCurrentPayload($site);
+
+        $this->dispatch('toast', message: 'Ключ підключення створено. Скопіюйте зараз — більше не покажемо.');
+    }
+
+    public function revokeToken(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        app(SiteProvisioner::class)->revokeToken($site);
+        $this->visibleToken = null;
+        $this->auditToken('token.revoked', $site->id);
+
+        $this->dispatch('toast', message: 'Токени сайта відкликано');
+    }
+
+    public function rotateToken(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        $provisioner = app(SiteProvisioner::class);
+        $provisioner->revokeToken($site);
+        $connection = $provisioner->issuePluginConnection($site);
+        $this->visibleToken = $connection['connection_key'];
+        $this->auditToken('token.rotated', $site->id);
+        $this->publishCurrentPayload($site);
+
+        $this->dispatch('toast', message: 'Ключ підключення оновлено. Старий більше не діє.');
+    }
+
+    public function hasNoData(): bool
+    {
+        if (! $this->editingSiteId) {
+            return false;
+        }
+
+        return DataValue::where('scope_type', 'site')
+            ->where('scope_id', $this->editingSiteId)
+            ->doesntExist();
+    }
+
+    public function cloneParentData(): void
+    {
+        $this->authorizeSiteManagement();
+
+        $site = Site::findOrFail($this->editingSiteId);
+        if (! $site->parent_site_id) {
+            return;
+        }
+
+        if (! $this->hasNoData()) {
+            return;
+        }
+
+        $parent = Site::findOrFail($site->parent_site_id);
+        $parentValues = DataValue::where('scope_type', 'site')
+            ->where('scope_id', $parent->id)
+            ->get();
+
+        DB::transaction(function () use ($site, $parentValues): void {
+            foreach ($parentValues as $val) {
+                $newVal = $val->replicate();
+                $newVal->scope_id = $site->id;
+                $newVal->save();
+
+                foreach ($val->geoTags as $tag) {
+                    $newVal->geoTags()->attach($tag->id);
+                }
+            }
+        });
+
+        $this->dispatch('toast', message: 'Дані з джерела скопійовано');
+    }
+
+    private function authorizeSiteManagement(): void
+    {
+        abort_unless(app(AccessControl::class)->canManageAccess(auth()->user()), 403);
+    }
+
+    private function auditToken(string $action, int $siteId): void
+    {
+        AuditLog::create([
+            'actor_type' => 'user',
+            'actor_id' => auth()->id(),
+            'action' => $action,
+            'subject_type' => 'Site',
+            'subject_id' => $siteId,
+        ]);
+    }
+
+    private function connectionStatus(Site $site): array
+    {
+        return [
+            'lastSeenAt' => $site->tokens()->max('last_seen_at'),
+            'lastVersion' => Publication::where('site_id', $site->id)->max('version'),
+            'hasActiveToken' => $site->tokens()->whereNull('revoked_at')->exists(),
+            'pingUrl' => $site->ping_url,
+        ];
+    }
+
+    private function publishCurrentPayload(Site $site): void
+    {
+        $publication = app(SitePayloadCompiler::class)->publish($site->fresh());
+        app(BridgePublisher::class)->push($publication);
     }
 }

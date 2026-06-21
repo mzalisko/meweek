@@ -5,16 +5,17 @@ tags: [dbmanager, контекст]
 # DBManager — Контекст
 
 **Оновлено:** 2026-06-22
-**Стан:** Реалізовано Дашборд, Обране, Інциденти та проведено повний UI/UX редизайн стилістики плагіну під сучасні бізнес-стандарти (Stripe/Vercel-style картки, покращені відступи, Slate-палітра). 53 тести клієнтського плагіну та 17 тестів сервісу core — PASS.
+**Стан:** Реалізовано Дашборд, Обране, Інциденти, повний UI/UX редизайн плагіну, а також швидке редагування налаштувань сайту безпосередньо зі сторінки з даними (ValuesGrid). Всі тести проходять успішно (включаючи новий ValuesGridTest).
 
-## Реалізовано (Дашборд, Обране, Інциденти, UI/UX Редизайн)
+## Реалізовано (Дашборд, Обране, Інциденти, Редизайн, Редагування з ValuesGrid)
+- **Редагування сайту з ValuesGrid:** додано кнопку «Редагувати сайт» та висувну бічну панель (slide-over) на сторінку перегляду даних сайту. Дозволяє суперадміністраторам змінювати назву, домен, країну, групу, джерело, клонувати дані та керувати токенами/зв'язком плагіна безпосередньо з робочого екрана сайту. Зміни внесено у [ValuesGrid.php](file:///c:/Dev/Meweek/10-Projects/DBManager/code/core/app/Livewire/ValuesGrid.php) та [values-grid.blade.php](file:///c:/Dev/Meweek/10-Projects/DBManager/code/core/resources/views/livewire/values-grid.blade.php).
 - **Повний редизайн плагіну (бізнес-стиль):** оновлено всю стилістику та покращено відступи (whitespace). Упроваджено сітку окремих карток з лівими маркерами типів та ховер-підняттям, прямокутні бейджі статусів (3px), чистий великий текст значень без плашок, сучасний вигляд табів і фокусування полів введення. Зміни внесено в [AdminPages.php](file:///C:/Dev/Meweek/10-Projects/DBManager/code/plugin/dbmanager/src/Admin/AdminPages.php) та [PresentationBlockRenderer.php](file:///C:/Dev/Meweek/10-Projects/DBManager/code/plugin/dbmanager/src/Wp/PresentationBlockRenderer.php).
-- **Ширина бейджів у списку сайтів:** виправлено розтягування бейджів (країна, статус сателіта, архів) за допомогою класу `justify-self-start` у [site-row.blade.php](file:///C:/Dev/Meweek/10-Projects/DBManager/code/core/resources/views/livewire/partials/site-row.blade.php) та [sites-manager.blade.php](file:///C:/Dev/Meweek/10-Projects/DBManager/code/core/resources/views/livewire/sites-manager.blade.php).
 - **Дашборд (`/admin/dashboard`):** віджети статистики (не розтягуються), обрані групи/сайти з робочими статусами, блок непідтверджених інцидентів з кнопкою підтвердження («Acknowledge»), офлайн-сайти.
 - **Обране на сторінці сайтів (`/admin/sites`):** додано зірочки (★ / ☆) біля назв неархівованих груп та доменів для додавання до `user_favorites` з миттєвою Livewire-синхронізацією з Дашбордом.
 - **Окрема сторінка «Інциденти» (`/admin/incidents`):** сітка квадратних карток сайтів із розподілом по 2 табах («На резервах» та «На основних»). Картки містять домен, групу, статус онлайн/офлайн та список слотів із бейджами статусу.
 - **Виправлення відображення резервів (`/admin/site?site=id`):** видалено конфліктуючий CSS-код з `app.css`, замінено на стандартні Alpine-атрибути `x-cloak`. Резервні номери та їхнє форматування тепер повністю відображаються при розгортанні.
 
 ## Тести та перевірка
-- `docker compose exec -T core php artisan test --filter "SitesManagerTest|IncidentsPageTest"` — **PASS** (всі 17 тестів зелені).
+- `docker compose exec -T core php artisan test --filter=ValuesGridTest` — **PASS** (новий тест успішного редагування та доступу суперадміна зелений).
+- `docker compose exec -T core php artisan test --filter=SitesManagerTest` — **PASS** (регресія відсутня).
 - Робочий код: `10-Projects/DBManager/code/`.
