@@ -440,7 +440,7 @@ class AdminPages
             
             echo '<tr><th scope="row"><label for="dbm_image_' . $net . '">' . $label . '</label></th><td>';
             echo '<div style="display:flex; align-items:center; gap:12px;">';
-            echo '<img id="dbm_preview_' . $net . '" src="' . $val . '" style="width:36px; height:36px; object-fit:contain; border:1px solid var(--dbm-line); padding:2px; border-radius:4px; background:#fff;' . $displayStyle . '" alt="Preview" />';
+            echo '<img id="dbm_preview_' . $net . '" src="' . $val . '" style="width:36px; height:36px; object-fit:contain; border:1px solid var(--dbm-line); padding:2px; border-radius:2px; background:#fff;' . $displayStyle . '" alt="Preview" />';
             echo '<input id="dbm_image_' . $net . '" type="text" name="dbm_custom_settings[image_' . $net . ']" value="' . $val . '" class="regular-text" style="flex-grow:1; max-width:400px;" readonly>';
             echo '<button type="button" class="button dbm-upload-btn" data-input="dbm_image_' . $net . '" data-preview="dbm_preview_' . $net . '">Загрузить</button>';
             echo '<button type="button" class="button dbm-clear-btn" data-input="dbm_image_' . $net . '" data-preview="dbm_preview_' . $net . '">Очистить</button>';
@@ -568,7 +568,7 @@ class AdminPages
 <style>
 .dbm-admin{--dbm-ink:#243342;--dbm-muted:#6b7683;--dbm-line:#dfe5ea;--dbm-soft:#f5f7f8;--dbm-accent:#315f8a;--dbm-accent-soft:#eaf2f8;--dbm-ok:#1f7a4d;--dbm-warn:#9a6a1f;--dbm-bad:#9a3434;max-width:1180px;color:var(--dbm-ink)}
 .dbm-admin *{box-sizing:border-box}
-.dbm-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:18px 0 14px;padding:18px 20px;border:1px solid var(--dbm-line);border-radius:8px;background:#fff;box-shadow:0 12px 34px rgba(31,45,56,.06)}
+.dbm-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:18px 0 14px;padding:18px 20px;border:1px solid var(--dbm-line);border-radius:4px;background:#fff;box-shadow:0 12px 34px rgba(31,45,56,.06)}
 .dbm-hero h1{margin:2px 0 6px;color:var(--dbm-ink);font-size:24px;line-height:1.2}
 .dbm-hero p,.dbm-muted{margin:0;color:var(--dbm-muted);font-size:13px;line-height:1.45}
 .dbm-eyebrow{color:var(--dbm-muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
@@ -576,14 +576,14 @@ class AdminPages
 .dbm-version span{display:block;color:var(--dbm-muted);font-size:11px;text-transform:uppercase;font-weight:800}
 .dbm-version strong{display:block;margin-top:4px;color:var(--dbm-accent);font-size:28px;line-height:1}
 .dbm-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
-.dbm-stat{min-width:0;padding:13px 14px;border:1px solid var(--dbm-line);border-radius:8px;background:#fff}
+.dbm-stat{min-width:0;padding:13px 14px;border:1px solid var(--dbm-line);border-radius:4px;background:#fff}
 .dbm-stat span{display:block;color:var(--dbm-muted);font-size:11px;text-transform:uppercase;font-weight:800}
 .dbm-stat strong{display:block;margin-top:5px;color:var(--dbm-ink);font-size:17px;line-height:1.25;overflow-wrap:anywhere}
-.dbm-card{margin:0 0 14px;padding:16px;border:1px solid var(--dbm-line);border-radius:8px;background:#fff;box-shadow:0 10px 26px rgba(31,45,56,.05)}
+.dbm-card{margin:0 0 14px;padding:16px;border:1px solid var(--dbm-line);border-radius:4px;background:#fff;box-shadow:0 10px 26px rgba(31,45,56,.05)}
 .dbm-card h2{margin:0 0 5px;color:var(--dbm-ink);font-size:16px}
 .dbm-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
 .dbm-highlight{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:#cbdceb;background:linear-gradient(180deg,#fff,#f6fafc)}
-.dbm-table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--dbm-line);border-radius:8px;background:#fff}
+.dbm-table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--dbm-line);border-radius:4px;background:#fff}
 .dbm-table th{padding:10px 12px;background:#f4f7f8;color:var(--dbm-muted);font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.03em}
 .dbm-table td{padding:10px 12px;border-top:1px solid #edf1f3;vertical-align:middle}
 .dbm-table tr:hover td{background:#f8fbfd}
@@ -591,10 +591,10 @@ class AdminPages
 .dbm-value{display:flex;flex-direction:column;gap:4px;min-width:0}
 .dbm-value strong{font-size:15px;color:var(--dbm-ink);overflow-wrap:anywhere}
 .dbm-value small{color:var(--dbm-muted)}
-.dbm-badge,.dbm-chip,.dbm-state{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;line-height:1}
+.dbm-badge,.dbm-chip,.dbm-state{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:4px 8px;border-radius:3px;font-size:11px;font-weight:800;line-height:1}
 .dbm-badge{background:var(--dbm-accent-soft);color:var(--dbm-accent)}
 .dbm-chip{margin:2px;background:#eef2f5;color:var(--dbm-muted)}.dbm-chip--deny{background:#fdeeee;color:var(--dbm-bad)}
-.dbm-net-badge{display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;text-transform:uppercase;padding:2px 5px;border-radius:4px;margin-left:6px;cursor:help;line-height:1;border:1px solid var(--dbm-line);background:#f1f4f6;color:var(--dbm-muted);vertical-align:middle}
+.dbm-net-badge{display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;text-transform:uppercase;padding:2px 5px;border-radius:2px;margin-left:6px;cursor:help;line-height:1;border:1px solid var(--dbm-line);background:#f1f4f6;color:var(--dbm-muted);vertical-align:middle}
 .dbm-net-badge--telegram{background:#eaf5fc;color:#315f8a;border-color:#bce0f2}
 .dbm-net-badge--whatsapp{background:#eef7f2;color:#1f7a4d;border-color:#c5f2d6}
 .dbm-net-badge--viber{background:#f6f1fc;color:#7360f2;border-color:#dfcff7}
@@ -604,16 +604,16 @@ class AdminPages
 .dbm-state--pending{background:#eef2f5;color:var(--dbm-muted)}
 .dbm-field-row{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid #edf1f3}
 .dbm-field-row span{color:var(--dbm-muted);font-weight:700}
-.dbm-field-row code,.dbm-card code{display:inline-flex;max-width:100%;padding:4px 7px;border-radius:6px;background:#f1f4f6;color:#22313f;overflow-wrap:anywhere;white-space:normal}
-.dbm-form textarea,.dbm-form input[type=text],.dbm-select{max-width:620px;border-color:var(--dbm-line);border-radius:8px}
+.dbm-field-row code,.dbm-card code{display:inline-flex;max-width:100%;padding:4px 7px;border-radius:3px;background:#f1f4f6;color:#22313f;overflow-wrap:anywhere;white-space:normal}
+.dbm-form textarea,.dbm-form input[type=text],.dbm-select{max-width:620px;border-color:var(--dbm-line);border-radius:4px}
 @media (max-width:782px){.dbm-hero{display:block}.dbm-version,.dbm-status-card{text-align:left;margin-top:12px}.dbm-stats{grid-template-columns:1fr 1fr}.dbm-table{display:block;overflow-x:auto}.dbm-field-row{display:block}.dbm-field-row code,.dbm-field-row strong{display:inline-block;margin-top:5px}}
 .dbm-snippet-item{margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .dbm-snippet-item:last-child{margin-bottom:0}
 .dbm-snippet-item span,.dbm-snippet-item .dbm-label{color:var(--dbm-muted);font-size:10px;font-weight:700;text-transform:uppercase;width:180px;flex-shrink:0;display:inline-block}
 .dbm-snippet-item code{vertical-align:middle}
-.dbm-copy-wrapper{display:inline-flex;align-items:center;background:#f5f7f8;border:1px solid var(--dbm-line);border-radius:6px;padding:2px 4px;gap:4px;vertical-align:middle}
+.dbm-copy-wrapper{display:inline-flex;align-items:center;background:#f5f7f8;border:1px solid var(--dbm-line);border-radius:3px;padding:2px 4px;gap:4px;vertical-align:middle}
 .dbm-copy-wrapper code{background:none !important;border:none !important;padding:0 6px !important;margin:0 !important;font-size:11px !important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dbm-ink);vertical-align:middle}
-.dbm-copy-btn{background:#fff;border:1px solid var(--dbm-line);border-radius:4px;padding:3px 5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--dbm-muted);transition:all .15s ease}
+.dbm-copy-btn{background:#fff;border:1px solid var(--dbm-line);border-radius:2px;padding:3px 5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--dbm-muted);transition:all .15s ease}
 .dbm-copy-btn:hover{color:var(--dbm-accent);border-color:var(--dbm-accent);background:var(--dbm-accent-soft)}
 .dbm-copy-btn.copied{color:var(--dbm-ok);border-color:var(--dbm-ok);background:#eef6f1}
 .dbm-price-list{display:flex;flex-direction:column;gap:6px}
