@@ -39,9 +39,10 @@
         </div>
         @if($canManageSites)
             <div class="flex items-center gap-3">
-                <label class="inline-flex items-center gap-2 text-xs text-mut">
-                    <input type="checkbox" wire:model.live="showArchived" class="rounded border-[#cfd6d0]">
-                    Показати архів
+                <label class="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-[#dfe3e0] bg-white px-2.5 text-xs font-medium text-mut transition hover:border-acc hover:bg-acc-bg hover:text-acc-tx">
+                    <input type="checkbox" wire:model.live="showArchived" class="peer sr-only">
+                    <span class="relative inline-flex h-4 w-7 shrink-0 rounded-full bg-[#dfe3e0] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-acc peer-checked:after:translate-x-3 peer-focus-visible:ring-2 peer-focus-visible:ring-acc peer-focus-visible:ring-offset-2"></span>
+                    <span class="whitespace-nowrap">Показати архів</span>
                 </label>
                 <button type="button" wire:click="startCreateGroup"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-[#dfe3e0] px-3 py-2 text-xs font-semibold text-acc-tx hover:border-acc hover:bg-acc-bg">
@@ -88,10 +89,18 @@
                 'border-[#dfe3e0]' => ! $group->trashed(),
                 'border-dashed border-[#cdb9b4]' => $group->trashed(),
             ])>
-                <div class="flex items-center justify-between gap-2 border-b border-[#edf0ed] px-3 py-2">
-                    <div class="flex items-center gap-2 min-w-0">
+                <div class="flex cursor-pointer items-center justify-between gap-2 border-b border-[#edf0ed] px-3 py-2 hover:bg-[#f7f8f6]"
+                    role="button"
+                    tabindex="0"
+                    @click="toggle('group-{{ $group->id }}')"
+                    @keydown.enter.prevent="toggle('group-{{ $group->id }}')"
+                    @keydown.space.prevent="toggle('group-{{ $group->id }}')"
+                    data-site-group-header="group-{{ $group->id }}"
+                    :aria-expanded="(isOpen('group-{{ $group->id }}') || {{ $siteSearch !== '' ? 'true' : 'false' }}).toString()">
+                    <div class="grid min-w-0 items-center gap-x-2 gap-y-0.5"
+                        style="grid-template-columns: 1.5rem minmax(10rem, 14rem) 1.25rem auto auto auto;">
                         <button type="button"
-                            @click="toggle('group-{{ $group->id }}')"
+                            @click.stop="toggle('group-{{ $group->id }}')"
                             :aria-expanded="(isOpen('group-{{ $group->id }}') || {{ $siteSearch !== '' ? 'true' : 'false' }}).toString()"
                             aria-label="Згорнути або розгорнути групу"
                             class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-mut hover:bg-acc-bg hover:text-acc-tx">
@@ -99,34 +108,37 @@
                         </button>
                         <span class="font-semibold text-ink truncate">{{ $group->name }}</span>
                         @if(!$group->trashed())
-                            <button type="button" wire:click="toggleFavorite('group', {{ $group->id }})" 
-                                class="{{ in_array($group->id, $favGroupIds) ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500' }} text-[15px] shrink-0 focus:outline-none transition-colors ml-0.5" 
+                            <button type="button" @click.stop wire:click="toggleFavorite('group', {{ $group->id }})" 
+                                data-site-group-favorite="{{ $group->id }}"
+                                class="{{ in_array($group->id, $favGroupIds) ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500' }} text-[15px] justify-self-center focus:outline-none transition-colors" 
                                 title="{{ in_array($group->id, $favGroupIds) ? 'Вилучити з улюблених' : 'Додати до улюблених' }}">
                                 {{ in_array($group->id, $favGroupIds) ? '★' : '☆' }}
                             </button>
+                        @else
+                            <span></span>
                         @endif
                         @if($group->trashed())
-                            <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52]">архів</span>
+                            <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52] justify-self-start">архів</span>
                         @endif
                         <span class="text-[11px] text-mut">{{ $groupSiteCounts[$group->id] ?? $group->sites->count() }} сайт(ів)</span>
                     </div>
                     @if($canManageSites)
                         <div class="flex shrink-0 items-center gap-1.5">
                             @if($group->trashed())
-                                <button type="button" wire:click="restoreGroup({{ $group->id }})"
+                                <button type="button" @click.stop wire:click="restoreGroup({{ $group->id }})"
                                     class="inline-flex h-7 items-center gap-1 rounded-md border border-[#dfe3e0] px-2 text-[11px] font-semibold text-acc-tx hover:border-acc hover:bg-acc-bg">
                                     @svg('check') Відновити
                                 </button>
                             @else
-                                <button type="button" wire:click="startCreateSite({{ $group->id }})"
+                                <button type="button" @click.stop wire:click="startCreateSite({{ $group->id }})"
                                     class="inline-flex h-7 items-center gap-1 rounded-md border border-[#dfe3e0] px-2 text-[11px] font-semibold text-acc-tx hover:border-acc hover:bg-acc-bg">
                                     @svg('plus') Сайт
                                 </button>
-                                <button type="button" wire:click="editGroup({{ $group->id }})" aria-label="Редагувати групу"
+                                <button type="button" @click.stop wire:click="editGroup({{ $group->id }})" aria-label="Редагувати групу"
                                     class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#dfe3e0] text-mut hover:border-acc hover:bg-acc-bg hover:text-acc-tx">
                                     @svg('edit')
                                 </button>
-                                <button type="button" wire:click="archiveGroup({{ $group->id }})"
+                                <button type="button" @click.stop wire:click="archiveGroup({{ $group->id }})"
                                     wire:confirm="Заархівувати групу «{{ $group->name }}» разом з усіма її сайтами? Дані лишаться, сайти стануть прихованими."
                                     aria-label="Заархівувати групу"
                                     class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#dfe3e0] text-mut hover:border-[#cdb9b4] hover:bg-[#f3e7e4] hover:text-[#a85c52]">
