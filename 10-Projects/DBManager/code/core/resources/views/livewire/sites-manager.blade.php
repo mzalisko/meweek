@@ -118,7 +118,7 @@
                             <span></span>
                         @endif
                         @if($group->trashed())
-                            <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52] justify-self-start">архів</span>
+                            <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52]" style="justify-self: start;">архів</span>
                         @endif
                         <span class="text-[11px] text-mut">{{ $groupSiteCounts[$group->id] ?? $group->sites->count() }} сайт(ів)</span>
                     </div>

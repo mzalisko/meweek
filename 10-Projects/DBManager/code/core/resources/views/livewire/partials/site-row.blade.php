@@ -27,15 +27,15 @@
         <span class="text-mut text-[10px] whitespace-nowrap">ID: {{ $site->id }}</span>
 
         @if($site->country_hint)
-            <span class="rounded bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut justify-self-start">{{ $site->country_hint }}</span>
+            <span class="rounded bg-[#eef1ee] px-1.5 py-0.5 text-[10px] text-mut" style="justify-self: start;">{{ $site->country_hint }}</span>
         @endif
 
         @if($site->parent_site_id)
-            <span class="rounded bg-[#e8efff] px-1.5 py-0.5 text-[10px] text-[#3b66c4] font-medium justify-self-start">сателіт</span>
+            <span class="rounded bg-[#e8efff] px-1.5 py-0.5 text-[10px] text-[#3b66c4] font-medium" style="justify-self: start;">сателіт</span>
         @endif
 
         @if($site->trashed())
-            <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52] justify-self-start">архів</span>
+            <span class="rounded bg-[#f3e7e4] px-1.5 py-0.5 text-[10px] text-[#a85c52]" style="justify-self: start;">архів</span>
         @endif
 
         <div class="col-start-2 col-span-5 row-start-2 text-[11px] text-mut truncate">{{ $site->name }}</div>
