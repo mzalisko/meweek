@@ -1,0 +1,120 @@
+services:
+  core:
+    build: ./docker/core
+    volumes:
+      - ./core:/app
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      # DB_CONNECTION і DB_DATABASE задаються в core/.env (runtime) та core/phpunit.xml
+      # (тести → окрема БД dbmanager_core_test). Тут лише хост і креди.
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+    depends_on:
+      - mysql
+      - redis
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: dbmanager_core
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:33061:3306"
+
+  redis:
+    image: redis:7-alpine
+
+  bridge:
+    build: ./docker/core
+    volumes:
+      - ./bridge:/app
+    ports:
+      - "127.0.0.1:8002:8000"
+    environment:
+      # DB_CONNECTION і DB_DATABASE задаються в bridge/.env (runtime) та bridge/phpunit.xml
+      # (тести → окрема БД dbmanager_bridge_test). Тут лише хост і креди.
+      DB_HOST: bridge-mysql
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+    depends_on:
+      - bridge-mysql
+      - redis
+
+  bridge-worker:
+    build: ./docker/core
+    volumes:
+      - ./bridge:/app
+    command: php artisan queue:work --sleep=1 --tries=3 --timeout=30
+    environment:
+      DB_HOST: bridge-mysql
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+    depends_on:
+      - bridge
+      - bridge-mysql
+      - redis
+
+  bridge-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: dbmanager_bridge
+    volumes:
+      - bridge-mysql-data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:33062:3306"
+
+  plugin:
+    build: ./docker/core
+    volumes:
+      - ./plugin:/app
+    working_dir: /app
+
+  wordpress:
+    image: wordpress:php8.4-apache
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      WORDPRESS_DB_NAME: dbmanager_wp
+    volumes:
+      # Лише спільний том WP. Код плагіна НЕ bind-монтуємо у wp-content/plugins —
+      # install-wp.sh копіює його з /plugin у том, щоб сценарій B (wp plugin delete)
+      # реально видаляв файли плагіна, а не натикався на точку bind-монтування.
+      - wp-data:/var/www/html
+    depends_on:
+      - mysql
+
+  wpcli:
+    image: wordpress:cli-php8.4
+    # Образ wordpress:apache тримає www-data на uid 33, а wordpress:cli — на uid 82.
+    # Через спільний том це ламає права (cp у wp-content, запис uploads). Прирівнюємо
+    # wpcli до uid/gid 33, щоб усі файли тому належали одному власнику.
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      WORDPRESS_DB_NAME: dbmanager_wp
+    volumes:
+      - ./plugin:/plugin          # вихідний код плагіна (тільки для читання install-скриптом)
+      - wp-data:/var/www/html     # той самий том WP, що й у сервісу wordpress
+    depends_on:
+      - wordpress
+
+volumes:
+  mysql-data:
+  bridge-mysql-data:
+  wp-data:

@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Запобігання миготливості Alpine.js (layout shift) */
+[x-cloak] {
+    display: none !important;
+}
+
+
+@layer components {
+    .dbm-action-grid:not(:has(> span.bg-ok-bg)):not(:has(> span.bg-bad-bg)) > button:first-of-type {
+        grid-column-start: 2;
+    }
+
+    .dbm-action-grid:not(:has(> span.bg-ok-bg)):not(:has(> span.bg-bad-bg)) > button:last-child:nth-child(3) {
+        grid-column-start: 5;
+    }
+}

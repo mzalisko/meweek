@@ -87,6 +87,29 @@ class IngestTest extends TestCase
         $this->assertSame(1, PublishedSite::where('domain', 'domen.ua')->count());
     }
 
+    public function test_ingest_accepts_lower_version_for_new_connection_token(): void
+    {
+        Queue::fake();
+        $this->postSigned($this->body([
+            'token_hash' => hash('sha256', 'old-token'),
+            'version' => 137,
+            'payload' => ['site' => 'domen.ua', 'version' => 137, 'values' => [['key' => 'old']]],
+        ]))->assertOk();
+
+        $this->postSigned($this->body([
+            'token_hash' => hash('sha256', 'new-token'),
+            'push_secret' => 'new-listener-secret-with-enough-length',
+            'version' => 9,
+            'payload' => ['site' => 'domen.ua', 'version' => 9, 'values' => [['key' => 'fresh']]],
+        ]))->assertOk();
+
+        $site = PublishedSite::where('domain', 'domen.ua')->first();
+        $this->assertSame(9, $site->version);
+        $this->assertSame(hash('sha256', 'new-token'), $site->token_hash);
+        $this->assertSame('new-listener-secret-with-enough-length', $site->push_secret);
+        $this->assertSame('fresh', $site->payload['values'][0]['key']);
+    }
+
     public function test_ingest_rejects_equal_version_and_keeps_payload(): void
     {
         Queue::fake();

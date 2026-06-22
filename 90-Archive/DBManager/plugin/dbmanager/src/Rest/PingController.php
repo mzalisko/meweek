@@ -34,13 +34,22 @@ class PingController
         }
 
         $incomingVersion = (int) $payload['version'];
-        $currentVersion = $this->cache->version();
+        $incomingSiteId = (int) ($payload['site_id'] ?? 0);
+        $current = $this->cache->get();
+        $currentVersion = (int) ($current['version'] ?? 0);
+        $currentSiteId = (int) ($current['site_id'] ?? 0);
 
-        if ($incomingVersion < $currentVersion) {
+        // Монотонність версії застосовується ЛИШЕ в межах одного site_id. Якщо site_id
+        // змінився (перепідключення плагіна до іншого сайту) або кеш порожній — приймаємо
+        // дані незалежно від версії. Безпека збережена: підпис уже перевірено вище, а
+        // захист від повтору старих даних діє в межах того самого сайту.
+        $sameSite = $incomingSiteId === $currentSiteId;
+
+        if ($sameSite && $incomingVersion < $currentVersion) {
             return 409;
         }
 
-        if ($incomingVersion > $currentVersion) {
+        if (! $sameSite || $incomingVersion > $currentVersion) {
             $this->cache->put($payload);
         }
 
