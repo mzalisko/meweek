@@ -152,9 +152,11 @@ class SitePayloadCompilerTest extends TestCase
         $main = $this->itemByKey($payload, 'tg_main');
         $backup = $this->itemByKey($payload, 'tg_backup');
 
+        $this->assertNull($backup);
         $this->assertSame('on_reserve', $main['state']);
-        $this->assertSame('ok', $backup['state']);
-        $this->assertTrue($backup['is_current']);
+        $this->assertTrue($main['is_current']);
+        $this->assertSame('Backup TG', $main['value']);
+        $this->assertSame('https://t.me/backup', $main['url']);
     }
 
     public function test_hidden_phone_slot_is_published_with_hidden_state(): void
@@ -270,4 +272,46 @@ class SitePayloadCompilerTest extends TestCase
             'text:note',
         ], array_map(fn (array $item) => $item['type'].':'.$item['key'], $payload['values']));
     }
+
+    public function test_reserve_messenger_state_and_current_flag(): void
+    {
+        $site = Site::factory()->create();
+        
+        $tg = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'tg_brand',
+            'content' => ['value' => 'Telegram support', 'network' => 'telegram', 'url' => 'https://t.me/brand', 'linked_slot' => 'phone_ro_1', 'enabled' => true],
+        ]);
+        
+        $viber = DataValue::factory()->ofType('messenger')->forSite($site)->create([
+            'key' => 'viber_ro_1',
+            'content' => ['value' => 'Viber support', 'network' => 'viber', 'url' => 'https://viber.example', 'messenger_slot' => 'tg_brand', 'enabled' => true],
+        ]);
+
+        $compiler = app(SitePayloadCompiler::class);
+
+        $payload = $compiler->compile($site);
+        $tgItem = $this->itemByKey($payload, 'tg_brand');
+        $viberItem = $this->itemByKey($payload, 'viber_ro_1');
+
+        $this->assertNull($viberItem);
+        $this->assertSame('ok', $tgItem['state']);
+        $this->assertTrue($tgItem['is_current']);
+        $this->assertSame('Telegram support', $tgItem['value']);
+        $this->assertSame('https://t.me/brand', $tgItem['url']);
+        $this->assertSame('telegram', $tgItem['network']);
+
+        $tg->update(['content' => array_merge($tg->content, ['enabled' => false])]);
+        
+        $payload = $compiler->compile($site);
+        $tgItem = $this->itemByKey($payload, 'tg_brand');
+        $viberItem = $this->itemByKey($payload, 'viber_ro_1');
+
+        $this->assertNull($viberItem);
+        $this->assertSame('on_reserve', $tgItem['state']);
+        $this->assertTrue($tgItem['is_current']);
+        $this->assertSame('Viber support', $tgItem['value']);
+        $this->assertSame('https://viber.example', $tgItem['url']);
+        $this->assertSame('viber', $tgItem['network']);
+    }
 }
+

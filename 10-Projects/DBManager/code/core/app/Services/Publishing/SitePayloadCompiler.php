@@ -187,6 +187,46 @@ class SitePayloadCompiler
     private function messengerItem(DataValue $value, array $base, Collection $all): ?array
     {
         $content = $value->content ?? [];
+        
+        $messengers = $all->filter(fn (DataValue $dv) => $dv->type->code === 'messenger'
+            && $dv->scope_type === $value->scope_type
+            && $dv->scope_id === $value->scope_id);
+
+        $groupKey = $this->getMessengerGroupKey($value, $messengers);
+        $group = $messengers
+            ->filter(fn (DataValue $dv) => $this->getMessengerGroupKey($dv, $messengers) === $groupKey)
+            ->sortBy(fn (DataValue $dv) => sprintf(
+                '%010d_%010d',
+                $dv->created_at?->getTimestamp() ?? 0,
+                $dv->id
+            ))
+            ->values();
+
+        $primary = $group->first();
+        
+        // If this DataValue is NOT the primary messenger of the group, do not compile it.
+        // It will be compiled as part of the primary messenger slot's payload.
+        if ($primary && $value->id !== $primary->id) {
+            return null;
+        }
+
+        $primaryContent = $primary?->content ?? [];
+        $policy = $primaryContent['exhaustion_policy'] ?? 'hide';
+        $returnMode = $primaryContent['return_mode'] ?? 'auto';
+        $storedCurrentId = $primaryContent['current_messenger_id'] ?? null;
+        $current = $group
+            ->first(fn (DataValue $dv) => (bool) ($dv->content['pinned'] ?? false)
+                && ($dv->status ?? 'active') === 'active'
+                && ($dv->content['enabled'] ?? true))
+            ?? ($returnMode === 'sticky' && $storedCurrentId
+                ? $group->first(fn (DataValue $dv) => (int) $dv->id === (int) $storedCurrentId
+                    && ($dv->status ?? 'active') === 'active'
+                    && ($dv->content['enabled'] ?? true))
+                : null)
+            ?? $group->first(fn (DataValue $dv) => ($dv->status ?? 'active') === 'active' && ($dv->content['enabled'] ?? true));
+        $currentId = $current?->id;
+
+        // Base properties for the primary messenger slot key
         $linkedSlotRaw = $content['linked_slot'] ?? null;
         $linkedSlotStr = null;
         if (is_array($linkedSlotRaw)) {
@@ -205,52 +245,7 @@ class SitePayloadCompiler
             'return_mode' => $content['return_mode'] ?? 'auto',
         ];
 
-        $messengers = $all->filter(fn (DataValue $dv) => $dv->type->code === 'messenger'
-            && $dv->scope_type === $value->scope_type
-            && $dv->scope_id === $value->scope_id);
-
-        $groupKey = $content['messenger_slot'] ?? $linkedSlotStr ?? $value->key;
-        $group = $messengers
-            ->filter(fn (DataValue $dv) => ($dv->content['messenger_slot']
-                ?? (is_array($dv->content['linked_slot'] ?? null)
-                    ? (($dv->content['linked_slot'] ?? [])[0] ?? null)
-                    : (is_string($dv->content['linked_slot'] ?? null) && ($dv->content['linked_slot'] ?? '') !== ''
-                        ? $dv->content['linked_slot'] : null))
-                ?? $dv->key) === $groupKey)
-            ->sortBy(fn (DataValue $dv) => sprintf(
-                '%010d_%010d',
-                $dv->created_at?->getTimestamp() ?? 0,
-                $dv->id
-            ))
-            ->values();
-
-        $primary = $group->first();
-        $primaryContent = $primary?->content ?? [];
-        $policy = $primaryContent['exhaustion_policy'] ?? 'hide';
-        $returnMode = $primaryContent['return_mode'] ?? 'auto';
-        $storedCurrentId = $primaryContent['current_messenger_id'] ?? null;
-        $current = $group
-            ->first(fn (DataValue $dv) => (bool) ($dv->content['pinned'] ?? false)
-                && ($dv->status ?? 'active') === 'active'
-                && ($dv->content['enabled'] ?? true))
-            ?? ($returnMode === 'sticky' && $storedCurrentId
-                ? $group->first(fn (DataValue $dv) => (int) $dv->id === (int) $storedCurrentId
-                    && ($dv->status ?? 'active') === 'active'
-                    && ($dv->content['enabled'] ?? true))
-                : null)
-            ?? $group->first(fn (DataValue $dv) => ($dv->status ?? 'active') === 'active' && ($dv->content['enabled'] ?? true));
-        $currentId = $current?->id;
-
         if (! $currentId) {
-            if ($value->id !== $primary?->id) {
-                return $base + [
-                    'state' => 'hidden',
-                    'value' => null,
-                    'url' => null,
-                    'is_current' => false,
-                ];
-            }
-
             return $base + match ($policy) {
                 'emergency' => [
                     'state' => 'exhausted',
@@ -273,24 +268,72 @@ class SitePayloadCompiler
             };
         }
 
-        if (($value->status ?? 'active') === 'hidden' || ($content['enabled'] ?? true) === false) {
+        // If the active/current messenger itself is hidden or disabled, hide the slot
+        $currentContent = $current->content ?? [];
+        if (($current->status ?? 'active') === 'hidden' || ($currentContent['enabled'] ?? true) === false) {
             return $base + [
                 'state' => 'hidden',
                 'value' => null,
-                'url' => $content['url'] ?? null,
+                'url' => $currentContent['url'] ?? null,
             ];
         }
 
+        // If the active messenger is different from the primary slot, override base properties
+        if ($current->id !== $primary->id) {
+            $currentLinkedSlotRaw = $currentContent['linked_slot'] ?? null;
+            $currentLinkedSlotStr = null;
+            if (is_array($currentLinkedSlotRaw)) {
+                $currentLinkedSlotStr = count($currentLinkedSlotRaw) > 0 ? (string) $currentLinkedSlotRaw[0] : null;
+            } elseif (is_string($currentLinkedSlotRaw) && $currentLinkedSlotRaw !== '') {
+                $currentLinkedSlotStr = $currentLinkedSlotRaw;
+            }
+
+            $base['network'] = $currentContent['network'] ?? 'unknown';
+            $base['name'] = $currentContent['value'] ?? ($currentContent['name'] ?? $current->key);
+            $base['linked_slot'] = $currentLinkedSlotStr ?? $linkedSlotStr;
+        }
+
         return $base + [
-            'state' => $value->id === $currentId ? 'ok' : 'on_reserve',
-            'value' => $content['value'] ?? null,
-            'url' => $content['url'] ?? null,
-            'is_current' => $value->id === $currentId,
+            'state' => $current->id === $primary->id ? 'ok' : 'on_reserve',
+            'value' => $currentContent['value'] ?? null,
+            'url' => $currentContent['url'] ?? null,
+            'is_current' => true,
         ];
     }
 
     private function messengerUrlFromValue(?string $value): ?string
     {
         return $value && preg_match('/^https?:\/\//i', $value) ? $value : null;
+    }
+
+    private function getMessengerGroupKey(DataValue $value, Collection $allMessengers): string
+    {
+        $content = $value->content ?? [];
+        $messengerSlot = $content['messenger_slot'] ?? null;
+        if ($messengerSlot) {
+            $parent = $allMessengers->first(fn (DataValue $dv) => $dv->key === $messengerSlot);
+            if ($parent) {
+                $parentContent = $parent->content ?? [];
+                $parentLinkedSlotRaw = $parentContent['linked_slot'] ?? null;
+                $parentLinkedSlotStr = null;
+                if (is_array($parentLinkedSlotRaw)) {
+                    $parentLinkedSlotStr = count($parentLinkedSlotRaw) > 0 ? (string) $parentLinkedSlotRaw[0] : null;
+                } elseif (is_string($parentLinkedSlotRaw) && $parentLinkedSlotRaw !== '') {
+                    $parentLinkedSlotStr = $parentLinkedSlotRaw;
+                }
+                return $parentLinkedSlotStr ?? $parent->key;
+            }
+            return $messengerSlot;
+        }
+
+        $linkedSlotRaw = $content['linked_slot'] ?? null;
+        $linkedSlotStr = null;
+        if (is_array($linkedSlotRaw)) {
+            $linkedSlotStr = count($linkedSlotRaw) > 0 ? (string) $linkedSlotRaw[0] : null;
+        } elseif (is_string($linkedSlotRaw) && $linkedSlotRaw !== '') {
+            $linkedSlotStr = $linkedSlotRaw;
+        }
+
+        return $linkedSlotStr ?? $value->key;
     }
 }

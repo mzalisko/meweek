@@ -209,7 +209,13 @@
  
         <div class="overflow-x-auto rounded-lg border border-[#dfe3e0] bg-white relative">
             <div wire:loading.delay wire:target="targetType, stateFilter, geoFilter, search, phoneFilter, scope, groupId, rootSiteId, selectedSiteIds, operation, findText, replaceText, contentValue, statusValue, geoCodes, geoMode, phoneReplacement, phoneStatus, phoneFormat" 
-                class="abs            <div class="min-w-[980px]">
+                class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                <span class="text-[11px] text-mut animate-pulse font-semibold flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-full border shadow-sm">
+                    <span class="h-2.5 w-2.5 animate-spin rounded-full border border-mut border-t-transparent"></span>
+                    Оновлення...
+                </span>
+            </div>
+            <div class="min-w-[980px]">
                 @php
                     $gridCols = match($targetType) {
                         'phone_reserve' => '1.5fr 1.2fr 1.2fr 1.5fr 2.0fr',
