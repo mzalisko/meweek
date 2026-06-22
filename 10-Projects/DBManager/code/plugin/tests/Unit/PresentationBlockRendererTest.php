@@ -31,6 +31,46 @@ class PresentationBlockRendererTest extends TestCase
         $this->assertLessThan(strpos($html, '1200'), strpos($html, 'Telegram'));
     }
 
+    public function test_renders_social_address_and_text_types(): void
+    {
+        $html = (new PresentationBlockRenderer())->render([
+            'site_id' => 7,
+            'values' => [
+                ['geo' => ['WORLD'], 'key' => 'social_ig', 'type' => 'social', 'state' => 'ok', 'network' => 'Instagram', 'value' => '@brand', 'url' => 'https://instagram.com/brand'],
+                ['geo' => ['WORLD'], 'key' => 'addr_main', 'type' => 'address', 'state' => 'ok', 'value' => 'Украина, Киев, ул. Крещатик 1', 'city' => 'Киев', 'country' => 'Украина'],
+                ['geo' => ['WORLD'], 'key' => 'note', 'type' => 'text', 'state' => 'ok', 'label' => 'График', 'value' => 'Пн-Пт 9-18'],
+            ],
+        ], ['country' => 'UA']);
+
+        // Нові типи отримали власні вкладки-фільтри й секції.
+        $this->assertStringContainsString('data-dbm-filter="social"', $html);
+        $this->assertStringContainsString('data-dbm-filter="address"', $html);
+        $this->assertStringContainsString('data-dbm-filter="text"', $html);
+
+        // Соцмережа: мережа як заголовок, нікнейм як значення, безпечне http(s)-посилання.
+        $this->assertStringContainsString('Instagram', $html);
+        $this->assertStringContainsString('@brand', $html);
+        $this->assertStringContainsString('href="https://instagram.com/brand"', $html);
+
+        // Адреса: дзеркало value показується, місто йде заголовком картки.
+        $this->assertStringContainsString('Украина, Киев, ул. Крещатик 1', $html);
+        $this->assertStringContainsString('Киев', $html);
+
+        // Текст: лейбл як заголовок, значення видиме.
+        $this->assertStringContainsString('Пн-Пт 9-18', $html);
+    }
+
+    public function test_social_type_rejects_unsafe_link(): void
+    {
+        $html = (new PresentationBlockRenderer())->render([
+            'values' => [
+                ['key' => 'social_bad', 'type' => 'social', 'state' => 'ok', 'network' => 'X', 'value' => 'handle', 'url' => 'javascript:alert(1)'],
+            ],
+        ]);
+
+        $this->assertStringNotContainsString('href="javascript:alert(1)"', $html);
+    }
+
     public function test_skips_hidden_values_and_does_not_create_unsafe_links(): void
     {
         $html = (new PresentationBlockRenderer())->render([

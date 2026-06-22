@@ -8,12 +8,18 @@ class PresentationBlockRenderer
         'phone' => 0,
         'messenger' => 1,
         'price' => 2,
+        'social' => 3,
+        'address' => 4,
+        'text' => 5,
     ];
 
     private const TYPE_LABELS = [
         'phone' => 'Номера',
         'messenger' => 'Мессенджеры',
         'price' => 'Цены',
+        'social' => 'Соцсети',
+        'address' => 'Адреса',
+        'text' => 'Прочее',
     ];
 
     private static int $instance = 0;
@@ -233,6 +239,26 @@ class PresentationBlockRenderer
             return $name !== '' ? $name : 'Мессенджер';
         }
 
+        if ($type === 'social') {
+            $network = trim((string) ($value['network'] ?? ''));
+            return $network !== '' ? $network : 'Соцсеть';
+        }
+
+        if ($type === 'address') {
+            foreach (['city', 'region', 'country'] as $field) {
+                $candidate = trim((string) ($value[$field] ?? ''));
+                if ($candidate !== '') {
+                    return $candidate;
+                }
+            }
+            return 'Адрес';
+        }
+
+        if ($type === 'text') {
+            $label = trim((string) ($value['label'] ?? ''));
+            return $label !== '' ? $label : 'Текст';
+        }
+
         return 'Телефон';
     }
 
@@ -257,7 +283,7 @@ class PresentationBlockRenderer
             return $phone !== '' ? 'tel:' . $phone : '';
         }
 
-        if ($type === 'messenger') {
+        if ($type === 'messenger' || $type === 'social') {
             $url = trim((string) ($value['url'] ?? $value['value'] ?? ''));
             if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
                 $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
@@ -346,7 +372,7 @@ class PresentationBlockRenderer
     /** @param array<int,array<string,mixed>> $items @return array<string,int> */
     private function counts(array $items): array
     {
-        $counts = ['phone' => 0, 'messenger' => 0, 'price' => 0];
+        $counts = array_fill_keys(array_keys(self::TYPE_LABELS), 0);
         foreach ($items as $item) {
             $type = (string) $item['type'];
             if (array_key_exists($type, $counts)) {
