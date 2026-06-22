@@ -83,6 +83,28 @@
 
     </div>
 
+    {{-- Глобальні сповіщення (тости) з $this->dispatch('toast', message: ...) --}}
+    <div x-data="{ toasts: [] }"
+        @toast.window="
+            const id = Date.now() + Math.random();
+            const msg = ($event.detail && $event.detail.message) ? $event.detail.message
+                : (Array.isArray($event.detail) && $event.detail[0] ? $event.detail[0].message : '');
+            const bad = /Помилк|Немає прав|офлайн/i.test(msg);
+            toasts.push({ id, msg, bad });
+            setTimeout(() => { toasts = toasts.filter(t => t.id !== id); }, 4000);
+        "
+        class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2"
+        aria-live="polite">
+        <template x-for="t in toasts" :key="t.id">
+            <div x-transition.opacity
+                class="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-semibold shadow-lg"
+                :class="t.bad ? 'border-bad-tx/30 bg-bad-bg text-bad-tx' : 'border-ok-tx/30 bg-ok-bg text-ok-tx'">
+                <span class="inline-block h-2 w-2 rounded-full" :class="t.bad ? 'bg-bad-tx' : 'bg-ok-tx'"></span>
+                <span x-text="t.msg"></span>
+            </div>
+        </template>
+    </div>
+
     @livewireScripts
 </body>
 </html>

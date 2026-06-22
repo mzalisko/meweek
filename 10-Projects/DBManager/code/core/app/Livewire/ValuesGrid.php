@@ -2206,7 +2206,7 @@ class ValuesGrid extends Component
         $success = app(BridgePublisher::class)->push($publication);
 
         if ($success) {
-            $this->dispatch('toast', message: 'Дані сайту успішно синхронізовано з плагіном');
+            $this->dispatch('toast', message: "Синхронізовано з плагіном — версія {$publication->version}");
         } else {
             $this->dispatch('toast', message: 'Помилка синхронізації (відсутній токен або плагін офлайн)');
         }
