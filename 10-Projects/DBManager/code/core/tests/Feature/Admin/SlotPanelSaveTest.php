@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Livewire\SlotPanel;
+use App\Models\Publication;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Provisioning\SiteProvisioner;
@@ -23,7 +24,7 @@ class SlotPanelSaveTest extends TestCase
         $this->actingAs(User::factory()->create());
     }
 
-    public function test_save_publishes_affected_sites_to_bridge(): void
+    public function test_save_publishes_affected_sites_locally(): void
     {
         config([
             'services.bridge.ingest_url'     => 'https://bridge.local/api/internal/publish',
@@ -44,10 +45,9 @@ class SlotPanelSaveTest extends TestCase
             ->assertSet('open', false)
             ->assertDispatched('slot-updated');
 
-        Http::assertSent(
-            fn ($r) => str_contains($r->url(), 'internal/publish')
-                && json_decode($r->body(), true)['domain'] === 'domen.ua'
-        );
+        // Збереження слота публікує сайт ЛОКАЛЬНО (Publication), без пушу в bridge — синхронізація ручна.
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'internal/publish'));
+        $this->assertTrue(Publication::where('site_id', $site->id)->exists());
     }
 
     public function test_save_phone_format_on_slot(): void

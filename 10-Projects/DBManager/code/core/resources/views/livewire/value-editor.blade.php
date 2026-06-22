@@ -36,13 +36,14 @@
     {{-- Value (не для телефона — номери в панелі слота; не для цін — список; не для адреси — структуровані поля) --}}
     @if($type !== 'phone' && $type !== 'price' && $type !== 'address')
     <div class="mb-3">
-        <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">
-            {{ $type === 'messenger' ? 'Значення месенджера' : ($type === 'social' ? 'Нікнейм / handle' : 'Значення') }}
+        <label class="flex items-center gap-1.5 text-mut uppercase tracking-[.06em] text-[11px] mb-1">
+            <span>{{ $type === 'messenger' ? 'Значення месенджера' : ($type === 'social' ? 'Нікнейм / handle' : 'Значення') }}</span>
+            @if($this->isValueDirty())<span class="text-acc-tx normal-case tracking-normal font-semibold">● змінено</span>@endif
         </label>
-        <input wire:model="value" type="text" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc @error('value') border-bad-tx @enderror" />
+        <input wire:model="value" type="text" class="w-full border rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc @error('value') border-bad-tx @elseif($this->isValueDirty()) border-acc @else border-[#dfe3e0] @enderror" />
         @error('value')<p class="text-bad-tx text-[11px] mt-0.5">{{ $message }}</p>@enderror
-        @if($valueId && $originalValue !== null && $originalValue !== $value)
-            <p class="text-mut text-[11px] mt-0.5">Було: <span class="line-through text-bad-tx">{{ $originalValue }}</span></p>
+        @if($this->isValueDirty())
+            <p class="text-mut text-[11px] mt-0.5">Було: <span class="line-through text-bad-tx">{{ $originalValue }}</span> <span class="text-mut">➔</span> <span class="text-ok-tx font-semibold">{{ $value }}</span></p>
         @endif
     </div>
     @elseif($type === 'phone')
@@ -182,8 +183,8 @@
             <label class="block text-mut uppercase tracking-[.06em] text-[11px] mb-1">Індекс</label>
             <input wire:model="addrPostcode" type="text" placeholder="01001" class="w-full border border-[#dfe3e0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-acc" />
         </div>
-        @if($valueId && $originalValue !== null)
-            <p class="text-mut text-[11px]">Було: <span class="line-through text-bad-tx">{{ $originalValue }}</span></p>
+        @if($this->isValueDirty())
+            <p class="text-mut text-[11px]">Було: <span class="line-through text-bad-tx">{{ $originalValue }}</span> <span class="text-mut">➔</span> <span class="text-ok-tx font-semibold">{{ $this->currentDisplayValue() }}</span></p>
         @endif
     </div>
     @endif

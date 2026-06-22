@@ -96,17 +96,24 @@ class ValuesGridTest extends TestCase
         $this->assertSame('+380991112233', $slot->emergency_number);
     }
 
-    public function test_inline_reorder_phone_reserves(): void
+    public function test_inline_reorder_keeps_primary_fixed_and_reorders_reserves(): void
     {
         $site = Site::factory()->create();
         [$slot, $entries] = $this->slotWithNumbers(['active', 'active', 'active']);
         $slot->dataValue->update(['scope_type' => 'site', 'scope_id' => $site->id]);
 
-        Livewire::test(ValuesGrid::class, ['site' => $site->id])
-            ->call('movePhoneUp', $entries[1]->id);
+        $grid = Livewire::test(ValuesGrid::class, ['site' => $site->id]);
 
-        $this->assertSame(0, $entries[1]->fresh()->priority);
-        $this->assertSame(1, $entries[0]->fresh()->priority);
+        // Перший резерв (priority 1) не може зайняти місце основного (priority 0): рух угору — no-op.
+        $grid->call('movePhoneUp', $entries[1]->id);
+        $this->assertSame(0, $entries[0]->fresh()->priority);
+        $this->assertSame(1, $entries[1]->fresh()->priority);
+
+        // Другий резерв (priority 2) піднімається — міняється місцями з першим резервом; основний незмінний.
+        $grid->call('movePhoneUp', $entries[2]->id);
+        $this->assertSame(0, $entries[0]->fresh()->priority);
+        $this->assertSame(2, $entries[1]->fresh()->priority);
+        $this->assertSame(1, $entries[2]->fresh()->priority);
     }
 
     public function test_manual_sync_current_site_calls_bridge_publisher(): void
@@ -119,7 +126,7 @@ class ValuesGridTest extends TestCase
 
         Livewire::test(ValuesGrid::class, ['site' => $site->id])
             ->call('syncCurrentSite')
-            ->assertDispatched('toast', message: 'Дані сайту успішно синхронізовано з плагіном');
+            ->assertDispatched('toast', message: 'Синхронізовано з плагіном — версія 1');
     }
 
     public function test_manager_can_edit_site_details_directly_from_grid(): void

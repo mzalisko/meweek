@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Livewire\ValueEditor;
 use App\Models\DataValue;
+use App\Models\Publication;
 use App\Models\Site;
 use App\Models\SiteGroup;
 use App\Models\User;
@@ -47,8 +48,10 @@ class ValueEditorPublishTest extends TestCase
             ->set('scope', 'site')
             ->call('save');
 
-        Http::assertSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'a.ua');
-        Http::assertNotSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'b.ua');
+        // Збереження публікує ЛОКАЛЬНО лише уражений сайт; пуш у bridge — ручний (syncCurrentSite).
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'internal/publish'));
+        $this->assertTrue(Publication::where('site_id', $a->id)->exists());
+        $this->assertFalse(Publication::where('site_id', $b->id)->exists());
     }
 
     public function test_deleting_value_publishes_affected_sites(): void
@@ -65,7 +68,9 @@ class ValueEditorPublishTest extends TestCase
             ->call('edit', $dv->id)
             ->call('delete');
 
-        Http::assertSent(fn ($r) => json_decode($r->body(), true)['domain'] === 'del.ua');
+        // Видалення публікує уражений сайт ЛОКАЛЬНО (Publication), без пушу в bridge.
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'internal/publish'));
+        $this->assertTrue(Publication::where('site_id', $site->id)->exists());
     }
 
 

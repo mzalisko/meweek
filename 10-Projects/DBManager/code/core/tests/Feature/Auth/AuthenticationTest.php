@@ -95,8 +95,8 @@ class AuthenticationTest extends TestCase
 
         $this->actingAs($user);
 
-        // /dashboard зведено на нашу адмінку (routes/web.php).
-        $this->get('/dashboard')->assertRedirect('/admin');
+        // /dashboard зведено на дашборд адмінки (routes/web.php).
+        $this->get('/dashboard')->assertRedirect('/admin/dashboard');
     }
 
     public function test_users_can_logout(): void

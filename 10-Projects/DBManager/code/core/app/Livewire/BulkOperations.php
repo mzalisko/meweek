@@ -877,6 +877,13 @@ class BulkOperations extends Component
                 ->implode('; ') ?: '—';
         }
 
+        if (($value->type?->code ?? null) === 'social') {
+            $handle = (string) ($content['value'] ?? $content['url'] ?? '—');
+            $network = $content['network'] ?? null;
+
+            return $network ? "{$handle} ({$network})" : $handle;
+        }
+
         return (string) ($content['value'] ?? $content['url'] ?? '—');
     }
 
@@ -966,23 +973,31 @@ class BulkOperations extends Component
                         $key = \App\Models\DataValue::where('id', $log->subject_id)->value('key');
                     }
                     
-                    $changeDesc = '';
+                    // Структуруємо «старе → нове» окремими полями, щоб список рендерив
+                    // справжній кольоровий diff (підсвічування змін, не лише в прев'ю).
+                    $prefix = '';
+                    $old = '—';
+                    $new = '—';
                     if ($log->action === 'bulk.replace_phone') {
-                        $changeDesc = ($log->old['phone'] ?? '—') . ' ➔ ' . ($log->new['phone'] ?? '—');
+                        $old = $log->old['phone'] ?? '—';
+                        $new = $log->new['phone'] ?? '—';
                     } elseif ($log->action === 'bulk.set_phone_status') {
-                        $oldStat = ($log->old['phone_status'] ?? '') === 'down' ? 'збій' : (($log->old['phone_status'] ?? '') === 'active' ? 'активний' : ($log->old['phone_status'] ?? '—'));
-                        $newStat = ($log->new['phone_status'] ?? '') === 'down' ? 'збій' : (($log->new['phone_status'] ?? '') === 'active' ? 'активний' : ($log->new['phone_status'] ?? '—'));
-                        $changeDesc = ($log->new['phone'] ?? '') . ' [' . $oldStat . ' ➔ ' . $newStat . ']';
+                        $phone = $log->new['phone'] ?? '';
+                        $prefix = $phone !== '' ? $phone . ': ' : '';
+                        $old = ($log->old['phone_status'] ?? '') === 'down' ? 'збій' : (($log->old['phone_status'] ?? '') === 'active' ? 'активний' : ($log->old['phone_status'] ?? '—'));
+                        $new = ($log->new['phone_status'] ?? '') === 'down' ? 'збій' : (($log->new['phone_status'] ?? '') === 'active' ? 'активний' : ($log->new['phone_status'] ?? '—'));
                     } elseif ($log->action === 'bulk.set_phone_format') {
-                        $changeDesc = 'формат: ' . ($log->old['content']['phone_format'] ?? '—') . ' ➔ ' . ($log->new['content']['phone_format'] ?? '—');
+                        $prefix = 'формат: ';
+                        $old = $log->old['content']['phone_format'] ?? '—';
+                        $new = $log->new['content']['phone_format'] ?? '—';
                     } elseif ($log->action === 'bulk.set_status') {
-                        $oldStat = ($log->old['status'] ?? '') === 'hidden' ? 'прихований' : (($log->old['status'] ?? '') === 'active' ? 'активний' : ($log->old['status'] ?? '—'));
-                        $newStat = ($log->new['status'] ?? '') === 'hidden' ? 'прихований' : (($log->new['status'] ?? '') === 'active' ? 'активний' : ($log->new['status'] ?? '—'));
-                        $changeDesc = 'статус: ' . $oldStat . ' ➔ ' . $newStat;
+                        $prefix = 'статус: ';
+                        $old = ($log->old['status'] ?? '') === 'hidden' ? 'прихований' : (($log->old['status'] ?? '') === 'active' ? 'активний' : ($log->old['status'] ?? '—'));
+                        $new = ($log->new['status'] ?? '') === 'hidden' ? 'прихований' : (($log->new['status'] ?? '') === 'active' ? 'активний' : ($log->new['status'] ?? '—'));
                     } elseif ($log->action === 'bulk.set_geo') {
-                        $oldGeo = implode(',', $log->old['geo'] ?? []);
-                        $newGeo = implode(',', $log->new['geo'] ?? []);
-                        $changeDesc = 'гео: ' . ($oldGeo ?: '—') . ' ➔ ' . ($newGeo ?: '—');
+                        $prefix = 'гео: ';
+                        $old = implode(',', $log->old['geo'] ?? []) ?: '—';
+                        $new = implode(',', $log->new['geo'] ?? []) ?: '—';
                     } else {
                         $oldVal = $log->old['content']['value'] ?? $log->old['key'] ?? '';
                         $newVal = $log->new['content']['value'] ?? $log->new['key'] ?? '';
@@ -992,12 +1007,18 @@ class BulkOperations extends Component
                         if (is_array($newVal)) {
                             $newVal = json_encode($newVal, JSON_UNESCAPED_UNICODE);
                         }
-                        $changeDesc = \Illuminate\Support\Str::limit((string)$oldVal, 30) . ' ➔ ' . \Illuminate\Support\Str::limit((string)$newVal, 30);
+                        $old = \Illuminate\Support\Str::limit((string)$oldVal, 30) ?: '—';
+                        $new = \Illuminate\Support\Str::limit((string)$newVal, 30) ?: '—';
                     }
-                    
+
+                    $changeDesc = trim($prefix . $old . ' ➔ ' . $new);
+
                     return [
                         'site' => $siteDomain,
                         'key' => $key,
+                        'prefix' => $prefix,
+                        'old' => (string) $old,
+                        'new' => (string) $new,
                         'change' => $changeDesc,
                     ];
                 })->values();

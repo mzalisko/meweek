@@ -587,9 +587,9 @@
                                     <div class="mt-1.5 space-y-1 pl-1.5 border-l border-acc/20 max-h-[120px] overflow-y-auto font-mono text-[9px] text-mut">
                                         @foreach($session['details'] as $det)
                                             <div class="leading-tight">
-                                                <span class="text-ink font-semibold">{{ $det['site'] }}</span>: 
-                                                <span class="text-[#3c5a42] font-semibold">{{ $det['key'] }}</span> 
-                                                <span>({{ $det['change'] }})</span>
+                                                <span class="text-ink font-semibold">{{ $det['site'] }}</span>:
+                                                <span class="text-[#3c5a42] font-semibold">{{ $det['key'] }}</span>
+                                                <span>(@if(!empty($det['prefix'])){{ $det['prefix'] }}@endif<span class="text-bad-tx line-through">{{ $det['old'] ?? '—' }}</span> <span class="text-mut">➔</span> <span class="text-ok-tx font-semibold">{{ $det['new'] ?? '—' }}</span>)</span>
                                             </div>
                                         @endforeach
                                     </div>

@@ -386,6 +386,27 @@ class ValueEditor extends Component
         return preg_match('/^https?:\/\//i', $value) ? $value : null;
     }
 
+    /**
+     * Поточне відображуване значення (для підсвічування «Було → стало» в single-edit).
+     * Для адреси — похідне value-дзеркало зі структурованих полів.
+     */
+    public function currentDisplayValue(): ?string
+    {
+        if ($this->type === 'address') {
+            return $this->buildAddressContent()['value'];
+        }
+
+        return $this->value !== '' ? $this->value : null;
+    }
+
+    /** Чи відрізняється поточне значення від збереженого (single-edit dirty). */
+    public function isValueDirty(): bool
+    {
+        return $this->valueId !== null
+            && $this->originalValue !== null
+            && $this->originalValue !== $this->currentDisplayValue();
+    }
+
     /** Структурована адреса (A+): структуровані поля + похідне value-дзеркало для generic-механізмів. */
     private function buildAddressContent(): array
     {

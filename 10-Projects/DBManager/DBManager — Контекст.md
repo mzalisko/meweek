@@ -5,18 +5,20 @@ tags: [dbmanager, контекст]
 # DBManager — Контекст
 
 **Оновлено:** 2026-06-22
-**Стан:** Реалізовано Дашборд, Обране, Інциденти, повний UI/UX редизайн плагіну, а також приховування резервних месенджерів з окремих ключів у плагіні (з інтеграцією в основний ключ при failover). Всі тести проходять успішно.
+**Стан:** Нові типи даних (соцмережі, адреси, текст) **доведені до робочого стану** в усіх механізмах (створення/валідація/редагування/публікація/масові зміни/логування/аудит/права), плюс закрито підсвічування змін (вимога §4). Повний suite зелений: **289 passed, 0 failed**.
 
-## Реалізовано (Дашборд, Обране, Інциденти, Редизайн, Редагування з ValuesGrid, Резервні месенджери)
-- **Приховування резервних месенджерів:** з плагіну приховано окремі ключі резервних месенджерів (Viber і т.д.), які натомість failover-інтегровані в основний ключ (Telegram), аналогічно телефонам. Зміни внесено у [SitePayloadCompiler.php](file:///c:/Dev/Meweek/10-Projects/DBManager/code/core/app/Services/Publishing/SitePayloadCompiler.php).
-- **Редагування сайту з ValuesGrid:** додано кнопку «Редагувати сайт» та висувну бічну панель (slide-over) на сторінку перегляду даних сайту. Зміни внесено у [ValuesGrid.php](file:///c:/Dev/Meweek/10-Projects/DBManager/code/core/app/Livewire/ValuesGrid.php) та [values-grid.blade.php](file:///c:/Dev/Meweek/10-Projects/DBManager/code/core/resources/views/livewire/values-grid.blade.php).
-- **Повний редизайн плагіну (бізнес-стиль):** оновлено всю стилістику та покращено відступи (whitespace). Зміни внесено в [AdminPages.php](file:///C:/Dev/Meweek/10-Projects/DBManager/code/plugin/dbmanager/src/Admin/AdminPages.php) та [PresentationBlockRenderer.php](file:///C:/Dev/Meweek/10-Projects/DBManager/code/plugin/dbmanager/src/Wp/PresentationBlockRenderer.php).
-- **Дашборд (`/admin/dashboard`):** віджети статистики, обрані групи/сайти з робочими статусами, блок непідтверджених інцидентів з кнопкою підтвердження («Acknowledge»), офлайн-сайти.
-- **Обране на сторінці сайтів (`/admin/sites`):** додано зірочки (★ / ☆) біля назв неархівованих груп та доменів для додавання до `user_favorites`.
-- **Окрема сторінка «Інциденти» (`/admin/incidents`):** сітка квадратних карток сайтів із розподілом по 2 табах («На резервах» та «На основних»).
-- **Виправлення відображення резервів (`/admin/site?site=id`):** замінено на стандартні Alpine-атрибути `x-cloak`.
+## Реалізовано — нові типи + підсвічування
+- **Соцмережі (`social`):** структурований тип (платформа + handle + url), валідація `network` обов'язкова; публікується як `{network, value, url}`.
+- **Адреси (`address`):** рішення **A+** (структуровані поля country/region/city/street/postcode + похідне `value`-дзеркало) — див. [[ADDRESS_DECISION]]. Публікація через явний allow-list (без витоку службових полів). Масові текстові операції на адресі заблоковано (структуру правлять у картці).
+- **Текст (`text`):** добитий як первокласний тип (label/іконка, create-whitelist із реєстру `value_types`).
+- **Реєстр як єдина точка істини:** create/edit-валідація типів береться з `ValueType::pluck('code')` ([ValueEditor.php](file:///c:/Dev/Meweek/10-Projects/DBManager/code/core/app/Livewire/ValueEditor.php)).
+- **Підсвічування (§4):** single-edit — dirty-індикатор «● змінено» + «Було ➔ стало» (значення й адреса); bulk — diff old/new у звіті «останні зміни» (не лише в прев'ю); `displayValue` для social → `@handle (network)`.
+- **Звірка тестів:** 6 прееснуючих *сталих* тестів приведено до поточної навмисної поведінки (локальна публікація + ручна версійована синхронізація, незмінний основний номер при reorder, маршрут `/dashboard → /admin/dashboard`) — це були застарілі очікування, не регресія.
+
+## Дослідження (закоммічені документи)
+- [[DATA_TYPES_MAP]] — карта «тип → механізми»; [[BULK_EDIT_AUDIT]] — критичний аудит масових змін (B1 блок адреси впроваджено, B2–B7 — пропозиції); [[NEW_TYPES_PLAN]] — план інтеграції.
 
 ## Тести та перевірка
-- `docker compose exec -T core php artisan test --filter=SitePayloadCompilerTest` — **PASS** (13 тестів успішні, перевірено нову поведінку резервів).
-- `docker compose exec -T core php artisan test --filter=ValuesGridTest` — **PASS** (новий тест успішного редагування та доступу суперадміна зелений).
+- `docker compose exec -T core php artisan test` — **289 passed (910 assertions)**.
+- Нові типи: `NewDataTypesTest` (12) + підсвічування: `ChangeHighlightTest` (4) — усі зелені.
 - Робочий код: `10-Projects/DBManager/code/`.
