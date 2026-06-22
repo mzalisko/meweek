@@ -43,6 +43,9 @@ return [
         'ingest_url' => env('BRIDGE_INGEST_URL'),
         'publish_secret' => env('BRIDGE_PUBLISH_SECRET'),
         'geodb_url' => env('BRIDGE_GEODB_URL'),
+        // Локальне середовище: якщо задано — усі підключення пінгуються на цей URL
+        // (локальний WordPress), незалежно від домену сайту. У проді лишати порожнім.
+        'local_ping_url' => env('BRIDGE_LOCAL_PING_URL'),
     ],
 
 ];

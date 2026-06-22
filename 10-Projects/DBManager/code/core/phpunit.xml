@@ -32,5 +32,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Тести йдуть у прод-режимі: локальний ping-оверайд вимкнено, тож перевіряється
+             домен-базований ping_url (як у проді). Окремий тест вмикає оверайд явно. -->
+        <env name="BRIDGE_LOCAL_PING_URL" value=""/>
     </php>
 </phpunit>

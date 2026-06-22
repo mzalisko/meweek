@@ -36,7 +36,14 @@ class SiteProvisioner
     {
         $rawToken = Str::random(48);
         $pushSecret = Str::random(64);
-        $pingUrl = $this->normalizePingUrl($site->ping_url ?: $this->defaultPingUrl($site));
+        // У локальному середовищі (BRIDGE_LOCAL_PING_URL заданий) усі підключення
+        // пінгують локальний WordPress, незалежно від домену сайту — інакше після
+        // пересіву БД нові сайти пінгувались би на зовнішні домени й локальний плагін
+        // не оновлювався б при синхронізації.
+        $localPing = (string) config('services.bridge.local_ping_url');
+        $pingUrl = $localPing !== ''
+            ? $localPing
+            : $this->normalizePingUrl($site->ping_url ?: $this->defaultPingUrl($site));
 
         ApiToken::create([
             'site_id' => $site->id,

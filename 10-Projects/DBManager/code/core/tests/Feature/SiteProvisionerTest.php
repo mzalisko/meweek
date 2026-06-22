@@ -81,6 +81,34 @@ class SiteProvisionerTest extends TestCase
         $this->assertSame($connection['ping_url'], $site->fresh()->ping_url);
     }
 
+    public function test_local_ping_override_used_when_configured(): void
+    {
+        // Локальне середовище: оверайд застосовується незалежно від домену сайту.
+        config(['services.bridge.local_ping_url' => 'http://wordpress/?rest_route=/dbm/v1/ping']);
+
+        $site = Site::factory()->create([
+            'domain' => 'domen.ua',
+            'ping_url' => 'https://domen.ua/?rest_route=/dbm/v1/ping',
+        ]);
+
+        $connection = app(SiteProvisioner::class)->issuePluginConnection($site);
+
+        $this->assertSame('http://wordpress/?rest_route=/dbm/v1/ping', $connection['ping_url']);
+        $this->assertSame('http://wordpress/?rest_route=/dbm/v1/ping', $site->fresh()->ping_url);
+    }
+
+    public function test_without_override_ping_url_is_domain_based_for_production(): void
+    {
+        // Прод: оверайд порожній → ping_url будується з домену сайту (безпечно й коректно).
+        config(['services.bridge.local_ping_url' => null]);
+
+        $site = Site::factory()->create(['domain' => 'prod-site.com', 'ping_url' => '']);
+
+        $connection = app(SiteProvisioner::class)->issuePluginConnection($site);
+
+        $this->assertSame('https://prod-site.com/?rest_route=/dbm/v1/ping', $connection['ping_url']);
+    }
+
     public function test_revoke_token_marks_all_active_tokens_revoked(): void
     {
         $site = Site::factory()->create();
