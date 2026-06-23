@@ -53,8 +53,15 @@ done
 
 `claude -p` (headless режим) переходить на Agent SDK Credit Pool. Обліковувати використання, щоб не перевищити ліміт кредитів ($20/міс для Pro).
 
+## Loop Engineering (еволюція, червень 2026)
+
+Черні (червень 2026): «Я більше не пишу промпти — Claude пише промпт, а я говорю з тим Claude, що координує». Це наступний рівень після Prompt Engineering — **Loop Engineering**: людина задає цілі та контролює цикл, агент формує деталі виконання.
+
+Практично: замість написання промпту → описати мету → Claude будує власний промпт → людина ревʼює цикл.
+
 ## Джерела
 
 - [Boris Cherny — Fortune, 11 червня 2026](https://fortune.com/2026/06/11/anthropic-claude-boris-cherny-doesnt-write-code-by-hand-anymore/)
-- [Loop Engineering Guide (explainx.ai)](https://explainx.ai/blog/loop-engineering-coding-agents-claude-code-guide-2026)
-- [Anthropic Engineer Loops Article](https://explainx.ai/blog/anthropic-engineer-loops-prompts-ai-coding-harness-engineering-2026)
+- [Boris Cherny — Fortune, 8 червня 2026](https://fortune.com/2026/06/08/anthropics-boris-cherny-creator-of-claude-code-says-there-are-days-he-manages-tens-of-thousands-of-ai-agents-at-once/)
+- [Loop Engineering Guide (explainx.ai)](https://explainx.ai/blog/what-is-loop-engineering-ai-agents-2026)
+- [[30-Agents/AI News Digest/Daily/2026-06-23]]
