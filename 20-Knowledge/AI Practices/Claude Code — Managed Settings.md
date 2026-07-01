@@ -31,7 +31,7 @@ Allowlist моделей, доступних у цій конфігурації.
 // .claude/settings.json (managed — не перевизначається проєктом)
 {
   "enforceAvailableModels": true,
-  "availableModels": ["claude-sonnet-4-6"],
+  "availableModels": ["claude-sonnet-5"],
   "permissions": {
     "allow": ["Bash", "Read", "Write", "Edit"]
   }
@@ -47,10 +47,14 @@ claude --model claude-fable-5
 
 | Контекст | Модель | Причина |
 |---|---|---|
-| Автоматичні рутини (`claude -p`) | `claude-sonnet-4-6` | Економія кредитного пулу |
+| Автоматичні рутини (`claude -p`) | `claude-sonnet-5` | Економія кредитного пулу |
 | Масова обробка (Fitness звіти) | `claude-haiku-4-5` | Швидко + дешево |
 | Інтерактивні сесії розробки | Default (Fable 5) | Максимальні можливості |
 | Критичні архітектурні рішення | `claude-fable-5` | Явно вказати |
+
+## Оновлення 30 червня 2026: Claude Sonnet 5
+
+Anthropic випустив Claude Sonnet 5 — рівень продуктивності близько Opus 4.8, нижчий rate галюцинацій/sycophancy, дефолт у Claude Code (2.1.197). Вступна ціна $2/$10 за Mtok (вхід/вихід) до 31 серпня 2026, потім $3/$15 — заміняє `claude-sonnet-4-6` як рекомендовану модель для автоматичних рутин Meweek.
 
 **Рекомендація**: у `CLAUDE.md` навичок-рутин (daily-digest, weekly-review, Fitness) додати `availableModels` обмеження на Sonnet.
 
@@ -64,3 +68,5 @@ claude --model claude-fable-5
 - [Claude Code Changelog v2.1.175](https://code.claude.com/docs/en/changelog)
 - [Claude Credit Overhaul June 15 (Digital Applied)](https://www.digitalapplied.com/blog/anthropic-claude-credit-overhaul-june-15-2026)
 - [Anthropic June 15 Billing Change](https://codersera.com/blog/anthropic-june-2026-billing-change-claude-code/)
+- [Anthropic — Claude Sonnet 5](https://www.anthropic.com/news/claude-sonnet-5)
+- [[AI Дайджест 2026-07-01]]
