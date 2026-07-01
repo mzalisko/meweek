@@ -40,6 +40,12 @@ export CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5-20251001
 ```
 Всі субагенти, що не перевизначають модель явно, отримають Haiku.
 
+## Порівняння: LangChain Dynamic Subagents (30 червня 2026)
+
+LangChain представив паттерн, де оркестратор не викликає субагента як звичайний tool-call, а сам пише короткий скрипт (цикли, гілкування, конкурентність), що керує субагентами під конкретну задачу — оркестраційна логіка стає кодом, а не фіксованим шаблоном виклику.
+
+Це підтверджує напрямок, який Meweek вже використовує через `Workflow`-скрипти (JS-оркестрація subagents з `pipeline`/`parallel`) — не приватний вибір, а домінантний паттерн 2026 року.
+
 ## Обмеження
 
 - Максимум 5 рівнів вкладеності; рекомендовано 2–3 на практиці.
@@ -50,5 +56,7 @@ export CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5-20251001
 
 - [Claude Code Changelog v2.1.172](https://code.claude.com/docs/en/changelog)
 - [Claude Code Nested Sub-Agents Guide](https://ofox.ai/blog/claude-code-nested-subagents-2026/)
+- [LangChain — Dynamic Subagents in Deep Agents](https://www.langchain.com/blog/introducing-dynamic-subagents-in-deep-agents)
 - [[AI Дайджест 2026-06-12]]
 - [[AI Дайджест 2026-06-14]]
+- [[AI Дайджест 2026-07-01]]
