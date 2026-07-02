@@ -40,6 +40,12 @@ export CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5-20251001
 ```
 Всі субагенти, що не перевизначають модель явно, отримають Haiku.
 
+## Програмна диспетчеризація (замість послідовних викликів)
+
+LangChain у пості «Dynamic Subagents in Deep Agents» (~30 червня 2026) описав підхід, де оркестратор не викликає субагентів по черзі через tool calls, а пише короткий скрипт (цикли, розгалуження, паралельність), який диспетчеризує субагентів програмно. Корисно при запуску сотень субагентів або коли логіка оркестрації умовна/багатофазна.
+
+У Meweek цей підхід уже доступний через інструмент `Workflow` у Claude Code (`pipeline()`/`parallel()` у JS-скрипті) — не потрібно чекати на окрему реалізацію, лише свідомо застосовувати для великих fan-out задач (наприклад, глибокий аудит усіх проєктів або масовий рефакторинг).
+
 ## Обмеження
 
 - Максимум 5 рівнів вкладеності; рекомендовано 2–3 на практиці.
@@ -50,5 +56,7 @@ export CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5-20251001
 
 - [Claude Code Changelog v2.1.172](https://code.claude.com/docs/en/changelog)
 - [Claude Code Nested Sub-Agents Guide](https://ofox.ai/blog/claude-code-nested-subagents-2026/)
+- [LangChain — Dynamic Subagents in Deep Agents](https://www.langchain.com/blog/introducing-dynamic-subagents-in-deep-agents)
 - [[AI Дайджест 2026-06-12]]
 - [[AI Дайджест 2026-06-14]]
+- [[AI Дайджест 2026-07-02]]
