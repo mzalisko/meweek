@@ -49,6 +49,12 @@ done
 | Weekly Review | `claude -p "/weekly-review"` кожного понеділка |
 | Inbox processing | `claude -p` при появі нових файлів у `00-Inbox/` |
 
+## Notification hooks для фонових агентів (з v2.1.198, 1 липня 2026)
+
+Claude Code додав події хуків `agent_needs_input` та `agent_completed`, що спрацьовують саме для фонових/хмарних агентів. Це формалізує момент, коли рутина (harness) має надіслати сповіщення або передати керування далі, замість того щоб агент вирішував це вручну в кожному промпті.
+
+Того ж релізу фонові агенти отримали можливість самостійно робити commit, push і відкривати draft PR по завершенню кодової задачі — варто звірити з правилом «не пушити без прохання користувача» для хмарних рутин Meweek (`daily-ai-digest` тощо), щоб авто-PR не з'являлись там, де це небажано.
+
 ## Важливо після 15 червня 2026
 
 `claude -p` (headless режим) переходить на Agent SDK Credit Pool. Обліковувати використання, щоб не перевищити ліміт кредитів ($20/міс для Pro).
@@ -58,3 +64,5 @@ done
 - [Boris Cherny — Fortune, 11 червня 2026](https://fortune.com/2026/06/11/anthropic-claude-boris-cherny-doesnt-write-code-by-hand-anymore/)
 - [Loop Engineering Guide (explainx.ai)](https://explainx.ai/blog/loop-engineering-coding-agents-claude-code-guide-2026)
 - [Anthropic Engineer Loops Article](https://explainx.ai/blog/anthropic-engineer-loops-prompts-ai-coding-harness-engineering-2026)
+- [Claude Code Changelog v2.1.198](https://code.claude.com/docs/en/changelog)
+- [[AI Дайджест 2026-07-02]]
